@@ -20,12 +20,17 @@ import importlib.util  # noqa: E402
 _spec = importlib.util.spec_from_file_location('bf_grade', HERE / 'bench/browser_flow/grade.py')
 bf_grade = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(bf_grade)
+_spec2 = importlib.util.spec_from_file_location('ds_grade', HERE / 'bench/own_app_flow/grade.py')
+ds_grade = importlib.util.module_from_spec(_spec2)
+_spec2.loader.exec_module(ds_grade)
 
 FF_TASK_FILES = [HERE / 'bench/find_feature/tasks/lexical.json',
                  HERE / 'bench/find_feature/tasks/semantic.json']
 SUCCESS = {'find_feature': {'correct'}, 'fix_bug': {'fixed'}, 'fix_bug_hard': {'fixed'},
-           'write_tests': {'catches-bug'}, 'browser_flow': {'correct'}}
+           'write_tests': {'catches-bug'}, 'browser_flow': {'correct'}, 'own_app_flow': {'correct'}}
 BF_TASKS = {t['id']: t for t in json.loads((HERE / 'bench/browser_flow/tasks.json').read_text())['tasks']}
+_ds = HERE / 'bench/own_app_flow/tasks.json'
+DS_TASKS = {t['id']: t for t in json.loads(_ds.read_text())['tasks']} if _ds.exists() else {}
 
 
 def load_ff_tasks():
@@ -114,6 +119,9 @@ def main():
                 family = ff_tasks[r['id']]['family']
             elif bench == 'browser_flow':
                 outcome, detail = bf_grade.grade_one(BF_TASKS[r['id']], r)
+                family = bench
+            elif bench == 'own_app_flow':
+                outcome, detail = ds_grade.grade_one(DS_TASKS[r['id']], r)
                 family = bench
             else:
                 key = f"{r['model_requested']} / {effort} / {r['trial']} / {r['id']}"

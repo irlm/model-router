@@ -57,7 +57,8 @@ def grade_one(wt, build_dir, task, record):
         if ran == 0:
             if not clean['passed'] and ('error' in clean['output_tail'].lower()
                                         and '0 tests run' not in clean['output_tail']):
-                return 'compile-fail', clean['output_tail'][-400:]
+                errors = [l.strip() for l in clean['output'].splitlines() if 'error:' in l][:3]
+                return 'compile-fail', ' | '.join(errors)[:400] or clean['output_tail'][-400:]
             return 'empty-suite', 'built but ran 0 cases'
         if c_fail:
             # Not deliverable as written, but record whether the suite
@@ -68,7 +69,8 @@ def grade_one(wt, build_dir, task, record):
             return 'fails-on-correct-code', (f'cases={ran} clean_fail={c_fail} '
                                              f'bug_fail={b_fail} detects={b_fail > c_fail}')
         if not clean['passed']:
-            return 'compile-fail', clean['output_tail'][-400:]
+            errors = [l.strip() for l in clean['output'].splitlines() if 'error:' in l][:3]
+            return 'compile-fail', ' | '.join(errors)[:400] or clean['output_tail'][-400:]
         W.seed_mutation(wt, task)
         buggy = W.run_suite(wt, build_dir, KUNITCONFIG)
         b_pass, b_fail, b_skip, b_ran = run_totals(buggy['output'])

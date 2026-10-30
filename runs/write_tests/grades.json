@@ -59,12 +59,6 @@
   "kunit_cases": 22,
   "test_bytes": 7199
  },
- "claude-sonnet-5-5 / low / 1 / test-cmdline-01-get_option": {
-  "outcome": "compile-fail",
-  "detail": "Projects/Github/$KERNEL_TREE-wt/grade-tests/scripts/Makefile.build:478: lib] Error 2\nmake[2]: *** [$KERNEL_WT/grade-tests/Makefile:1936: .] Error 2\nmake[1]: *** [$KERNEL_WT/grade-tests/Makefile:224: __sub-make] Error 2\nmake: *** [Makefile:224: __sub-make] Error 2\n",
-  "kunit_cases": 20,
-  "test_bytes": 6185
- },
  "claude-haiku-5-5 / low / 1 / test-string_helpers-02-string_escape_mem": {
   "outcome": "fails-on-correct-code",
   "detail": "cases=20 clean_fail=1 bug_fail=15 detects=True",
@@ -100,5 +94,269 @@
   "detail": "cases=14 failing_on_bug=7",
   "kunit_cases": 14,
   "test_bytes": 9634
+ },
+ "claude-fable-5-1 / low / 1 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=15 failing_on_bug=5",
+  "kunit_cases": 15,
+  "test_bytes": 17181
+ },
+ "claude-haiku-5-5 / low / 1 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=26 failing_on_bug=12",
+  "kunit_cases": 26,
+  "test_bytes": 10283
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=10 failing_on_bug=7",
+  "kunit_cases": 10,
+  "test_bytes": 4534
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=16 failing_on_bug=12",
+  "kunit_cases": 16,
+  "test_bytes": 11407
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=12 failing_on_bug=7",
+  "kunit_cases": 12,
+  "test_bytes": 6267
+ },
+ "claude-haiku-5-5 / low / 1 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=11 (kernel crashed on bug: \".427s total, 0.001s configuring, 3.421s building, 0.005s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 11,
+  "test_bytes": 6835
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=15 failing_on_bug=12",
+  "kunit_cases": 15,
+  "test_bytes": 4199
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=15 failing_on_bug=13",
+  "kunit_cases": 15,
+  "test_bytes": 6433
+ },
+ "claude-fable-5-1 / low / 1 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=26 clean_fail=1 bug_fail=21 detects=True",
+  "kunit_cases": 26,
+  "test_bytes": 22055
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=29 failing_on_bug=24",
+  "kunit_cases": 29,
+  "test_bytes": 7648
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=16 failing_on_bug=4",
+  "kunit_cases": 16,
+  "test_bytes": 8705
+ },
+ "claude-haiku-5-5 / low / 1 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=9 failing_on_bug=5",
+  "kunit_cases": 9,
+  "test_bytes": 8670
+ },
+ "claude-haiku-5-5 / low / 1 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=6 failing_on_bug=2",
+  "kunit_cases": 6,
+  "test_bytes": 6439
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=9 failing_on_bug=3",
+  "kunit_cases": 9,
+  "test_bytes": 8069
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "catches-bug",
+  "detail": "cases=21 failing_on_bug=18",
+  "kunit_cases": 21,
+  "test_bytes": 8377
+ },
+ "claude-fable-5-1 / low / 1 / test-string_helpers-03-string_unescape": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=18 clean_fail=1 bug_fail=15 detects=True",
+  "kunit_cases": 18,
+  "test_bytes": 18366
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "catches-bug",
+  "detail": "cases=30 failing_on_bug=21",
+  "kunit_cases": 30,
+  "test_bytes": 13692
+ },
+ "claude-haiku-5-5 / low / 1 / test-cmdline-01-get_option": {
+  "outcome": "compile-fail",
+  "detail": "$KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer",
+  "kunit_cases": 23,
+  "test_bytes": 7056
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-string_helpers-03-string_unescape": {
+  "outcome": "catches-bug",
+  "detail": "cases=19 failing_on_bug=13",
+  "kunit_cases": 19,
+  "test_bytes": 9344
+ },
+ "claude-sonnet-5-5 / low / 1 / test-cmdline-01-get_option": {
+  "outcome": "compile-fail",
+  "detail": "$KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer | $KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer | $KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid ini",
+  "kunit_cases": 20,
+  "test_bytes": 6185
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=13 failing_on_bug=5",
+  "kunit_cases": 13,
+  "test_bytes": 12327
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "catches-bug",
+  "detail": "cases=22 failing_on_bug=19",
+  "kunit_cases": 22,
+  "test_bytes": 15459
+ },
+ "claude-fable-5-1 / low / 1 / test-cmdline-01-get_option": {
+  "outcome": "compile-fail",
+  "detail": "$KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer | $KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer | $KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid ini",
+  "kunit_cases": 16,
+  "test_bytes": 11023
+ },
+ "claude-fable-5-1 / low / 1 / test-cmdline-02-get_options": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=41 clean_fail=2 bug_fail=30 detects=True",
+  "kunit_cases": 41,
+  "test_bytes": 17546
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-string_helpers-03-string_unescape": {
+  "outcome": "catches-bug",
+  "detail": "cases=30 failing_on_bug=15",
+  "kunit_cases": 30,
+  "test_bytes": 12232
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-cmdline-01-get_option": {
+  "outcome": "catches-bug",
+  "detail": "cases=29 failing_on_bug=8",
+  "kunit_cases": 29,
+  "test_bytes": 10217
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=28 failing_on_bug=13",
+  "kunit_cases": 28,
+  "test_bytes": 10287
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=18 (kernel crashed on bug: \".341s total, 0.001s configuring, 3.336s building, 0.005s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 18,
+  "test_bytes": 5968
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-cmdline-01-get_option": {
+  "outcome": "catches-bug",
+  "detail": "cases=10 failing_on_bug=6",
+  "kunit_cases": 10,
+  "test_bytes": 4260
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=23 failing_on_bug=11",
+  "kunit_cases": 23,
+  "test_bytes": 6929
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=8 (kernel crashed on bug: \".381s total, 0.001s configuring, 3.375s building, 0.005s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 8,
+  "test_bytes": 2810
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=10 failing_on_bug=3",
+  "kunit_cases": 10,
+  "test_bytes": 6017
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=12 failing_on_bug=6",
+  "kunit_cases": 13,
+  "test_bytes": 6799
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-string_helpers-03-string_unescape": {
+  "outcome": "catches-bug",
+  "detail": "cases=11 failing_on_bug=8",
+  "kunit_cases": 11,
+  "test_bytes": 12405
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-cmdline-01-get_option": {
+  "outcome": "catches-bug",
+  "detail": "cases=11 failing_on_bug=4",
+  "kunit_cases": 11,
+  "test_bytes": 6486
+ },
+ "claude-fable-5-1 / low / 1 / test-cmdline-03-memparse": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=22 clean_fail=1 bug_fail=0 detects=False",
+  "kunit_cases": 22,
+  "test_bytes": 15940
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=8 failing_on_bug=3",
+  "kunit_cases": 8,
+  "test_bytes": 8511
+ },
+ "claude-fable-5-1 / low / 1 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=14 failing_on_bug=5",
+  "kunit_cases": 14,
+  "test_bytes": 16069
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=10 failing_on_bug=7",
+  "kunit_cases": 10,
+  "test_bytes": 8167
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=35 failing_on_bug=23",
+  "kunit_cases": 35,
+  "test_bytes": 13644
+ },
+ "claude-fable-5-1 / low / 1 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=12 failing_on_bug=5",
+  "kunit_cases": 12,
+  "test_bytes": 16029
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=18 (kernel crashed on bug: \".384s total, 0.001s configuring, 3.378s building, 0.005s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 18,
+  "test_bytes": 10691
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=16 failing_on_bug=10",
+  "kunit_cases": 16,
+  "test_bytes": 16839
+ },
+ "claude-fable-5-1 / low+kunit / 1 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=10 failing_on_bug=8",
+  "kunit_cases": 10,
+  "test_bytes": 12405
  }
 }

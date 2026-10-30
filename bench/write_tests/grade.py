@@ -26,7 +26,8 @@ TOTAL_RE = re.compile(r'# (\S+): pass:(\d+) fail:(\d+) skip:(\d+) total:(\d+)')
 
 def suite_totals(output):
     """{suite: (pass, fail, skip, total)} from kunit.py output."""
-    return {m.group(1): tuple(int(x) for x in m.groups()[1:]) for m in TOTAL_RE.finditer(output)}
+    return {m.group(1): tuple(int(x) for x in m.groups()[1:])
+            for m in TOTAL_RE.finditer(output) if m.group(1) != 'Totals'}
 
 
 def grade_one(wt, build_dir, task, record):

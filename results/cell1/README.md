@@ -37,20 +37,20 @@ about $0.55 of the $0.58 per call. Model choice changes the price of that overhe
 - One trial per cell. Whether Haiku's 70/72 is a stable 97% or noise around 100% is unknown; the
   earlier run of Haiku, in the author's previous evaluation repository, at medium effort scored 72/72 on the same tasks.
 
-## Iterations (same day)
+## Iterations (2026-10-29 and 2026-10-30)
 
-| Model | Effort | Trial | correct / 72 | cost total | note |
+| Model | Effort | Trials | Correct | Cold cost per task | Note |
 |---|---|---|---|---|---|
-| claude-haiku-5-5 | low | 2 | 72 | $0.29 | repeat of trial 1's prompts: caches warm, cost not comparable |
-| claude-haiku-5-5 | low | 3 | 72 | $0.23 | same |
-| claude-haiku-5-5 | medium | 1 | 72 | $0.47 | effort lever on the cheapest model |
+| claude-haiku-5-5 | low | 3 | 214 of 216 | $0.0067 | misses: fields-06, callers-10 (trial 1 only) |
+| claude-haiku-5-5 | medium | 3 | 213 of 216 | $0.0065 | misses: refs-05, refs-10 (trial 2), fields-06 (trial 3) |
+| claude-sonnet-5-5 | low | 2 | 144 of 144 | $0.119 and $0.115 | trial 2 ran the next day, cache cold again |
+| claude-fable-5-1 | low | 1 | 72 of 72 | $0.578 | |
 
-- Haiku at low effort: 214 of 216 over three trials (99.1%). The two misses did not repeat; they are
-  noise around a high rate, not a stable failure on specific tasks. Haiku at medium: 72 of 72, one trial.
-  With these sample sizes, 99% and 100% are not distinguishable.
-- Repeat trials reuse the prompt cache written by trial 1 (identical conversations read everything,
-  see `PREFIX.md`), so only trial 1 of each cell carries a fair cold-session cost. Repeat trials
-  measure accuracy variance only.
+- Haiku lands at 98.8% over 432 calls at either effort; medium effort did not help it. The misses are
+  scattered, except `fields-06`, which it missed twice in six trials.
+- Sonnet is 144 of 144 over two cold trials; its cost per task is stable across days.
+- Repeat trials run on the same day reuse the prompt cache written by trial 1 (identical conversations
+  read everything, see `PREFIX.md`), so same-day repeat costs are lower and not comparable.
 - Prefix test: see `PREFIX.md`. About 95k tokens of fixed prefix per new session on every model,
   27k of it written at the 1-hour cache rate; the 184 agent files are about 17k of it.
 
@@ -58,11 +58,10 @@ about $0.55 of the $0.58 per call. Model choice changes the price of that overhe
 
 Family "find a feature in a huge codebase, agent with search tools":
 
-- Default: `claude-haiku-5-5` at medium effort. 72/72 at medium, 99.1% at low, about 1/18 of
-  Sonnet's cost per session and 1/86 of Fable's.
-- Step-up when the answer is not checkable and a miss is expensive: `claude-sonnet-5-5` at low effort
-  (72/72, one trial). Fable bought nothing on this family at 4.9x Sonnet's cost.
+- Default: `claude-haiku-5-5` at low effort, 98.8% over 432 calls, about 1/18 of Sonnet's cost per
+  session and 1/86 of Fable's. Medium effort buys nothing here.
+- Step-up when a 1-in-80 miss is expensive: `claude-sonnet-5-5` at low effort, 144 of 144 over two
+  cold trials. Fable bought nothing on this family at 4.9x Sonnet's cost.
 - No escalation rule: lookup answers carry no failure signal (misses were confident, not "unknown").
-- Still open before deciding: Sonnet has one trial; Haiku medium has one trial; the family is
-  saturated, so it cannot rank Sonnet against Fable. Harder families with a checker (write tests,
+- Still open before deciding: the family is saturated for Sonnet and Fable, so it cannot rank them. Harder families with a checker (write tests,
   fix bugs, browser flows) are where the models will separate and where escalation can be measured.

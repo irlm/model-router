@@ -70,7 +70,7 @@ def main():
     ap.add_argument('--max-turns', type=int, default=15)
     ap.add_argument('--tools', default='Read Glob Grep')
     ap.add_argument('--timeout', type=int, default=900)
-    ap.add_argument('--out', type=Path, default=here.parents[1] / 'runs')
+    ap.add_argument('--out', type=Path, default=here.parents[1] / 'runs/find_feature')
     args = ap.parse_args()
 
     tree, tasks = load_tasks(args.tasks, args.ids, args.limit)

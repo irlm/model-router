@@ -37,9 +37,32 @@ about $0.55 of the $0.58 per call. Model choice changes the price of that overhe
 - One trial per cell. Whether Haiku's 70/72 is a stable 97% or noise around 100% is unknown; the
   earlier run of Haiku, in the author's previous evaluation repository, at medium effort scored 72/72 on the same tasks.
 
-## Next iterations (cheap, running)
+## Iterations (same day)
 
-1. Haiku low, trials 2 and 3: variance.
-2. Haiku medium, trial 1: the effort lever on the cheapest model.
-3. Prefix test: one trivial call with and without the 184 agent files, to size the per-session
-   cache write that dominates every bill.
+| Model | Effort | Trial | correct / 72 | cost total | note |
+|---|---|---|---|---|---|
+| claude-haiku-5-5 | low | 2 | 72 | $0.29 | repeat of trial 1's prompts: caches warm, cost not comparable |
+| claude-haiku-5-5 | low | 3 | 72 | $0.23 | same |
+| claude-haiku-5-5 | medium | 1 | 72 | $0.47 | effort lever on the cheapest model |
+
+- Haiku at low effort: 214 of 216 over three trials (99.1%). The two misses did not repeat; they are
+  noise around a high rate, not a stable failure on specific tasks. Haiku at medium: 72 of 72, one trial.
+  With these sample sizes, 99% and 100% are not distinguishable.
+- Repeat trials reuse the prompt cache written by trial 1 (identical conversations read everything,
+  see `PREFIX.md`), so only trial 1 of each cell carries a fair cold-session cost. Repeat trials
+  measure accuracy variance only.
+- Prefix test: see `PREFIX.md`. About 95k tokens of fixed prefix per new session on every model,
+  27k of it written at the 1-hour cache rate; the 184 agent files are about 17k of it.
+
+## What this cell would say, if it were the decision (it is not yet)
+
+Family "find a feature in a huge codebase, agent with search tools":
+
+- Default: `claude-haiku-5-5` at medium effort. 72/72 at medium, 99.1% at low, about 1/18 of
+  Sonnet's cost per session and 1/86 of Fable's.
+- Step-up when the answer is not checkable and a miss is expensive: `claude-sonnet-5-5` at low effort
+  (72/72, one trial). Fable bought nothing on this family at 4.9x Sonnet's cost.
+- No escalation rule: lookup answers carry no failure signal (misses were confident, not "unknown").
+- Still open before deciding: Sonnet has one trial; Haiku medium has one trial; the family is
+  saturated, so it cannot rank Sonnet against Fable. Harder families with a checker (write tests,
+  fix bugs, browser flows) are where the models will separate and where escalation can be measured.

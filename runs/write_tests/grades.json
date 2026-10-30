@@ -64,5 +64,41 @@
   "detail": "Projects/Github/$KERNEL_TREE-wt/grade-tests/scripts/Makefile.build:478: lib] Error 2\nmake[2]: *** [$KERNEL_WT/grade-tests/Makefile:1936: .] Error 2\nmake[1]: *** [$KERNEL_WT/grade-tests/Makefile:224: __sub-make] Error 2\nmake: *** [Makefile:224: __sub-make] Error 2\n",
   "kunit_cases": 20,
   "test_bytes": 6185
+ },
+ "claude-haiku-5-5 / low / 1 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=20 clean_fail=1 bug_fail=15 detects=True",
+  "kunit_cases": 20,
+  "test_bytes": 13488
+ },
+ "claude-haiku-5-5 / low / 1 / test-string_helpers-03-string_unescape": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=15 clean_fail=2 bug_fail=12 detects=True",
+  "kunit_cases": 15,
+  "test_bytes": 11142
+ },
+ "claude-sonnet-5-5 / low / 1 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=19 failing_on_bug=11",
+  "kunit_cases": 19,
+  "test_bytes": 7148
+ },
+ "claude-sonnet-5-5 / low / 1 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=11 (kernel crashed on bug: \".096s total, 0.002s configuring, 9.082s building, 0.012s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 11,
+  "test_bytes": 4176
+ },
+ "claude-sonnet-5-5 / low / 1 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=10 failing_on_bug=7",
+  "kunit_cases": 11,
+  "test_bytes": 6568
+ },
+ "claude-sonnet-5-5 / low / 1 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=14 failing_on_bug=7",
+  "kunit_cases": 14,
+  "test_bytes": 9634
  }
 }

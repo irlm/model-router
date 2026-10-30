@@ -10,6 +10,9 @@ Status: scaffold and first cell (2026-10-29). See `results/` for what has actual
 
 - `catalog/models.json`: models, API prices, verified date and source. Prices are not in the providers'
   model-list APIs, so a new model is "price unknown" until a human fills it in.
+- `catalog/discover.py`: the thing to run after a launch. Lists live models per provider, diffs against the
+  catalog, flags new ids, delisted ids and stale prices. Needs `ANTHROPIC_API_KEY` (or the anthropic SDK
+  with an `ant auth login` profile) and `OPENAI_API_KEY`; without them it says so and checks only staleness.
 - `bench/find_feature/`: the "find a feature in a huge codebase" family. Agent with file and search
   tools inside a pinned Linux v6.12 tree, web off. 48 lexical tasks with string-verified truth plus
   24 semantic tasks with hand-classified truth. Copied from the author's earlier evaluation repository, see `PROVENANCE.md`.

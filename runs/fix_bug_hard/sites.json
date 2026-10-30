@@ -1,0 +1,782 @@
+{
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"Fixed get_option to skip the leading '-' with ++cur instead of --cur, and fixed get_options to stop only when no comma follows (res == 1) rather than b"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"Fixed two pointer-direction bugs in lib/cmdline.c: get_option now advances past the leading '-' (++cur) when parsing negative numbers, and get_range no"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\", \"lib/kstrtox.c\"], \"summary\": \"Fixed get_option() to skip past a leading '-' (++cur instead of --cur) and restored the inverted '0' prefix check in _parse_integer_fi"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\", \"lib/kstrtox.c\"], \"summary\": \"Fixed get_option() stepping backward (--cur instead of ++cur) past a leading '-', and _parse_integer_limit() accepting digits equal to"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two sign/direction bugs in lib/string_helpers.c: string_get_size decremented the exponent (i--) instead of incrementing while reducing lar"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed string_unescape to only treat a backslash as an escape when followed by a non-NUL character (src[1] != '\\\\0'), and fixed string_escape_mem"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed string_get_size to increment (not decrement) the exponent while reducing a large size, and fixed string_unescape to only treat a backslash"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed string_get_size decrementing instead of incrementing the exponent while reducing a >32-bit size (yielding 'UNK' units), and fixed escape_p"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "All 20 tests pass.\n\n{\"changed_files\": [\"lib/string.c\"], \"summary\": \"Fixed two pointer-direction bugs in lib/string.c: strncasecmp decremented s1 instead of incrementing it, and strcspn walked its poin"
+ },
+ "claude-fable-5-1 / low+kunit / 1 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/siphash.c\"], \"summary\": \"Restored the tail-byte mask in __siphash_aligned and __hsiphash_aligned from `len & (sizeof(u64) - 2)` to `len & (sizeof(u64) - 1)`, so odd remaining b"
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_option(), the negative-number path decremented the cursor (--cur) instead of skipping the leading '-' (++cur), so negative values like \\\"-3\\\" ne"
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In lib/cmdline.c, get_option now advances past a leading '-' (++cur instead of --cur) so negative numbers parse, and get_range fills the output array f"
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   false
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"get_option() decremented the cursor (--cur) instead of advancing past the leading '-' (++cur) when parsing negative numbers, so strings like \\\"-3,...\\\""
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   false
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_option(), the negative-number branch decremented the cursor (--cur) instead of skipping past the '-' (++cur), so values like \\\"-3\\\" were never p"
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed string_get_size decrementing the unit exponent (i--) instead of incrementing when reducing a large size, and fixed string_escape_mem readi"
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   false,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed inverted check in string_unescape() so escape sequences are processed when a character follows the backslash (src[1] != '\\\\0') instead of "
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"In lib/string_helpers.c, fixed string_get_size decrementing instead of incrementing the exponent while reducing size (producing bogus 'UNK' unit"
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed string_get_size decrementing instead of incrementing the exponent when reducing a large size (yielding a negative index and 'UNK'), and fi"
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string.c\"], \"summary\": \"strncasecmp() walked s1 backwards (*s1--) instead of forwards; changed to *s1++ so both strings advance together.\"}"
+ },
+ "claude-fable-5-1 / low / 1 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/siphash.c\"], \"summary\": \"Restored the tail-length mask in __siphash_aligned and __hsiphash_aligned from `len & (sizeof(u64) - 2)` back to `len & (sizeof(u64) - 1)`, so odd left"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"Fixed three bugs in lib/cmdline.c: get_option() used `--cur` instead of `++cur` when skipping a leading '-' so negative numbers after a comma were mis-"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In lib/cmdline.c, get_option() stepped backwards (`--cur`) instead of skipping the leading '-' (`++cur`), and get_range() walked its output pointer bac"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\", \"lib/kstrtox.c\"], \"summary\": \"The seed commit introduced two bugs: `get_option()` in lib/cmdline.c used `--cur` instead of `++cur` for a leading '-', and `_parse_in"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\", \"lib/kstrtox.c\"], \"summary\": \"Two bugs: `get_option()` in lib/cmdline.c stepped back with `--cur` instead of `++cur` when parsing a leading minus, and `_parse_integ"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"string_escape_mem() read its input backwards (`*src--`) instead of forwards, and string_get_size() decremented the unit index (`i--`) in the siz"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two inverted/wrong-direction bugs in lib/string_helpers.c: string_unescape() had its backslash guard inverted (`src[1] == '\\\\0'` instead o"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Two bugs in lib/string_helpers.c: string_get_size() decremented the unit index (`i--`) instead of incrementing it when reducing a large size, an"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed three bugs in lib/string_helpers.c: string_get_size's size-reduction loop used `i--` instead of `i++` (driving the unit index negative so "
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string.c\"], \"summary\": \"Fixed two pointer-direction bugs in lib/string.c: strncasecmp read `*s1--` instead of `*s1++`, and strcspn looped with `--p` instead of `++p`; the strin"
+ },
+ "claude-haiku-5-5 / low+kunit / 1 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/siphash.c\"], \"summary\": \"The 64-bit aligned SipHash and HalfSipHash tail computations used `len & (sizeof(u64) - 2)` (mask 6) instead of `sizeof(u64) - 1` (mask 7), dropping th"
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In lib/cmdline.c, get_option() used `--cur` instead of `++cur` when skipping a leading '-', so negative numbers were not parsed, and get_options() brok"
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   false,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_range() (lib/cmdline.c), the expanded range values were written with `*pint--`, which moved the output pointer backwards; changed it to `*pint++"
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   false
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_option(), a leading '-' was handled with `--cur` (pre-decrement), so the number was parsed from the character before the '-' rather than the dig"
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   false
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_option() (lib/cmdline.c), a leading '-' was handled with `simple_strtoull(--cur, ...)`, which parsed from the byte before the minus sign and so "
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two bugs in lib/string_helpers.c: string_get_size() decremented the exponent when reducing a huge size (i-- should be i++, which caused th"
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   false,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"In string_unescape(), the escape-sequence guard tested `src[1] == '\\\\0'` instead of `src[1] != '\\\\0'`, so backslash escapes were never decoded ("
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two inverted checks in lib/string_helpers.c: string_get_size() decremented the exponent `i` when reducing `size` (it must increment, like "
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two bugs in lib/string_helpers.c: string_get_size() decremented the exponent `i` in its size-reduction loop instead of incrementing it (ca"
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string.c\"], \"summary\": \"strncasecmp() in lib/string.c read the first string with `*s1--` (walking backwards) instead of `*s1++`, so it compared the wrong bytes; changed it to `"
+ },
+ "claude-haiku-5-5 / low / 1 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/siphash.c\"], \"summary\": \"The 64-bit `__siphash_aligned` and `__hsiphash_aligned` functions computed the tail length with `len & (sizeof(u64) - 2)`, which drops bit 0 and miscou"
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In lib/cmdline.c, get_option() used `--cur` instead of `++cur` when parsing a leading hyphen, and get_options() broke out of its loop when `res != 1` i"
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"Fixed two typos in lib/cmdline.c: `get_range()` wrote range values with `*pint--` instead of `*pint++`, and `get_option()` parsed a leading hyphen with"
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\", \"lib/kstrtox.c\"], \"summary\": \"Fixed two bugs: get_option() in lib/cmdline.c used `--cur` instead of `++cur` after a leading '-', and `_parse_integer_fixup_radix()` "
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\", \"lib/kstrtox.c\"], \"summary\": \"Fixed two bugs: get_option() used `--cur` instead of `++cur` when parsing negative numbers, and _parse_integer_limit() rejected only d"
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two typos in lib/string_helpers.c: `string_get_size()` decremented the unit index (`i--`) when reducing size instead of incrementing it, a"
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two bugs in lib/string_helpers.c: string_unescape tested `src[1] == '\\\\0'` instead of `!= '\\\\0'`, and string_escape_mem walked the source "
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two bugs in lib/string_helpers.c: `string_unescape` tested `src[1] == '\\\\0'` instead of `!= '\\\\0'`, and `string_get_size` decremented `i` "
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two bugs in lib/string_helpers.c: the size-reduction loop in string_get_size decremented the exponent (i--) instead of incrementing it, an"
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "All 20 tests now pass, so I'm sending the result.\n\n{\"changed_files\": [\"lib/string.c\"], \"summary\": \"Fixed two pointer-direction typos in lib/string.c: strncasecmp advanced s1 with `s1--` instead of `s1"
+ },
+ "claude-sonnet-5-5 / low+kunit / 1 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/siphash.c\"], \"summary\": \"Fixed the tail-length mask in the aligned siphash and hsiphash functions in lib/siphash.c, which used `sizeof(u64) - 2` instead of `sizeof(u64) - 1`, a"
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   false,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_options(), the loop-exit check was inverted (`res != 1` instead of `res == 1`), so parsing stopped after the first comma or range instead of at "
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   false,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_range(), the range expansion wrote values with `*pint--` and so walked backwards through the array. I changed it to `*pint++`. I couldn't build "
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   false
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_option(), the negative-number branch used `--cur` instead of `++cur`, so it parsed from the wrong position and the leading hyphen was never skip"
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   false
+  ],
+  "summary": "{\"changed_files\": [\"lib/cmdline.c\"], \"summary\": \"In get_option(), a leading '-' was handled with `--cur` instead of `++cur`. The sign was re-parsed from the wrong position, which broke negative number"
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"In lib/string_helpers.c, `string_get_size` now does `i++` instead of `i--` when reducing `size`, and `string_escape_mem` reads the source with `"
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   false,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"In string_unescape(), the escape check tested `src[1] == '\\\\0'` instead of `src[1] != '\\\\0'`, so escape sequences were never unescaped; I restor"
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   false,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed string_get_size's Napier reduction, which now adds 2 to the exponent per divide in both loops instead of \u00b11, and string_unescape's escape "
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string_helpers.c\"], \"summary\": \"Fixed two bugs in lib/string_helpers.c: string_get_size() decremented the exponent (i--) instead of incrementing it when reducing size, and esca"
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "still-failing",
+  "applied": true,
+  "restored": [
+   true,
+   false
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/string.c\"], \"summary\": \"strncasecmp() decremented the s1 pointer (`*s1--`) instead of incrementing it, so I changed it to `*s1++`.\"}"
+ },
+ "claude-sonnet-5-5 / low / 1 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "applied": true,
+  "restored": [
+   true,
+   true
+  ],
+  "files_touched": [
+   true,
+   true
+  ],
+  "summary": "{\"changed_files\": [\"lib/siphash.c\"], \"summary\": \"Fixed the tail-length mask in __siphash_aligned and __hsiphash_aligned (the 64-bit hsiphash variant), where `sizeof(u64) - 2` should have been `sizeof("
+ }
+}

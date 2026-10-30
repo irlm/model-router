@@ -4,7 +4,7 @@ Which model, at which effort, for which kind of agent work, measured on our own 
 The output is a routing strategy per task family that agents read, with the numbers behind it,
 re-evaluated when a new model appears and repriced when a price changes.
 
-Status: routing v1 decided 2026-10-30 from three families, see `ROUTING.md`. `results/` holds what has actually run.
+Status: routing v1 decided 2026-10-30 from three families and revised after cell 3 (harder bugs), see `ROUTING.md`. `results/` holds what has actually run.
 
 ## Layout
 

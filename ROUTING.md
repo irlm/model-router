@@ -1,6 +1,7 @@
 # Routing v1: which model, at which effort, for which kind of agent work
 
-Decided 2026-10-30 from three families measured on our own tasks (`results/cell1`, `results/cell2`).
+Decided 2026-10-30 from three families measured on our own tasks (`results/cell1`, `results/cell2`),
+revised the same day after cell 3 (harder bugs, `results/cell3`).
 Machine-readable copy: `routing.json`. Applied to the agent files with `apply_agents.py`.
 This is version 1. It covers three families and says "no decision" for the rest.
 
@@ -15,7 +16,7 @@ and none of the three measured families needed it.
 | Family | Default | Step-up | Escalation rule | Evidence (all at effort low) |
 |---|---|---|---|---|
 | **Find a feature in a huge codebase.** Locate code, callers, struct fields, dispatch targets with search tools. No writes. | `haiku`, `low` | `sonnet`, `low`, when a 1-in-80 wrong answer costs more than 18x the session | None. Misses are confident answers, so there is no failure signal to trigger on. | Haiku 214/216 over 3 trials (98.8%; medium effort 213/216, bought nothing). Sonnet 144/144 over 2 cold trials. Fable 72/72. Cold cost per task $0.0067 / $0.119 / $0.578. |
-| **Fix a bug with a failing test.** The test names the failing case; the agent reads and edits, no test runs. | `haiku`, `low` | `sonnet`, `low` | Run Haiku, run the suite, escalate if it still fails. Needs a runner. | 10/10 on every tier. Cost per task $0.012 / $0.149 / $0.748. **Provisional**: the bugs were single-site, every tier saturated; harder bugs are cell 3. |
+| **Fix a bug with a failing test.** The test names the failing case; the agent reads and edits. | `haiku`, `low`, **with the test runner in the loop** | None needed | Not needed with the runner: 21/21 at every tier. Without a runner no tier is reliable when there may be more than one defect, and a bigger model fails the same way. | Single-site bugs: 10/10 on every tier, no runs ($0.012 / $0.149 / $0.748 per task). Hard tier, 11 hidden-helper and 10 two-site bugs: with runner 21/21 on every tier ($0.014 / $0.197 / $0.885 per task); without runner 16 / 14 / 16 of 21, every miss a partial fix that stopped after one defect (`results/cell3`). |
 | **Write tests for a function.** Success = builds, passes on the real code, fails on a seeded bug. | `haiku`, `low`, **with the test runner in the loop** | None needed | Not needed: with the runner every tier is 10/10 | With runner 10/10 on every tier at $0.025 / $0.287 / $1.51 per task. Without runner 5 / 7 / 4 of 10, cost per success $0.049 / $0.370 / $4.58. Every tier ships wrong expected values when it cannot run. |
 | **Everything else** (review, design, writing, browser flows, data work) | `inherit` (unchanged) | | | No evidence. Not routed. |
 
@@ -27,9 +28,10 @@ Fable, and Sonnet already saturated every family.
 
 1. **Effort low first.** The one effort sweep (Haiku, find-feature) showed medium buying nothing.
    No family needed more than low on any tier.
-2. **A checker before a bigger model.** Haiku with a test runner beat Fable without one on quality
-   (10/10 vs 4/10) and on cost per success (180x). If an agent can be given build or tests, do that
-   before raising its model.
+2. **A checker before a bigger model.** Two families now show it. Write-tests: Haiku with a test
+   runner beat Fable without one on quality (10/10 vs 4/10) and cost per success (180x). Fix-bug,
+   hard tier: Haiku with the runner 21/21 at $0.014, Fable without it 16/21 at $1.127 per success
+   (80x). If an agent can be given build or tests, do that before raising its model.
 3. **No blind downgrade.** Where there is no mechanical checker, a cheap model's miss is silent.
    Unmeasured families stay on `inherit` until they are measured.
 4. **Count sessions, not tokens, on expensive models.** Each new headless session pays about
@@ -50,7 +52,7 @@ Fable, and Sonnet already saturated every family.
   | Agent file | Family | Set to |
   |---|---|---|
   | `engineering-codebase-onboarding-engineer.md` | find_feature | haiku / low |
-  | `engineering-minimal-change-engineer.md` | fix_bug | haiku / low (provisional) |
+  | `engineering-minimal-change-engineer.md` | fix_bug | haiku / low (it has Bash; it should run the tests before it finishes) |
   | `testing-api-tester.md` | write_tests | haiku / low (it has Bash, so it can run the tests) |
 
   The other 181 files are untouched. `CLAUDE_CODE_SUBAGENT_MODEL` is not set, on purpose: it
@@ -63,8 +65,8 @@ Fable, and Sonnet already saturated every family.
   test runners. That is the main thing v2 should test on one of the user's own projects.
 - The `claude` CLI is logged in with a claude.ai subscription. `cost_usd` in the receipts is the
   API-equivalent price, not a bill; on a subscription the saving is rate-limit headroom.
-- Cells 2 are one trial per cell, 10 tasks per family. Anthropic's bar for a production cutover
-  is about 50 cases and 5 trials. The find-feature family is past that bar for Haiku; the
+- Cells 2 and 3 are one trial per cell, 10 to 21 tasks per family. Anthropic's bar for a production
+  cutover is about 50 cases and 5 trials. The find-feature family is past that bar for Haiku; the
   other two are calibrations that all pointed the same way.
 
 ## When to re-check, and what to run
@@ -78,7 +80,8 @@ Fable, and Sonnet already saturated every family.
 
 ## What v1 does not decide
 
-- Harder bug fixing (multi-site, hidden helpers, cross-file): cell 3, running next.
+- Bugs that need a design change rather than a local fix: not measured (cell 3 covered hidden
+  helpers, cross-file callees and two-defect tasks).
 - Browser flows driven through Chrome MCP: no family yet.
 - Code review, architecture, writing: no checker, so no measured family; stays on `inherit`.
 - Non-Anthropic models: priced in the catalog, never run.

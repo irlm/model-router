@@ -26,3 +26,16 @@ Grades are cached in `runs/fix_bug/grades.json`.
   them at low effort. The family does not separate models yet; harder bugs (multi-site, cross-file,
   no test naming the function) are the next step.
 - One grade worktree, so grading is sequential.
+
+## Hard tier (cell 3)
+
+- `make_hard_tasks.py --worktree DIR --build-dir DIR` writes `tasks-hard.json`: hidden-helper
+  tasks (one mutation in a static helper or a callee in another file that no test names) and
+  two-site tasks (two verified mutations in two functions of one suite). Each candidate is kept
+  only if it compiles, boots, fails the paired suite and passes again when restored.
+- `run_agent.py ... --tasks tasks-hard.json --bench fix_bug_hard` runs the hard prompt (it does not
+  say how many defects there are). Add `--kunit --build-dir ABS` to let the agent run the suite.
+- `grade.py ... --tasks tasks-hard.json --runs ../../runs/fix_bug_hard` grades; receipts from the
+  runner arm are keyed `low+kunit`.
+- `analyze_sites.py --worktree DIR` reports, for two-site tasks, which seeded functions each patch
+  restored (`runs/fix_bug_hard/sites.json`).

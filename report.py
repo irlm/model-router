@@ -101,15 +101,17 @@ def main():
                 continue
             r = json.loads(line)
             bench = r.get('bench', 'find_feature')
+            variant = r.get('variant', 'noexec')
+            effort = r['effort'] + ('' if variant == 'noexec' else '+' + variant)
             if bench == 'find_feature':
                 outcome, detail = grade_ff(ff_tasks[r['id']], r, tree)
                 family = ff_tasks[r['id']]['family']
             else:
-                key = f"{r['model_requested']} / {r['effort']} / {r['trial']} / {r['id']}"
+                key = f"{r['model_requested']} / {effort} / {r['trial']} / {r['id']}"
                 g = cached[bench].get(key)
                 outcome, detail = (g['outcome'], g['detail']) if g else ('ungraded', '')
                 family = bench
-            cells[(bench, r['model_requested'], r['effort'], r['trial'])].append(
+            cells[(bench, r['model_requested'], effort, r['trial'])].append(
                 {'id': r['id'], 'family': family, 'outcome': outcome, 'detail': detail,
                  'cost': r.get('cost_usd'), 'turns': r.get('num_turns'),
                  'wall': r.get('wall_seconds')})

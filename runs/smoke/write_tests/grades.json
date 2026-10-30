@@ -1,8 +1,0 @@
-{
- "claude-haiku-5-5 / low / 1 / test-string-01-strncasecmp": {
-  "outcome": "fails-on-correct-code",
-  "detail": "cases=19 clean_fail=2 bug_fail=15 detects=True",
-  "kunit_cases": 19,
-  "test_bytes": 9602
- }
-}

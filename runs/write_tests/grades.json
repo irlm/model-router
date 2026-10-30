@@ -1,0 +1,68 @@
+{
+ "claude-fable-5-1 / low / 1 / test-string-01-strncasecmp": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=19 clean_fail=2 bug_fail=12 detects=True",
+  "kunit_cases": 19,
+  "test_bytes": 14007
+ },
+ "claude-fable-5-1 / low / 1 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=30 failing_on_bug=25",
+  "kunit_cases": 30,
+  "test_bytes": 14000
+ },
+ "claude-haiku-5-5 / low / 1 / test-string-01-strncasecmp": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=14 clean_fail=2 bug_fail=11 detects=True",
+  "kunit_cases": 14,
+  "test_bytes": 6721
+ },
+ "claude-haiku-5-5 / low / 1 / test-string-02-strcspn": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=16 clean_fail=1 bug_fail=13 detects=True",
+  "kunit_cases": 16,
+  "test_bytes": 6481
+ },
+ "claude-haiku-5-5 / low / 1 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=11 failing_on_bug=2",
+  "kunit_cases": 11,
+  "test_bytes": 6574
+ },
+ "claude-sonnet-5-5 / low / 1 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=14 failing_on_bug=11",
+  "kunit_cases": 14,
+  "test_bytes": 6588
+ },
+ "claude-sonnet-5-5 / low / 1 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=15 failing_on_bug=12",
+  "kunit_cases": 15,
+  "test_bytes": 4261
+ },
+ "claude-sonnet-5-5 / low / 1 / test-string_helpers-01-string_get_size": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=11 clean_fail=2 bug_fail=5 detects=True",
+  "kunit_cases": 11,
+  "test_bytes": 6300
+ },
+ "claude-sonnet-5-5 / low / 1 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "fails-on-correct-code",
+  "detail": "cases=20 clean_fail=1 bug_fail=16 detects=True",
+  "kunit_cases": 20,
+  "test_bytes": 8428
+ },
+ "claude-sonnet-5-5 / low / 1 / test-string_helpers-03-string_unescape": {
+  "outcome": "catches-bug",
+  "detail": "cases=22 failing_on_bug=13",
+  "kunit_cases": 22,
+  "test_bytes": 7199
+ },
+ "claude-sonnet-5-5 / low / 1 / test-cmdline-01-get_option": {
+  "outcome": "compile-fail",
+  "detail": "Projects/Github/$KERNEL_TREE-wt/grade-tests/scripts/Makefile.build:478: lib] Error 2\nmake[2]: *** [$KERNEL_WT/grade-tests/Makefile:1936: .] Error 2\nmake[1]: *** [$KERNEL_WT/grade-tests/Makefile:224: __sub-make] Error 2\nmake: *** [Makefile:224: __sub-make] Error 2\n",
+  "kunit_cases": 20,
+  "test_bytes": 6185
+ }
+}

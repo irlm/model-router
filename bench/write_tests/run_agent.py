@@ -23,6 +23,12 @@ Write a KUnit test suite for the function `{function}` defined in {file}. Write 
 
 When finished, reply with ONLY a JSON object: {{"test_cases": <number of KUNIT_CASE entries you wrote>, "summary": "<one sentence>"}}."""
 
+KUNIT_HINT = """You CAN build and run your suite in this session with exactly this command (it takes about a minute):
+
+    python3 tools/testing/kunit/kunit.py run --kunitconfig=agent.kunitconfig --build_dir={build_dir} --jobs=8
+
+Run it, read the output, and fix your suite until every case passes on the current code. A suite that fails on the current code is worthless."""
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -36,12 +42,22 @@ def main():
     ap.add_argument('--tools', default='Read Glob Grep Edit Write')
     ap.add_argument('--timeout', type=int, default=1500)
     ap.add_argument('--out', type=Path, default=HERE.parents[1] / 'runs/write_tests')
+    ap.add_argument('--kunit', action='store_true',
+                    help='let the agent build and run its suite (Bash restricted to kunit.py)')
+    ap.add_argument('--build-dir', type=Path, default=None,
+                    help='absolute build dir outside the worktree, used with --kunit')
     args = ap.parse_args()
+    variant = 'kunit' if args.kunit else 'noexec'
+    if args.kunit:
+        assert args.build_dir and args.build_dir.is_absolute(), '--kunit needs an absolute --build-dir'
+        args.tools = args.tools + ' Bash(python3 tools/testing/kunit/kunit.py:*)'
+        args.timeout = max(args.timeout, 3600)
     tasks = json.loads(args.tasks.read_text())['tasks']
     if args.ids:
         tasks = [t for t in tasks if t['id'] in set(args.ids)]
     args.out.mkdir(parents=True, exist_ok=True)
-    out = args.out / f'runs-{args.model}-{args.effort}-t{args.trial}.jsonl'
+    suffix = '' if variant == 'noexec' else '-' + variant
+    out = args.out / f'runs-{args.model}-{args.effort}{suffix}-t{args.trial}.jsonl'
     kept = []
     if out.exists():
         kept = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
@@ -55,10 +71,15 @@ def main():
                 continue
             W.reset(wt)
             wiring.apply(wt)
+            if args.kunit:
+                (Path(wt) / 'agent.kunitconfig').write_text((HERE / 'kunitconfig').read_text())
             W.git(wt, 'add', '-A')
             W.git(wt, '-c', 'user.email=bench@local', '-c', 'user.name=bench',
                   'commit', '-qm', 'wiring')
             prompt = PROMPT.format(function=task['function'], file=task['file'])
+            if args.kunit:
+                prompt = prompt.replace('You cannot run the build or the tests in this session.',
+                                        KUNIT_HINT.format(build_dir=args.build_dir))
             start = time.perf_counter()
             try:
                 reply = W.call_claude(prompt, args.model, args.effort, args.max_turns,
@@ -72,8 +93,10 @@ def main():
             status = W.git(wt, 'status', '--porcelain').stdout
             changed = [l[3:].strip() for l in status.splitlines()]
             other_patch = W.git(wt, 'diff', 'HEAD', '--', '.', ':!lib/agent_kunit.c').stdout
+            changed = [c for c in changed if c != 'agent.kunitconfig']
             record = {'id': task['id'], 'family': 'write_tests', 'bench': 'write_tests', 'arm': 'T',
                       'model_requested': args.model, 'effort': args.effort,
+                      'variant': variant,
                       'trial': args.trial, 'tools': args.tools, 'max_turns': args.max_turns,
                       'prompt_chars': len(prompt),
                       'wall_seconds': round(time.perf_counter() - start, 2),

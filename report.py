@@ -16,11 +16,16 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / 'bench/find_feature'))
 import grade  # noqa: E402
 import grade_semantic  # noqa: E402
+import importlib.util  # noqa: E402
+_spec = importlib.util.spec_from_file_location('bf_grade', HERE / 'bench/browser_flow/grade.py')
+bf_grade = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(bf_grade)
 
 FF_TASK_FILES = [HERE / 'bench/find_feature/tasks/lexical.json',
                  HERE / 'bench/find_feature/tasks/semantic.json']
 SUCCESS = {'find_feature': {'correct'}, 'fix_bug': {'fixed'}, 'fix_bug_hard': {'fixed'},
-           'write_tests': {'catches-bug'}}
+           'write_tests': {'catches-bug'}, 'browser_flow': {'correct'}}
+BF_TASKS = {t['id']: t for t in json.loads((HERE / 'bench/browser_flow/tasks.json').read_text())['tasks']}
 
 
 def load_ff_tasks():
@@ -107,6 +112,9 @@ def main():
             if bench == 'find_feature':
                 outcome, detail = grade_ff(ff_tasks[r['id']], r, tree)
                 family = ff_tasks[r['id']]['family']
+            elif bench == 'browser_flow':
+                outcome, detail = bf_grade.grade_one(BF_TASKS[r['id']], r)
+                family = bench
             else:
                 key = f"{r['model_requested']} / {effort} / {r['trial']} / {r['id']}"
                 g = cached[bench].get(key)

@@ -161,6 +161,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == '/':
             return self.send(login_page())
+        if self.path == '/favicon.ico':
+            return self.send('', 404)
         if not self.signed_in():
             self.note('denied', path=self.path)
             return self.redirect('/')

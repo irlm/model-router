@@ -1,0 +1,224 @@
+{
+ "checklist": [
+  "Sign in with username `tester` and password `wrong`: the page shows the message \"Invalid username or password\" and you are still on the sign-in page.",
+  "Sign in with username `tester` and password `letmein`: you land on the Items page and it shows \"Signed in as tester\".",
+  "Add an item with name `Pen`, quantity `3`, unit price `2.50`: a row `Pen` appears with line total 7.50.",
+  "Add an item with name `Notebook`, quantity `1`, unit price `3.25`: a row `Notebook` appears with line total 3.25.",
+  "The grand total shown is 10.75.",
+  "Open the Edit link of `Pen`, change the quantity to `4`, keep the rest, and Save: the `Pen` row shows line total 10.00 and the grand total is 13.25.",
+  "Press the Delete button of `Notebook`: the `Notebook` row is gone, the `Pen` row remains, and the grand total is 10.00.",
+  "Submit the Add item form with an empty name (quantity `1`, unit price `1.00`): the page shows \"Name is required\" and the table still has exactly one row.",
+  "Press Log out: you are on the sign-in page, and opening the Items page URL (/items) shows the sign-in page, not the items."
+ ],
+ "credentials": {
+  "username": "tester",
+  "password": "letmein"
+ },
+ "tasks": [
+  {
+   "id": "flow-01-none",
+   "defect": "none",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "pass",
+    "7": "pass",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": []
+  },
+  {
+   "id": "flow-02-wrong-password-accepted",
+   "defect": "wrong-password-accepted",
+   "truth": {
+    "1": "fail",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "pass",
+    "7": "pass",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": [
+    "1"
+   ]
+  },
+  {
+   "id": "flow-03-wrong-user-shown",
+   "defect": "wrong-user-shown",
+   "truth": {
+    "1": "pass",
+    "2": "fail",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "pass",
+    "7": "pass",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": [
+    "2"
+   ]
+  },
+  {
+   "id": "flow-04-line-total-adds",
+   "defect": "line-total-adds",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "fail",
+    "4": "fail",
+    "5": "fail",
+    "6": "fail",
+    "7": "fail",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": [
+    "3",
+    "4",
+    "5",
+    "6",
+    "7"
+   ]
+  },
+  {
+   "id": "flow-05-grand-total-skips-last",
+   "defect": "grand-total-skips-last",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "fail",
+    "6": "fail",
+    "7": "fail",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": [
+    "5",
+    "6",
+    "7"
+   ]
+  },
+  {
+   "id": "flow-06-grand-total-rounds",
+   "defect": "grand-total-rounds",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "fail",
+    "6": "fail",
+    "7": "pass",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": [
+    "5",
+    "6"
+   ]
+  },
+  {
+   "id": "flow-07-empty-name-accepted",
+   "defect": "empty-name-accepted",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "pass",
+    "7": "pass",
+    "8": "fail",
+    "9": "pass"
+   },
+   "fails": [
+    "8"
+   ]
+  },
+  {
+   "id": "flow-08-edit-not-saved",
+   "defect": "edit-not-saved",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "fail",
+    "7": "fail",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": [
+    "6",
+    "7"
+   ]
+  },
+  {
+   "id": "flow-09-edit-loses-name",
+   "defect": "edit-loses-name",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "fail",
+    "7": "fail",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": [
+    "6",
+    "7"
+   ]
+  },
+  {
+   "id": "flow-10-delete-wrong-row",
+   "defect": "delete-wrong-row",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "pass",
+    "7": "fail",
+    "8": "pass",
+    "9": "pass"
+   },
+   "fails": [
+    "7"
+   ]
+  },
+  {
+   "id": "flow-11-logout-keeps-session",
+   "defect": "logout-keeps-session",
+   "truth": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "pass",
+    "7": "pass",
+    "8": "pass",
+    "9": "fail"
+   },
+   "fails": [
+    "9"
+   ]
+  }
+ ]
+}

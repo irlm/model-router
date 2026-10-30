@@ -11,10 +11,18 @@ EXPECTED = {'login': 2, 'add': 3, 'edit': 1, 'delete': 1, 'logout': 1}
 
 
 def extract_json(text):
-    m = re.search(r'\{.*\}', text, re.S)
-    if not m:
-        raise ValueError('no json')
-    return json.loads(m.group(0))
+    """The first JSON object in the text that has a `results` key. Agents sometimes
+    wrap the object in a code fence or add prose after it; that is a format slip,
+    not a wrong verdict, so the grader tolerates it."""
+    dec = json.JSONDecoder()
+    for m in re.finditer(r'\{', text):
+        try:
+            obj, _ = dec.raw_decode(text[m.start():])
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and 'results' in obj:
+            return obj
+    raise ValueError('no json')
 
 
 def drove(state):

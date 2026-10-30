@@ -39,6 +39,21 @@ Receipts: `runs/browser_flow/`; grades: `grades.json`; tables: `tables.md`.
 Every model caught every planted defect: on all 33 runs each item the scripted user saw fail was
 reported as a fail. The clean app was reported clean by all three. 32 of 33 vectors matched exactly.
 
+## Repeat trials (Haiku)
+
+Two more Haiku trials, run later the same day, both 11/11 with the full flow driven every time:
+
+| Trial | Correct / 11 | Cost per flow | Turns | Wall |
+|---|---|---|---|---|
+| 1 | 11 | $0.035 | 47 | 91 s |
+| 2 | 11 | $0.034 | 48 | 82 s |
+| 3 | 11 | $0.032 | 45 | 83 s |
+
+33 of 33 over three trials. One trial-2 answer came wrapped in a code fence with a sentence of
+prose after the JSON; the verdicts inside were right. The grader now decodes the first JSON object
+that has a `results` key instead of a greedy brace match, so a format slip is not graded as a
+wrong verdict. No other receipt changed grade under the new parser.
+
 ## The one miss
 
 Fable, `flow-09-edit-loses-name`. After the edit the Pen row kept its numbers but lost its name.
@@ -69,8 +84,8 @@ the extension). Both runs still finished correct.
 
 ## Limits
 
-- One trial per tier. A second and third Haiku trial cost about $0.40 each and should be run
-  before this is treated as a production decision (Anthropic's bar is about 50 cases and 5 trials).
+- Three trials for Haiku (33/33), one for Sonnet and Fable. Anthropic's bar for a production
+  cutover is about 50 cases and 5 trials; this family is 11 flows.
 - One small server-rendered app. JavaScript-heavy pages, slow pages, pages that need scrolling or
   drag, and visual judgements from screenshots were not measured. The agents read the DOM through
   `read_page` and `get_page_text`; they did not have to look at pixels.

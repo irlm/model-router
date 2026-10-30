@@ -107,7 +107,7 @@
    "why_no_escalation": "haiku matched sonnet item for item; the only miss in 33 runs was fable's lenient reading of one ambiguous item",
    "checker": "a scripted user (bench/browser_flow/oracle.py) drives the same app and gives the truth vector; the app's action log confirms the flow was really driven",
    "evidence": {
-    "haiku low": "11/11 correct, 11/11 drove the full flow",
+    "haiku low": "33/33 correct over 3 trials, full flow driven every time",
     "sonnet low": "11/11 correct, 11/11 drove the full flow",
     "fable low": "10/11 correct, 11/11 drove the full flow",
     "cold_cost_per_flow_usd": {
@@ -130,7 +130,7 @@
     "exploratory testing without a checklist",
     "visual judgement from screenshots",
     "JavaScript-heavy, scrolling or slow pages",
-    "more than one trial"
+    "more than one trial for sonnet and fable"
    ],
    "status": "decided"
   },

@@ -1,0 +1,937 @@
+{
+ "tree": "$KERNEL_TREE",
+ "tasks": [
+  {
+   "id": "callers-01",
+   "family": "callers",
+   "name": "memparse",
+   "candidates": [
+    "fs/proc/loadavg.c",
+    "include/linux/string.h",
+    "lib/cmdline.c",
+    "mm/hugetlb.c"
+   ],
+   "truth": {
+    "calling": [
+     "mm/hugetlb.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string.h": [
+      {
+       "line": 318,
+       "class": "prototype",
+       "text": "extern unsigned long long memparse(const char *ptr, char **retptr);"
+      }
+     ],
+     "lib/cmdline.c": [
+      {
+       "line": 150,
+       "class": "definition",
+       "text": "unsigned long long memparse(const char *ptr, char **retptr)"
+      }
+     ],
+     "mm/hugetlb.c": [
+      {
+       "line": 4164,
+       "class": "call",
+       "text": "demote_size = (unsigned long)memparse(buf, NULL);"
+      },
+      {
+       "line": 4652,
+       "class": "call",
+       "text": "size = (unsigned long)memparse(s, NULL);"
+      },
+      {
+       "line": 4705,
+       "class": "call",
+       "text": "size = (unsigned long)memparse(s, NULL);"
+      },
+      {
+       "line": 7561,
+       "class": "call",
+       "text": "tmp = memparse(s, &s);"
+      },
+      {
+       "line": 7574,
+       "class": "call",
+       "text": "hugetlb_cma_size = memparse(p, &p);"
+      }
+     ],
+     "fs/proc/loadavg.c": []
+    }
+   }
+  },
+  {
+   "id": "callers-02",
+   "family": "callers",
+   "name": "match_string",
+   "candidates": [
+    "include/linux/string.h",
+    "lib/glob.c",
+    "lib/string_helpers.c",
+    "mm/vmpressure.c"
+   ],
+   "truth": {
+    "calling": [
+     "mm/vmpressure.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string.h": [
+      {
+       "line": 323,
+       "class": "prototype",
+       "text": "int match_string(const char * const *array, size_t n, const char *string);"
+      }
+     ],
+     "lib/string_helpers.c": [
+      {
+       "line": 920,
+       "class": "definition",
+       "text": "int match_string(const char * const *array, size_t n, const char *string)"
+      },
+      {
+       "line": 943,
+       "class": "comment",
+       "text": "* Returns index of @str in the @array or -EINVAL, just like match_string()."
+      }
+     ],
+     "mm/vmpressure.c": [
+      {
+       "line": 391,
+       "class": "call",
+       "text": "ret = match_string(vmpressure_str_levels, VMPRESSURE_NUM_LEVELS, token);"
+      },
+      {
+       "line": 399,
+       "class": "call",
+       "text": "ret = match_string(vmpressure_str_modes, VMPRESSURE_NUM_MODES, token);"
+      }
+     ],
+     "lib/glob.c": []
+    }
+   }
+  },
+  {
+   "id": "callers-03",
+   "family": "callers",
+   "name": "sysfs_streq",
+   "candidates": [
+    "include/linux/string.h",
+    "kernel/cpu.c",
+    "lib/net_utils.c",
+    "lib/string_helpers.c"
+   ],
+   "truth": {
+    "calling": [
+     "kernel/cpu.c",
+     "lib/string_helpers.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string.h": [
+      {
+       "line": 322,
+       "class": "prototype",
+       "text": "extern bool sysfs_streq(const char *s1, const char *s2);"
+      }
+     ],
+     "lib/string_helpers.c": [
+      {
+       "line": 886,
+       "class": "definition",
+       "text": "bool sysfs_streq(const char *s1, const char *s2)"
+      },
+      {
+       "line": 963,
+       "class": "call",
+       "text": "if (sysfs_streq(item, str))"
+      }
+     ],
+     "kernel/cpu.c": [
+      {
+       "line": 2926,
+       "class": "call",
+       "text": "if (sysfs_streq(buf, \"on\")) {"
+      },
+      {
+       "line": 2929,
+       "class": "call",
+       "text": "} else if (sysfs_streq(buf, \"off\")) {"
+      },
+      {
+       "line": 2932,
+       "class": "call",
+       "text": "} else if (sysfs_streq(buf, \"forceoff\")) {"
+      }
+     ],
+     "lib/net_utils.c": []
+    }
+   }
+  },
+  {
+   "id": "callers-04",
+   "family": "callers",
+   "name": "kbasename",
+   "candidates": [
+    "fs/exec.c",
+    "include/linux/string.h",
+    "kernel/gcov/fs.c",
+    "lib/glob.c"
+   ],
+   "truth": {
+    "calling": [
+     "fs/exec.c",
+     "kernel/gcov/fs.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string.h": [
+      {
+       "line": 383,
+       "class": "inline-definition",
+       "text": "static inline const char *kbasename(const char *path)"
+      }
+     ],
+     "kernel/gcov/fs.c": [
+      {
+       "line": 494,
+       "class": "call",
+       "text": "basename = kbasename(target);"
+      }
+     ],
+     "fs/exec.c": [
+      {
+       "line": 1350,
+       "class": "call",
+       "text": "__set_task_comm(me, kbasename(bprm->filename), true);"
+      }
+     ],
+     "lib/glob.c": []
+    }
+   }
+  },
+  {
+   "id": "callers-05",
+   "family": "callers",
+   "name": "strreplace",
+   "candidates": [
+    "fs/proc/uptime.c",
+    "include/linux/string.h",
+    "kernel/irq/irqdomain.c",
+    "lib/string_helpers.c"
+   ],
+   "truth": {
+    "calling": [
+     "kernel/irq/irqdomain.c",
+     "lib/string_helpers.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string.h": [
+      {
+       "line": 284,
+       "class": "prototype",
+       "text": "char *strreplace(char *str, char old, char new);"
+      }
+     ],
+     "lib/string_helpers.c": [
+      {
+       "line": 743,
+       "class": "call",
+       "text": "return strreplace(dst, old, new);"
+      },
+      {
+       "line": 981,
+       "class": "definition",
+       "text": "char *strreplace(char *str, char old, char new)"
+      }
+     ],
+     "kernel/irq/irqdomain.c": [
+      {
+       "line": 163,
+       "class": "call",
+       "text": "domain->name = strreplace(name, '/', ':');"
+      }
+     ],
+     "fs/proc/uptime.c": []
+    }
+   }
+  },
+  {
+   "id": "callers-06",
+   "family": "callers",
+   "name": "hex2bin",
+   "candidates": [
+    "fs/overlayfs/namei.c",
+    "include/linux/hex.h",
+    "lib/glob.c",
+    "lib/hexdump.c"
+   ],
+   "truth": {
+    "calling": [
+     "fs/overlayfs/namei.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/hex.h": [
+      {
+       "line": 30,
+       "class": "prototype",
+       "text": "extern int __must_check hex2bin(u8 *dst, const char *src, size_t count);"
+      }
+     ],
+     "lib/hexdump.c": [
+      {
+       "line": 63,
+       "class": "definition",
+       "text": "int hex2bin(u8 *dst, const char *src, size_t count)"
+      }
+     ],
+     "fs/overlayfs/namei.c": [
+      {
+       "line": 627,
+       "class": "call",
+       "text": "if (hex2bin(fh->buf, index->d_name.name, len))"
+      }
+     ],
+     "lib/glob.c": []
+    }
+   }
+  },
+  {
+   "id": "callers-07",
+   "family": "callers",
+   "name": "kstrdup_const",
+   "candidates": [
+    "include/kunit/test.h",
+    "include/linux/string.h",
+    "lib/kobject.c",
+    "mm/util.c"
+   ],
+   "truth": {
+    "calling": [
+     "lib/kobject.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string.h": [
+      {
+       "line": 301,
+       "class": "prototype",
+       "text": "extern const char *kstrdup_const(const char *s, gfp_t gfp);"
+      }
+     ],
+     "include/kunit/test.h": [
+      {
+       "line": 528,
+       "class": "comment",
+       "text": "* See kstrdup_const() and kunit_kmalloc_array() for more information."
+      }
+     ],
+     "mm/util.c": [
+      {
+       "line": 82,
+       "class": "definition",
+       "text": "const char *kstrdup_const(const char *s, gfp_t gfp)"
+      }
+     ],
+     "lib/kobject.c": [
+      {
+       "line": 504,
+       "class": "call",
+       "text": "name = dup_name = kstrdup_const(new_name, GFP_KERNEL);"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "callers-08",
+   "family": "callers",
+   "name": "memchr_inv",
+   "candidates": [
+    "include/linux/string.h",
+    "io_uring/register.c",
+    "lib/string.c",
+    "mm/vmstat.c"
+   ],
+   "truth": {
+    "calling": [
+     "include/linux/string.h",
+     "io_uring/register.c",
+     "mm/vmstat.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string.h": [
+      {
+       "line": 283,
+       "class": "prototype",
+       "text": "void *memchr_inv(const void *s, int c, size_t n);"
+      },
+      {
+       "line": 295,
+       "class": "call",
+       "text": "return !memchr_inv(s, 0, n);"
+      }
+     ],
+     "lib/string.c": [
+      {
+       "line": 820,
+       "class": "definition",
+       "text": "void *memchr_inv(const void *start, int c, size_t bytes)"
+      }
+     ],
+     "mm/vmstat.c": [
+      {
+       "line": 2030,
+       "class": "call",
+       "text": "if (memchr_inv(pzstats->vm_stat_diff, 0, sizeof(pzstats->vm_stat_diff)))"
+      },
+      {
+       "line": 2037,
+       "class": "call",
+       "text": "if (memchr_inv(n->vm_node_stat_diff, 0, sizeof(n->vm_node_stat_diff)))"
+      }
+     ],
+     "io_uring/register.c": [
+      {
+       "line": 54,
+       "class": "call",
+       "text": "if (memchr_inv(p, 0, size))"
+      },
+      {
+       "line": 345,
+       "class": "call",
+       "text": "if (memchr_inv(&reg.__resv, 0, sizeof(reg.__resv)))"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "callers-09",
+   "family": "callers",
+   "name": "skip_spaces",
+   "candidates": [
+    "drivers/gpio/gpio-sim.c",
+    "include/linux/string.h",
+    "lib/string_helpers.c",
+    "lib/vsprintf.c"
+   ],
+   "truth": {
+    "calling": [
+     "drivers/gpio/gpio-sim.c",
+     "lib/string_helpers.c",
+     "lib/vsprintf.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string.h": [
+      {
+       "line": 184,
+       "class": "prototype",
+       "text": "extern char * __must_check skip_spaces(const char *);"
+      }
+     ],
+     "lib/string_helpers.c": [
+      {
+       "line": 842,
+       "class": "definition",
+       "text": "char *skip_spaces(const char *str)"
+      },
+      {
+       "line": 872,
+       "class": "call",
+       "text": "return skip_spaces(s);"
+      }
+     ],
+     "lib/vsprintf.c": [
+      {
+       "line": 3438,
+       "class": "call",
+       "text": "fmt = skip_spaces(++fmt);"
+      },
+      {
+       "line": 3439,
+       "class": "call",
+       "text": "str = skip_spaces(str);"
+      },
+      {
+       "line": 3528,
+       "class": "call",
+       "text": "str = skip_spaces(str);"
+      },
+      {
+       "line": 3618,
+       "class": "call",
+       "text": "str = skip_spaces(str);"
+      }
+     ],
+     "drivers/gpio/gpio-sim.c": [
+      {
+       "line": 726,
+       "class": "call",
+       "text": "trimmed = kstrndup(skip_spaces(str), count, GFP_KERNEL);"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "callers-10",
+   "family": "callers",
+   "name": "string_get_size",
+   "candidates": [
+    "fs/proc/meminfo.c",
+    "include/linux/string_helpers.h",
+    "lib/string_helpers.c",
+    "mm/hugetlb.c"
+   ],
+   "truth": {
+    "calling": [
+     "mm/hugetlb.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/string_helpers.h": [
+      {
+       "line": 31,
+       "class": "prototype",
+       "text": "int string_get_size(u64 size, u64 blk_size, const enum string_size_units units,"
+      }
+     ],
+     "lib/string_helpers.c": [
+      {
+       "line": 39,
+       "class": "definition",
+       "text": "int string_get_size(u64 size, u64 blk_size, const enum string_size_units units,"
+      }
+     ],
+     "mm/hugetlb.c": [
+      {
+       "line": 3324,
+       "class": "call",
+       "text": "string_get_size(huge_page_size(h), 1, STRING_UNITS_2, buf, 32);"
+      },
+      {
+       "line": 3351,
+       "class": "call",
+       "text": "string_get_size(huge_page_size(h), 1, STRING_UNITS_2, buf, 32);"
+      },
+      {
+       "line": 3515,
+       "class": "call",
+       "text": "string_get_size(huge_page_size(h), 1, STRING_UNITS_2, buf, 32);"
+      },
+      {
+       "line": 4457,
+       "class": "call",
+       "text": "string_get_size(huge_page_size(&default_hstate),"
+      }
+     ],
+     "fs/proc/meminfo.c": []
+    }
+   }
+  },
+  {
+   "id": "callers-11",
+   "family": "callers",
+   "name": "mac_pton",
+   "candidates": [
+    "include/linux/hex.h",
+    "lib/hexdump.c",
+    "lib/net_utils.c",
+    "net/core/netpoll.c"
+   ],
+   "truth": {
+    "calling": [
+     "net/core/netpoll.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/hex.h": [
+      {
+       "line": 33,
+       "class": "prototype",
+       "text": "bool mac_pton(const char *s, u8 *mac);"
+      }
+     ],
+     "lib/net_utils.c": [
+      {
+       "line": 8,
+       "class": "definition",
+       "text": "bool mac_pton(const char *s, u8 *mac)"
+      }
+     ],
+     "net/core/netpoll.c": [
+      {
+       "line": 602,
+       "class": "call",
+       "text": "if (!mac_pton(cur, np->remote_mac))"
+      }
+     ],
+     "lib/hexdump.c": []
+    }
+   }
+  },
+  {
+   "id": "callers-12",
+   "family": "callers",
+   "name": "glob_match",
+   "candidates": [
+    "include/linux/glob.h",
+    "lib/glob.c",
+    "lib/globtest.c",
+    "lib/kunit/executor.c"
+   ],
+   "truth": {
+    "calling": [
+     "lib/globtest.c",
+     "lib/kunit/executor.c"
+    ]
+   },
+   "evidence": {
+    "sites": {
+     "include/linux/glob.h": [
+      {
+       "line": 8,
+       "class": "prototype",
+       "text": "bool __pure glob_match(char const *pat, char const *str);"
+      }
+     ],
+     "lib/glob.c": [
+      {
+       "line": 28,
+       "class": "comment",
+       "text": "* An example of the worst case is glob_match(\"*aaaaa\", \"aaaaaaaaaa\");"
+      },
+      {
+       "line": 40,
+       "class": "definition",
+       "text": "bool __pure glob_match(char const *pat, char const *str)"
+      }
+     ],
+     "lib/kunit/executor.c": [
+      {
+       "line": 63,
+       "class": "comment",
+       "text": "/* glob_match() needs NULL terminated strings, so we need a copy of filter_glob_param. */"
+      },
+      {
+       "line": 105,
+       "class": "call",
+       "text": "if (!test_glob || glob_match(test_glob, test_case->name))"
+      },
+      {
+       "line": 124,
+       "class": "call",
+       "text": "if (!test_glob || glob_match(test_glob, test_case->name))"
+      },
+      {
+       "line": 193,
+       "class": "call",
+       "text": "if (!glob_match(parsed_glob.suite_glob, filtered_suite->name))"
+      }
+     ],
+     "lib/globtest.c": [
+      {
+       "line": 21,
+       "class": "call",
+       "text": "bool match = glob_match(pat, str);"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "dispatch-01",
+   "family": "dispatch",
+   "name": "/proc/uptime",
+   "mechanism": "proc",
+   "m_visibility": "direct",
+   "subject": "is the seq_file show handler that generates the contents of /proc/uptime",
+   "truth": {
+    "function": "uptime_proc_show"
+   },
+   "evidence": {
+    "registration": {
+     "path": "fs/proc/uptime.c",
+     "line": 45,
+     "text": "pde = proc_create_single(\"uptime\", 0, NULL, uptime_proc_show);"
+    },
+    "definition": {
+     "path": "fs/proc/uptime.c",
+     "line": 12,
+     "text": "static int uptime_proc_show(struct seq_file *m, void *v)"
+    }
+   }
+  },
+  {
+   "id": "dispatch-02",
+   "family": "dispatch",
+   "name": "/proc/meminfo",
+   "mechanism": "proc",
+   "m_visibility": "direct",
+   "subject": "is the seq_file show handler that generates the contents of /proc/meminfo",
+   "truth": {
+    "function": "meminfo_proc_show"
+   },
+   "evidence": {
+    "registration": {
+     "path": "fs/proc/meminfo.c",
+     "line": 177,
+     "text": "pde = proc_create_single(\"meminfo\", 0, NULL, meminfo_proc_show);"
+    },
+    "definition": {
+     "path": "fs/proc/meminfo.c",
+     "line": 34,
+     "text": "static int meminfo_proc_show(struct seq_file *m, void *v)"
+    }
+   }
+  },
+  {
+   "id": "dispatch-03",
+   "family": "dispatch",
+   "name": "/proc/softirqs",
+   "mechanism": "proc",
+   "m_visibility": "direct",
+   "subject": "is the seq_file show handler that generates the contents of /proc/softirqs",
+   "truth": {
+    "function": "show_softirqs"
+   },
+   "evidence": {
+    "registration": {
+     "path": "fs/proc/softirqs.c",
+     "line": 33,
+     "text": "pde = proc_create_single(\"softirqs\", 0, NULL, show_softirqs);"
+    },
+    "definition": {
+     "path": "fs/proc/softirqs.c",
+     "line": 11,
+     "text": "static int show_softirqs(struct seq_file *p, void *v)"
+    }
+   }
+  },
+  {
+   "id": "dispatch-04",
+   "family": "dispatch",
+   "name": "/proc/cmdline",
+   "mechanism": "proc",
+   "m_visibility": "direct",
+   "subject": "is the seq_file show handler that generates the contents of /proc/cmdline",
+   "truth": {
+    "function": "cmdline_proc_show"
+   },
+   "evidence": {
+    "registration": {
+     "path": "fs/proc/cmdline.c",
+     "line": 19,
+     "text": "pde = proc_create_single(\"cmdline\", 0, NULL, cmdline_proc_show);"
+    },
+    "definition": {
+     "path": "fs/proc/cmdline.c",
+     "line": 8,
+     "text": "static int cmdline_proc_show(struct seq_file *m, void *v)"
+    }
+   }
+  },
+  {
+   "id": "dispatch-05",
+   "family": "dispatch",
+   "name": "/proc/sys/kernel/hostname",
+   "mechanism": "sysctl",
+   "m_visibility": "invisible",
+   "subject": "is the sysctl proc_handler invoked when a process writes to /proc/sys/kernel/hostname",
+   "truth": {
+    "function": "proc_do_uts_string"
+   },
+   "evidence": {
+    "registration": {
+     "path": "kernel/utsname_sysctl.c",
+     "line": 112,
+     "text": ".proc_handler\t= proc_do_uts_string,"
+    },
+    "definition": {
+     "path": "kernel/utsname_sysctl.c",
+     "line": 33,
+     "text": "static int proc_do_uts_string(const struct ctl_table *table, int write,"
+    }
+   }
+  },
+  {
+   "id": "dispatch-06",
+   "family": "dispatch",
+   "name": "/proc/sys/vm/overcommit_memory",
+   "mechanism": "sysctl",
+   "m_visibility": "invisible",
+   "subject": "is the sysctl proc_handler invoked when a process writes to /proc/sys/vm/overcommit_memory",
+   "truth": {
+    "function": "overcommit_policy_handler"
+   },
+   "evidence": {
+    "registration": {
+     "path": "kernel/sysctl.c",
+     "line": 2040,
+     "text": ".proc_handler\t= overcommit_policy_handler,"
+    },
+    "definition": {
+     "path": "mm/util.c",
+     "line": 927,
+     "text": "int overcommit_policy_handler(const struct ctl_table *table, int write, void *buffer,"
+    }
+   }
+  },
+  {
+   "id": "dispatch-07",
+   "family": "dispatch",
+   "name": "/proc/sys/vm/drop_caches",
+   "mechanism": "sysctl",
+   "m_visibility": "substring",
+   "subject": "is the sysctl proc_handler invoked when a process writes to /proc/sys/vm/drop_caches",
+   "truth": {
+    "function": "drop_caches_sysctl_handler"
+   },
+   "evidence": {
+    "registration": {
+     "path": "kernel/sysctl.c",
+     "line": 2100,
+     "text": ".proc_handler\t= drop_caches_sysctl_handler,"
+    },
+    "definition": {
+     "path": "fs/drop_caches.c",
+     "line": 51,
+     "text": "int drop_caches_sysctl_handler(const struct ctl_table *table, int write,"
+    }
+   }
+  },
+  {
+   "id": "dispatch-08",
+   "family": "dispatch",
+   "name": "/proc/sys/vm/dirty_ratio",
+   "mechanism": "sysctl",
+   "m_visibility": "substring",
+   "subject": "is the sysctl proc_handler invoked when a process writes to /proc/sys/vm/dirty_ratio",
+   "truth": {
+    "function": "dirty_ratio_handler"
+   },
+   "evidence": {
+    "registration": {
+     "path": "mm/page-writeback.c",
+     "line": 2320,
+     "text": ".proc_handler   = dirty_ratio_handler,"
+    },
+    "definition": {
+     "path": "mm/page-writeback.c",
+     "line": 538,
+     "text": "static int dirty_ratio_handler(const struct ctl_table *table, int write, void *buffer,"
+    }
+   }
+  },
+  {
+   "id": "dispatch-09",
+   "family": "dispatch",
+   "name": "/sys/kernel/uevent_seqnum",
+   "mechanism": "sysfs-paste",
+   "m_visibility": "convention",
+   "subject": "implements the read (show) operation of the sysfs file /sys/kernel/uevent_seqnum",
+   "truth": {
+    "function": "uevent_seqnum_show"
+   },
+   "evidence": {
+    "registration": {
+     "path": "kernel/ksysfs.c",
+     "line": 44,
+     "text": "KERNEL_ATTR_RO(uevent_seqnum);"
+    },
+    "definition": {
+     "path": "kernel/ksysfs.c",
+     "line": 39,
+     "text": "static ssize_t uevent_seqnum_show(struct kobject *kobj,"
+    }
+   }
+  },
+  {
+   "id": "dispatch-10",
+   "family": "dispatch",
+   "name": "/sys/kernel/cpu_byteorder",
+   "mechanism": "sysfs-paste",
+   "m_visibility": "convention",
+   "subject": "implements the read (show) operation of the sysfs file /sys/kernel/cpu_byteorder",
+   "truth": {
+    "function": "cpu_byteorder_show"
+   },
+   "evidence": {
+    "registration": {
+     "path": "kernel/ksysfs.c",
+     "line": 52,
+     "text": "KERNEL_ATTR_RO(cpu_byteorder);"
+    },
+    "definition": {
+     "path": "kernel/ksysfs.c",
+     "line": 47,
+     "text": "static ssize_t cpu_byteorder_show(struct kobject *kobj,"
+    }
+   }
+  },
+  {
+   "id": "dispatch-11",
+   "family": "dispatch",
+   "name": "/sys/kernel/vmcoreinfo",
+   "mechanism": "sysfs-paste",
+   "m_visibility": "convention",
+   "subject": "implements the read (show) operation of the sysfs file /sys/kernel/vmcoreinfo",
+   "truth": {
+    "function": "vmcoreinfo_show"
+   },
+   "evidence": {
+    "registration": {
+     "path": "kernel/ksysfs.c",
+     "line": 175,
+     "text": "KERNEL_ATTR_RO(vmcoreinfo);"
+    },
+    "definition": {
+     "path": "kernel/ksysfs.c",
+     "line": 168,
+     "text": "static ssize_t vmcoreinfo_show(struct kobject *kobj,"
+    }
+   }
+  },
+  {
+   "id": "dispatch-12",
+   "family": "dispatch",
+   "name": "/sys/kernel/fscaps",
+   "mechanism": "sysfs-paste",
+   "m_visibility": "convention",
+   "subject": "implements the read (show) operation of the sysfs file /sys/kernel/fscaps",
+   "truth": {
+    "function": "fscaps_show"
+   },
+   "evidence": {
+    "registration": {
+     "path": "kernel/ksysfs.c",
+     "line": 197,
+     "text": "KERNEL_ATTR_RO(fscaps);"
+    },
+    "definition": {
+     "path": "kernel/ksysfs.c",
+     "line": 192,
+     "text": "static ssize_t fscaps_show(struct kobject *kobj,"
+    }
+   }
+  }
+ ]
+}

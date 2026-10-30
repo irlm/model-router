@@ -1,0 +1,1562 @@
+{
+ "tree": "$KERNEL_TREE",
+ "seed": 20261008,
+ "noise_pool": [
+  "drivers/acpi/sbshc.c",
+  "drivers/acpi/wakeup.c",
+  "drivers/acpi/event.c",
+  "drivers/ata/pata_cmd640.c",
+  "drivers/acpi/ac.c",
+  "drivers/ata/pata_isapnp.c",
+  "drivers/ata/pata_acpi.c",
+  "drivers/acpi/acpi_pcc.c",
+  "drivers/ata/pata_cs5536.c",
+  "drivers/acpi/container.c",
+  "drivers/ata/ahci_seattle.c",
+  "drivers/acpi/processor_pdc.c",
+  "drivers/acpi/thermal_lib.c",
+  "drivers/ata/pata_falcon.c",
+  "drivers/acpi/evged.c",
+  "drivers/acpi/pci_slot.c",
+  "drivers/ata/pata_hpt3x3.c",
+  "drivers/acpi/hed.c",
+  "drivers/ata/pata_jmicron.c",
+  "drivers/acpi/bgrt.c",
+  "drivers/acpi/ec_sys.c",
+  "drivers/acpi/tiny-power-button.c",
+  "drivers/ata/ahci_mvebu.c",
+  "drivers/acpi/nvs.c",
+  "drivers/ata/pata_buddha.c",
+  "drivers/acpi/ioapic.c",
+  "drivers/acpi/fan_hwmon.c",
+  "drivers/ata/pata_marvell.c",
+  "drivers/acpi/proc.c",
+  "drivers/accel/drm_accel.c",
+  "drivers/ata/pata_cs5535.c",
+  "drivers/acpi/acpi_lpit.c",
+  "drivers/acpi/acpi_platform.c",
+  "drivers/amba/tegra-ahb.c",
+  "drivers/acpi/acpi_configfs.c",
+  "drivers/ata/pata_cs5520.c",
+  "drivers/acpi/spcr.c",
+  "drivers/acpi/debugfs.c",
+  "drivers/ata/ahci_octeon.c",
+  "drivers/ata/ahci_mtk.c",
+  "drivers/acpi/acpi_adxl.c",
+  "drivers/ata/ahci_dm816.c",
+  "drivers/acpi/acpi_lpat.c",
+  "drivers/ata/pata_gayle.c",
+  "drivers/acpi/acpi_apd.c",
+  "drivers/ata/ahci_st.c",
+  "drivers/ata/pata_imx.c",
+  "drivers/acpi/processor_driver.c",
+  "drivers/acpi/acpi_fpdt.c",
+  "drivers/acpi/acpi_ffh.c",
+  "drivers/acpi/reboot.c",
+  "drivers/ata/ahci_da850.c",
+  "drivers/ata/libata-zpodd.c",
+  "drivers/acpi/platform_profile.c",
+  "drivers/ata/libata-pata-timings.c",
+  "drivers/ata/libata-trace.c",
+  "drivers/acpi/acpi_watchdog.c",
+  "drivers/ata/pata_cypress.c",
+  "drivers/ata/ahci_platform.c",
+  "drivers/acpi/fan_attr.c"
+ ],
+ "verification": {
+  "tree": "$KERNEL_TREE",
+  "seed": 20261008,
+  "checks": [
+   {
+    "bait": "do_close_execat_atomic",
+    "absent": true
+   },
+   {
+    "bait": "nfsd4_cb_channel_good_locked",
+    "absent": true
+   },
+   {
+    "bait": "drain_local_stock_unlocked",
+    "absent": true
+   },
+   {
+    "bait": "alloc_migration_target_by_mpol_unlocked",
+    "absent": true
+   },
+   {
+    "bait": "free_func_state_deferred",
+    "absent": true
+   },
+   {
+    "bait": "nfs_readdir_array_index_cookie_atomic",
+    "absent": true
+   },
+   {
+    "bait": "insert_normal_tree_ref_locked",
+    "absent": true
+   },
+   {
+    "bait": "handle_quota_files_nofail",
+    "absent": true
+   },
+   {
+    "bait": "audit_fsnotify_init_rcu",
+    "absent": true
+   },
+   {
+    "bait": "afs_edit_init_block_locked",
+    "absent": true
+   },
+   {
+    "bait": "freeze_store_unlocked",
+    "absent": true
+   },
+   {
+    "bait": "contains_operator_locked",
+    "absent": true
+   }
+  ]
+ },
+ "tasks": [
+  {
+   "id": "exists-real-01",
+   "family": "exists",
+   "name": "free_rt_sched_group",
+   "truth": {
+    "exists": true,
+    "files": [
+     "kernel/sched/autogroup.c",
+     "kernel/sched/core.c",
+     "kernel/sched/rt.c",
+     "kernel/sched/sched.h"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "kernel/sched/rt.c",
+     "start": 151,
+     "end": 251
+    }
+   ]
+  },
+  {
+   "id": "exists-real-02",
+   "family": "exists",
+   "name": "accumulate_nsecs_to_secs",
+   "truth": {
+    "exists": true,
+    "files": [
+     "kernel/time/timekeeping.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "kernel/time/timekeeping.c",
+     "start": 2142,
+     "end": 2242
+    }
+   ]
+  },
+  {
+   "id": "exists-real-03",
+   "family": "exists",
+   "name": "need_mlock_drain",
+   "truth": {
+    "exists": true,
+    "files": [
+     "mm/internal.h",
+     "mm/mlock.c",
+     "mm/swap.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "mm/mlock.c",
+     "start": 183,
+     "end": 283
+    }
+   ]
+  },
+  {
+   "id": "exists-real-04",
+   "family": "exists",
+   "name": "event_hist_trigger_init",
+   "truth": {
+    "exists": true,
+    "files": [
+     "kernel/trace/trace_events_hist.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "kernel/trace/trace_events_hist.c",
+     "start": 6022,
+     "end": 6122
+    }
+   ]
+  },
+  {
+   "id": "exists-real-05",
+   "family": "exists",
+   "name": "check_mas_store_gfp",
+   "truth": {
+    "exists": true,
+    "files": [
+     "lib/test_maple_tree.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "lib/test_maple_tree.c",
+     "start": 1917,
+     "end": 2017
+    }
+   ]
+  },
+  {
+   "id": "exists-real-06",
+   "family": "exists",
+   "name": "find_free_dqentry",
+   "truth": {
+    "exists": true,
+    "files": [
+     "fs/quota/quota_tree.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "fs/quota/quota_tree.c",
+     "start": 209,
+     "end": 309
+    }
+   ]
+  },
+  {
+   "id": "exists-real-07",
+   "family": "exists",
+   "name": "bch2_sb_errors_from_cpu",
+   "truth": {
+    "exists": true,
+    "files": [
+     "fs/bcachefs/sb-errors.c",
+     "fs/bcachefs/sb-errors.h",
+     "fs/bcachefs/super-io.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "fs/bcachefs/sb-errors.c",
+     "start": 60,
+     "end": 160
+    }
+   ]
+  },
+  {
+   "id": "exists-real-08",
+   "family": "exists",
+   "name": "z3fold_zpool_unmap",
+   "truth": {
+    "exists": true,
+    "files": [
+     "mm/z3fold.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "mm/z3fold.c",
+     "start": 1350,
+     "end": 1447
+    }
+   ]
+  },
+  {
+   "id": "exists-real-09",
+   "family": "exists",
+   "name": "dlm_slot_save",
+   "truth": {
+    "exists": true,
+    "files": [
+     "fs/dlm/member.c",
+     "fs/dlm/member.h",
+     "fs/dlm/recover.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "fs/dlm/member.c",
+     "start": 1,
+     "end": 78
+    }
+   ]
+  },
+  {
+   "id": "exists-real-10",
+   "family": "exists",
+   "name": "generic_exec_single",
+   "truth": {
+    "exists": true,
+    "files": [
+     "kernel/smp.c",
+     "tools/perf/util/disasm.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "kernel/smp.c",
+     "start": 369,
+     "end": 469
+    }
+   ]
+  },
+  {
+   "id": "exists-real-11",
+   "family": "exists",
+   "name": "ubifs_tnc_locate",
+   "truth": {
+    "exists": true,
+    "files": [
+     "fs/ubifs/misc.h",
+     "fs/ubifs/recovery.c",
+     "fs/ubifs/tnc.c",
+     "fs/ubifs/ubifs.h"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "fs/ubifs/tnc.c",
+     "start": 1428,
+     "end": 1528
+    }
+   ]
+  },
+  {
+   "id": "exists-real-12",
+   "family": "exists",
+   "name": "ww_test_edeadlk_normal_slow",
+   "truth": {
+    "exists": true,
+    "files": [
+     "lib/locking-selftest.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "lib/locking-selftest.c",
+     "start": 1825,
+     "end": 1925
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-01",
+   "family": "exists",
+   "name": "do_close_execat_atomic",
+   "derived_from": "do_close_execat",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "fs/exec.c",
+     "start": 831,
+     "end": 931
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-02",
+   "family": "exists",
+   "name": "nfsd4_cb_channel_good_locked",
+   "derived_from": "nfsd4_cb_channel_good",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "fs/nfsd/nfs4state.c",
+     "start": 5610,
+     "end": 5710
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-03",
+   "family": "exists",
+   "name": "drain_local_stock_unlocked",
+   "derived_from": "drain_local_stock",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "mm/memcontrol.c",
+     "start": 1729,
+     "end": 1829
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-04",
+   "family": "exists",
+   "name": "alloc_migration_target_by_mpol_unlocked",
+   "derived_from": "alloc_migration_target_by_mpol",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "mm/mempolicy.c",
+     "start": 422,
+     "end": 522
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-05",
+   "family": "exists",
+   "name": "free_func_state_deferred",
+   "derived_from": "free_func_state",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "kernel/bpf/verifier.c",
+     "start": 1317,
+     "end": 1417
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-06",
+   "family": "exists",
+   "name": "nfs_readdir_array_index_cookie_atomic",
+   "derived_from": "nfs_readdir_array_index_cookie",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "fs/nfs/dir.c",
+     "start": 207,
+     "end": 307
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-07",
+   "family": "exists",
+   "name": "insert_normal_tree_ref_locked",
+   "derived_from": "insert_normal_tree_ref",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "fs/btrfs/tests/qgroup-tests.c",
+     "start": 1,
+     "end": 66
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-08",
+   "family": "exists",
+   "name": "handle_quota_files_nofail",
+   "derived_from": "handle_quota_files",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "fs/reiserfs/super.c",
+     "start": 1363,
+     "end": 1463
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-09",
+   "family": "exists",
+   "name": "audit_fsnotify_init_rcu",
+   "derived_from": "audit_fsnotify_init",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "kernel/audit_fsnotify.c",
+     "start": 133,
+     "end": 193
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-10",
+   "family": "exists",
+   "name": "afs_edit_init_block_locked",
+   "derived_from": "afs_edit_init_block",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "fs/afs/dir_edit.c",
+     "start": 125,
+     "end": 225
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-11",
+   "family": "exists",
+   "name": "freeze_store_unlocked",
+   "derived_from": "freeze_store",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "fs/gfs2/sys.c",
+     "start": 114,
+     "end": 214
+    }
+   ]
+  },
+  {
+   "id": "exists-bait-12",
+   "family": "exists",
+   "name": "contains_operator_locked",
+   "derived_from": "contains_operator",
+   "truth": {
+    "exists": false,
+    "files": []
+   },
+   "context_b": [
+    {
+     "path": "kernel/trace/trace_events_hist.c",
+     "start": 1760,
+     "end": 1860
+    }
+   ]
+  },
+  {
+   "id": "fields-01",
+   "family": "fields",
+   "name": "irq_poll",
+   "file": "include/linux/irq_poll.h",
+   "truth": {
+    "fields": [
+     "list",
+     "state",
+     "weight",
+     "poll"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/irq_poll.h",
+     "start": 1,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "id": "fields-02",
+   "family": "fields",
+   "name": "davinci_vc",
+   "file": "include/linux/mfd/davinci_voicecodec.h",
+   "truth": {
+    "fields": [
+     "dev",
+     "pdev",
+     "clk",
+     "base",
+     "regmap",
+     "cells",
+     "davinci_vcif"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/mfd/davinci_voicecodec.h",
+     "start": 17,
+     "end": 104
+    }
+   ]
+  },
+  {
+   "id": "fields-03",
+   "family": "fields",
+   "name": "dpll_pin_properties",
+   "file": "include/linux/dpll.h",
+   "truth": {
+    "fields": [
+     "board_label",
+     "panel_label",
+     "package_label",
+     "type",
+     "capabilities",
+     "freq_supported_num",
+     "freq_supported",
+     "phase_range"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/dpll.h",
+     "start": 59,
+     "end": 197
+    }
+   ]
+  },
+  {
+   "id": "fields-04",
+   "family": "fields",
+   "name": "mtget32",
+   "file": "include/linux/mtio.h",
+   "truth": {
+    "fields": [
+     "mt_type",
+     "mt_resid",
+     "mt_dsreg",
+     "mt_gstat",
+     "mt_erreg",
+     "mt_fileno",
+     "mt_blkno"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/mtio.h",
+     "start": 1,
+     "end": 60
+    }
+   ]
+  },
+  {
+   "id": "fields-05",
+   "family": "fields",
+   "name": "wm831x_battery_pdata",
+   "file": "include/linux/mfd/wm831x/pdata.h",
+   "truth": {
+    "fields": [
+     "enable",
+     "fast_enable",
+     "off_mask",
+     "trickle_ilim",
+     "vsel",
+     "eoc_iterm",
+     "fast_ilim",
+     "timeout"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/mfd/wm831x/pdata.h",
+     "start": 1,
+     "end": 98
+    }
+   ]
+  },
+  {
+   "id": "fields-06",
+   "family": "fields",
+   "name": "mlx5_ifc_query_q_counter_in_bits",
+   "file": "include/linux/mlx5/mlx5_ifc.h",
+   "truth": {
+    "fields": [
+     "opcode",
+     "reserved_at_10",
+     "reserved_at_20",
+     "op_mod",
+     "other_vport",
+     "reserved_at_41",
+     "vport_number",
+     "reserved_at_60",
+     "clear",
+     "aggregate",
+     "reserved_at_c2",
+     "reserved_at_e0",
+     "counter_set_id"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/mlx5/mlx5_ifc.h",
+     "start": 5863,
+     "end": 6003
+    }
+   ]
+  },
+  {
+   "id": "fields-07",
+   "family": "fields",
+   "name": "icmsg_hdr",
+   "file": "include/linux/hyperv.h",
+   "truth": {
+    "fields": [
+     "icverframe",
+     "icmsgtype",
+     "icvermsg",
+     "icmsgsize",
+     "status",
+     "ictransaction_id",
+     "icflags",
+     "reserved"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/hyperv.h",
+     "start": 1507,
+     "end": 1647
+    }
+   ]
+  },
+  {
+   "id": "fields-08",
+   "family": "fields",
+   "name": "rpc_pipe_ops",
+   "file": "include/linux/sunrpc/rpc_pipe_fs.h",
+   "truth": {
+    "fields": [
+     "upcall",
+     "downcall",
+     "release_pipe",
+     "open_pipe",
+     "destroy_msg"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/sunrpc/rpc_pipe_fs.h",
+     "start": 1,
+     "end": 105
+    }
+   ]
+  },
+  {
+   "id": "fields-09",
+   "family": "fields",
+   "name": "ffa_driver",
+   "file": "include/linux/arm_ffa.h",
+   "truth": {
+    "fields": [
+     "name",
+     "probe",
+     "remove",
+     "id_table",
+     "driver"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/arm_ffa.h",
+     "start": 78,
+     "end": 218
+    }
+   ]
+  },
+  {
+   "id": "fields-10",
+   "family": "fields",
+   "name": "ipaq_micro_msg",
+   "file": "include/linux/mfd/ipaq-micro.h",
+   "truth": {
+    "fields": [
+     "id",
+     "tx_len",
+     "tx_data",
+     "rx_len",
+     "rx_data",
+     "ack",
+     "node"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/mfd/ipaq-micro.h",
+     "start": 13,
+     "end": 149
+    }
+   ]
+  },
+  {
+   "id": "fields-11",
+   "family": "fields",
+   "name": "pruss",
+   "file": "include/linux/pruss_driver.h",
+   "truth": {
+    "fields": [
+     "dev",
+     "cfg_base",
+     "cfg_regmap",
+     "mem_regions",
+     "mem_in_use",
+     "lock",
+     "core_clk_mux",
+     "iep_clk_mux"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/pruss_driver.h",
+     "start": 25,
+     "end": 165
+    }
+   ]
+  },
+  {
+   "id": "fields-12",
+   "family": "fields",
+   "name": "palmas_pmic_driver_data",
+   "file": "include/linux/mfd/palmas.h",
+   "truth": {
+    "fields": [
+     "smps_start",
+     "smps_end",
+     "ldo_begin",
+     "ldo_end",
+     "max_reg",
+     "has_regen3",
+     "palmas_regs_info",
+     "palmas_matches",
+     "sleep_req_info",
+     "smps_register",
+     "ldo_register"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/mfd/palmas.h",
+     "start": 39,
+     "end": 179
+    }
+   ]
+  },
+  {
+   "id": "refs-01",
+   "family": "refs",
+   "name": "___ratelimit",
+   "candidates": [
+    "include/linux/ratelimit_types.h",
+    "fs/xfs/xfs_acl.c",
+    "fs/xfs/xfs_attr_inactive.c",
+    "fs/xfs/xfs_message.c"
+   ],
+   "truth": {
+    "referencing": [
+     "fs/xfs/xfs_message.c",
+     "include/linux/ratelimit_types.h"
+    ],
+    "clean": [
+     "fs/xfs/xfs_acl.c",
+     "fs/xfs/xfs_attr_inactive.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "include/linux/ratelimit_types.h",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/xfs/xfs_acl.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/xfs/xfs_attr_inactive.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/xfs/xfs_message.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-02",
+   "family": "refs",
+   "name": "__add_pages",
+   "candidates": [
+    "arch/loongarch/mm/extable.c",
+    "arch/s390/mm/init.c",
+    "arch/loongarch/mm/init.c",
+    "arch/loongarch/mm/cache.c"
+   ],
+   "truth": {
+    "referencing": [
+     "arch/loongarch/mm/init.c",
+     "arch/s390/mm/init.c"
+    ],
+    "clean": [
+     "arch/loongarch/mm/cache.c",
+     "arch/loongarch/mm/extable.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "arch/loongarch/mm/extable.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/s390/mm/init.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/loongarch/mm/init.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/loongarch/mm/cache.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-03",
+   "family": "refs",
+   "name": "__ashldi3",
+   "candidates": [
+    "arch/arc/kernel/devtree.c",
+    "arch/arc/kernel/disasm.c",
+    "arch/arc/kernel/arcksyms.c",
+    "arch/microblaze/lib/libgcc.h",
+    "arch/arm/kernel/armksyms.c",
+    "arch/arc/kernel/arc_hostlink.c",
+    "arch/microblaze/lib/ashldi3.c",
+    "arch/arc/kernel/asm-offsets.c"
+   ],
+   "truth": {
+    "referencing": [
+     "arch/arc/kernel/arcksyms.c",
+     "arch/arm/kernel/armksyms.c",
+     "arch/microblaze/lib/ashldi3.c",
+     "arch/microblaze/lib/libgcc.h"
+    ],
+    "clean": [
+     "arch/arc/kernel/arc_hostlink.c",
+     "arch/arc/kernel/asm-offsets.c",
+     "arch/arc/kernel/devtree.c",
+     "arch/arc/kernel/disasm.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "arch/arc/kernel/devtree.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/disasm.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/arcksyms.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/microblaze/lib/libgcc.h",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arm/kernel/armksyms.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/arc_hostlink.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/microblaze/lib/ashldi3.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/asm-offsets.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-04",
+   "family": "refs",
+   "name": "__ashrdi3",
+   "candidates": [
+    "arch/arc/kernel/asm-offsets.c",
+    "arch/arm/kernel/armksyms.c",
+    "arch/arc/kernel/arc_hostlink.c",
+    "arch/arc/kernel/devtree.c",
+    "arch/microblaze/lib/ashrdi3.c",
+    "arch/microblaze/lib/libgcc.h",
+    "arch/arc/kernel/arcksyms.c",
+    "arch/arc/kernel/disasm.c"
+   ],
+   "truth": {
+    "referencing": [
+     "arch/arc/kernel/arcksyms.c",
+     "arch/arm/kernel/armksyms.c",
+     "arch/microblaze/lib/ashrdi3.c",
+     "arch/microblaze/lib/libgcc.h"
+    ],
+    "clean": [
+     "arch/arc/kernel/arc_hostlink.c",
+     "arch/arc/kernel/asm-offsets.c",
+     "arch/arc/kernel/devtree.c",
+     "arch/arc/kernel/disasm.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "arch/arc/kernel/asm-offsets.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arm/kernel/armksyms.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/arc_hostlink.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/devtree.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/microblaze/lib/ashrdi3.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/microblaze/lib/libgcc.h",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/arcksyms.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/disasm.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-05",
+   "family": "refs",
+   "name": "__bitmap_clear",
+   "candidates": [
+    "drivers/firmware/efi/libstub/arm64-stub.c",
+    "drivers/firmware/efi/libstub/arm32-stub.c",
+    "drivers/firmware/efi/libstub/bitmap.c",
+    "tools/lib/bitmap.c",
+    "tools/include/linux/bitmap.h",
+    "drivers/firmware/efi/libstub/alignedmem.c"
+   ],
+   "truth": {
+    "referencing": [
+     "drivers/firmware/efi/libstub/bitmap.c",
+     "tools/include/linux/bitmap.h",
+     "tools/lib/bitmap.c"
+    ],
+    "clean": [
+     "drivers/firmware/efi/libstub/alignedmem.c",
+     "drivers/firmware/efi/libstub/arm32-stub.c",
+     "drivers/firmware/efi/libstub/arm64-stub.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "drivers/firmware/efi/libstub/arm64-stub.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "drivers/firmware/efi/libstub/arm32-stub.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "drivers/firmware/efi/libstub/bitmap.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "tools/lib/bitmap.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "tools/include/linux/bitmap.h",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "drivers/firmware/efi/libstub/alignedmem.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-06",
+   "family": "refs",
+   "name": "__bpf_dynptr_data_rw",
+   "candidates": [
+    "fs/backing-file.c",
+    "fs/anon_inodes.c",
+    "fs/bpf_fs_kfuncs.c",
+    "fs/verity/measure.c"
+   ],
+   "truth": {
+    "referencing": [
+     "fs/bpf_fs_kfuncs.c",
+     "fs/verity/measure.c"
+    ],
+    "clean": [
+     "fs/anon_inodes.c",
+     "fs/backing-file.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "fs/backing-file.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/anon_inodes.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/bpf_fs_kfuncs.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/verity/measure.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-07",
+   "family": "refs",
+   "name": "__bpf_dynptr_size",
+   "candidates": [
+    "fs/anon_inodes.c",
+    "fs/bpf_fs_kfuncs.c",
+    "fs/verity/measure.c",
+    "fs/backing-file.c"
+   ],
+   "truth": {
+    "referencing": [
+     "fs/bpf_fs_kfuncs.c",
+     "fs/verity/measure.c"
+    ],
+    "clean": [
+     "fs/anon_inodes.c",
+     "fs/backing-file.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "fs/anon_inodes.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/bpf_fs_kfuncs.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/verity/measure.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "fs/backing-file.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-08",
+   "family": "refs",
+   "name": "__cmpdi2",
+   "candidates": [
+    "arch/arc/kernel/arcksyms.c",
+    "arch/arc/kernel/arc_hostlink.c",
+    "arch/powerpc/include/asm/asm-prototypes.h",
+    "arch/microblaze/lib/libgcc.h",
+    "arch/arc/kernel/devtree.c",
+    "arch/arc/kernel/asm-offsets.c",
+    "arch/arc/kernel/disasm.c",
+    "arch/microblaze/lib/cmpdi2.c"
+   ],
+   "truth": {
+    "referencing": [
+     "arch/arc/kernel/arcksyms.c",
+     "arch/microblaze/lib/cmpdi2.c",
+     "arch/microblaze/lib/libgcc.h",
+     "arch/powerpc/include/asm/asm-prototypes.h"
+    ],
+    "clean": [
+     "arch/arc/kernel/arc_hostlink.c",
+     "arch/arc/kernel/asm-offsets.c",
+     "arch/arc/kernel/devtree.c",
+     "arch/arc/kernel/disasm.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "arch/arc/kernel/arcksyms.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/arc_hostlink.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/powerpc/include/asm/asm-prototypes.h",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/microblaze/lib/libgcc.h",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/devtree.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/asm-offsets.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arc/kernel/disasm.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/microblaze/lib/cmpdi2.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-09",
+   "family": "refs",
+   "name": "__compat_save_altstack",
+   "candidates": [
+    "arch/riscv/kernel/compat_signal.c",
+    "arch/mips/kernel/cacheinfo.c",
+    "arch/mips/kernel/signal_o32.c",
+    "arch/mips/kernel/cevt-bcm1480.c",
+    "arch/mips/kernel/asm-offsets.c",
+    "arch/mips/kernel/signal_n32.c"
+   ],
+   "truth": {
+    "referencing": [
+     "arch/mips/kernel/signal_n32.c",
+     "arch/mips/kernel/signal_o32.c",
+     "arch/riscv/kernel/compat_signal.c"
+    ],
+    "clean": [
+     "arch/mips/kernel/asm-offsets.c",
+     "arch/mips/kernel/cacheinfo.c",
+     "arch/mips/kernel/cevt-bcm1480.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "arch/riscv/kernel/compat_signal.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/mips/kernel/cacheinfo.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/mips/kernel/signal_o32.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/mips/kernel/cevt-bcm1480.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/mips/kernel/asm-offsets.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/mips/kernel/signal_n32.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-10",
+   "family": "refs",
+   "name": "__crc32c_le",
+   "candidates": [
+    "arch/riscv/lib/crc32.c",
+    "arch/powerpc/crypto/aes-spe-glue.c",
+    "arch/powerpc/crypto/aes.c",
+    "arch/powerpc/crypto/aes-gcm-p10-glue.c",
+    "arch/sparc/crypto/crc32c_glue.c",
+    "arch/powerpc/crypto/aes_cbc.c",
+    "arch/powerpc/crypto/crc-vpmsum_test.c",
+    "arch/powerpc/crypto/crc32c-vpmsum_glue.c"
+   ],
+   "truth": {
+    "referencing": [
+     "arch/powerpc/crypto/crc-vpmsum_test.c",
+     "arch/powerpc/crypto/crc32c-vpmsum_glue.c",
+     "arch/riscv/lib/crc32.c",
+     "arch/sparc/crypto/crc32c_glue.c"
+    ],
+    "clean": [
+     "arch/powerpc/crypto/aes-gcm-p10-glue.c",
+     "arch/powerpc/crypto/aes-spe-glue.c",
+     "arch/powerpc/crypto/aes.c",
+     "arch/powerpc/crypto/aes_cbc.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "arch/riscv/lib/crc32.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/powerpc/crypto/aes-spe-glue.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/powerpc/crypto/aes.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/powerpc/crypto/aes-gcm-p10-glue.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/sparc/crypto/crc32c_glue.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/powerpc/crypto/aes_cbc.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/powerpc/crypto/crc-vpmsum_test.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/powerpc/crypto/crc32c-vpmsum_glue.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-11",
+   "family": "refs",
+   "name": "__dev_get_by_index",
+   "candidates": [
+    "net/phonet/pn_netlink.c",
+    "drivers/infiniband/ulp/ipoib/ipoib_vlan.c",
+    "drivers/infiniband/ulp/ipoib/ipoib_fs.c",
+    "drivers/infiniband/ulp/ipoib/ipoib_verbs.c",
+    "drivers/infiniband/ulp/ipoib/ipoib_ethtool.c",
+    "net/core/link_watch.c",
+    "net/dsa/netlink.c",
+    "drivers/infiniband/ulp/ipoib/ipoib_netlink.c"
+   ],
+   "truth": {
+    "referencing": [
+     "drivers/infiniband/ulp/ipoib/ipoib_netlink.c",
+     "net/core/link_watch.c",
+     "net/dsa/netlink.c",
+     "net/phonet/pn_netlink.c"
+    ],
+    "clean": [
+     "drivers/infiniband/ulp/ipoib/ipoib_ethtool.c",
+     "drivers/infiniband/ulp/ipoib/ipoib_fs.c",
+     "drivers/infiniband/ulp/ipoib/ipoib_verbs.c",
+     "drivers/infiniband/ulp/ipoib/ipoib_vlan.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "net/phonet/pn_netlink.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "drivers/infiniband/ulp/ipoib/ipoib_vlan.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "drivers/infiniband/ulp/ipoib/ipoib_fs.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "drivers/infiniband/ulp/ipoib/ipoib_verbs.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "drivers/infiniband/ulp/ipoib/ipoib_ethtool.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "net/core/link_watch.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "net/dsa/netlink.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "drivers/infiniband/ulp/ipoib/ipoib_netlink.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  },
+  {
+   "id": "refs-12",
+   "family": "refs",
+   "name": "__do_softirq",
+   "candidates": [
+    "arch/arm/kernel/arch_timer.c",
+    "arch/arm/kernel/atags_compat.c",
+    "include/asm-generic/softirq_stack.h",
+    "arch/arm/kernel/irq.c",
+    "arch/riscv/kernel/irq.c",
+    "arch/arm/kernel/armksyms.c",
+    "arch/arm/kernel/asm-offsets.c",
+    "arch/arm64/kernel/irq.c"
+   ],
+   "truth": {
+    "referencing": [
+     "arch/arm/kernel/irq.c",
+     "arch/arm64/kernel/irq.c",
+     "arch/riscv/kernel/irq.c",
+     "include/asm-generic/softirq_stack.h"
+    ],
+    "clean": [
+     "arch/arm/kernel/arch_timer.c",
+     "arch/arm/kernel/armksyms.c",
+     "arch/arm/kernel/asm-offsets.c",
+     "arch/arm/kernel/atags_compat.c"
+    ]
+   },
+   "context_b": [
+    {
+     "path": "arch/arm/kernel/arch_timer.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arm/kernel/atags_compat.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "include/asm-generic/softirq_stack.h",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arm/kernel/irq.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/riscv/kernel/irq.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arm/kernel/armksyms.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arm/kernel/asm-offsets.c",
+     "start": 1,
+     "end": 1000000
+    },
+    {
+     "path": "arch/arm64/kernel/irq.c",
+     "start": 1,
+     "end": 1000000
+    }
+   ]
+  }
+ ]
+}

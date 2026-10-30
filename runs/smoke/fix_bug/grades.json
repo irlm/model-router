@@ -1,0 +1,7 @@
+{
+ "claude-haiku-5-5 / low / 1 / edit-string-01-strncasecmp": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ }
+}

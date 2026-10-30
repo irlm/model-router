@@ -47,7 +47,14 @@ def grade_one(wt, build_dir, task, record):
         ran = sum(t[3] for t in totals.values())
         if not clean['passed']:
             if totals and any(t[1] for t in totals.values()):
-                return 'fails-on-correct-code', json.dumps(totals)
+                # Not deliverable as written, but record whether the suite
+                # still has bug-detecting power: more failures on the bug.
+                clean_fail = sum(t[1] for t in totals.values())
+                W.seed_mutation(wt, task)
+                buggy = W.run_suite(wt, build_dir, KUNITCONFIG)
+                bug_fail = sum(t[1] for t in suite_totals(buggy['output']).values())
+                return 'fails-on-correct-code', (f'cases={ran} clean_fail={clean_fail} '
+                                                 f'bug_fail={bug_fail} detects={bug_fail > clean_fail}')
             return 'compile-fail', clean['output_tail'][-400:]
         if ran == 0:
             return 'empty-suite', 'built but ran 0 cases'

@@ -19,7 +19,8 @@ import grade_semantic  # noqa: E402
 
 FF_TASK_FILES = [HERE / 'bench/find_feature/tasks/lexical.json',
                  HERE / 'bench/find_feature/tasks/semantic.json']
-SUCCESS = {'find_feature': {'correct'}, 'fix_bug': {'fixed'}, 'write_tests': {'catches-bug'}}
+SUCCESS = {'find_feature': {'correct'}, 'fix_bug': {'fixed'}, 'fix_bug_hard': {'fixed'},
+           'write_tests': {'catches-bug'}}
 
 
 def load_ff_tasks():
@@ -88,7 +89,7 @@ def main():
     args = ap.parse_args()
     tree, ff_tasks = load_ff_tasks()
     cached = {}
-    for bench in ('fix_bug', 'write_tests'):
+    for bench in ('fix_bug', 'fix_bug_hard', 'write_tests'):
         gp = args.runs / bench / 'grades.json'
         cached[bench] = json.loads(gp.read_text()) if gp.exists() else {}
     cells = defaultdict(list)

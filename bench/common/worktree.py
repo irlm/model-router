@@ -20,15 +20,23 @@ def reset(wt, base=BASE):
     git(wt, 'clean', '-qfd')
 
 
-def seed_mutation(wt, task):
-    """Write the K2 mutated function over the pristine one. Returns pristine."""
-    file = Path(wt) / task['file']
+def seed_site(wt, site):
+    """Write one mutated function over the pristine one. Returns pristine text."""
+    file = Path(wt) / site['file']
     pristine = file.read_text()
-    span = kunit_lab.function_span(pristine, task['function'])
+    span = kunit_lab.function_span(pristine, site['function'])
     if span is None:
-        raise RuntimeError(f"no span for {task['function']} in {task['file']}")
-    file.write_text(pristine[:span[0]] + task['mutated_function'] + pristine[span[1]:])
+        raise RuntimeError(f"no span for {site['function']} in {site['file']}")
+    file.write_text(pristine[:span[0]] + site['mutated_function'] + pristine[span[1]:])
     return pristine
+
+
+def seed_mutation(wt, task):
+    """Seed a task's bug: one site (K2 tasks: file/function/mutated_function at
+    the top level) or several (hard tasks: task['sites']), spliced in order so
+    two sites in one file both land."""
+    for site in task.get('sites') or [task]:
+        seed_site(wt, site)
 
 
 def is_test_path(path):

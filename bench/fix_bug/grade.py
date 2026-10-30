@@ -4,7 +4,10 @@ Outcomes: fixed | still-failing | compile-or-boot-fail | touched-tests |
 no-change | abstained | operational. Grades are cached in
 runs/fix_bug/grades.json keyed "model / effort / trial / id".
 
-Usage: python3 grade.py --worktree DIR --build-dir DIR [--only GLOB]
+Hard tier: --tasks tasks-hard.json --runs ../../runs/fix_bug_hard. Receipts from the
+kunit arm are keyed with effort "low+kunit", matching report.py.
+
+Usage: python3 grade.py --worktree DIR --build-dir DIR [--only GLOB] [--tasks F --runs DIR]
 """
 import argparse
 import json
@@ -53,8 +56,9 @@ def main():
     ap.add_argument('--build-dir', type=Path, required=True)
     ap.add_argument('--runs', type=Path, default=HERE.parents[1] / 'runs/fix_bug')
     ap.add_argument('--only', default='')
+    ap.add_argument('--tasks', type=Path, default=HERE / 'tasks.json')
     args = ap.parse_args()
-    tasks = {t['id']: t for t in json.loads((HERE / 'tasks.json').read_text())['tasks']}
+    tasks = {t['id']: t for t in json.loads(args.tasks.read_text())['tasks']}
     grades_path = args.runs / 'grades.json'
     grades = json.loads(grades_path.read_text()) if grades_path.exists() else {}
     for f in sorted(args.runs.glob(f'runs-*{args.only}*.jsonl')):
@@ -62,7 +66,9 @@ def main():
             if not line.strip():
                 continue
             r = json.loads(line)
-            key = f"{r['model_requested']} / {r['effort']} / {r['trial']} / {r['id']}"
+            variant = r.get('variant', 'noexec')
+            effort = r['effort'] + ('' if variant == 'noexec' else '+' + variant)
+            key = f"{r['model_requested']} / {effort} / {r['trial']} / {r['id']}"
             if key in grades:
                 continue
             outcome, detail = grade_one(args.worktree, args.build_dir, tasks[r['id']], r)

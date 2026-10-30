@@ -4,7 +4,12 @@ agent inside the worktree with Read/Glob/Grep/Edit (no Bash: it cannot run
 the tests), give it only the suite name and the real failing KUnit output,
 then record its patch (git diff) and reset the worktree. Resumable.
 
+Hard tier (cell 3): --tasks tasks-hard.json --bench fix_bug_hard. The hard prompt
+does not say how many defects there are. --kunit lets the agent build and run the
+suite (Bash restricted to kunit.py, absolute --build-dir outside the worktree).
+
 Usage: python3 run_agent.py --model M --effort E --worktree DIR [--trial N] [--ids ...]
+       [--tasks tasks-hard.json --bench fix_bug_hard] [--kunit --build-dir DIR]
 """
 import argparse
 import json
@@ -26,6 +31,23 @@ Find the bug in the kernel source and fix it with a minimal change. Do not modif
 
 When finished, reply with ONLY a JSON object: {{"changed_files": ["path", ...], "summary": "<one sentence>"}} or {{"unknown": true}} if you cannot find the bug."""
 
+PROMPT_HARD = """You are working inside a full checkout of the Linux kernel v6.12 (your current working directory).
+
+The KUnit test suite `{suite}` fails. Failing output:
+
+{failing_output}
+
+Find what is wrong in the kernel source and fix it with minimal changes, so that the suite passes. Do not modify any test code (files named *_kunit.c or *test*.c, or anything under lib/kunit or tools/testing). Do not use the web. You cannot run the build or the tests in this session, so reason from the source and the failing output.
+
+When finished, reply with ONLY a JSON object: {{"changed_files": ["path", ...], "summary": "<one sentence>"}} or {{"unknown": true}} if you cannot find the cause."""
+
+NOEXEC_SENTENCE = 'You cannot run the build or the tests in this session, so reason from the source and the failing output.'
+KUNIT_HINT = """You CAN build and run the suite in this session with exactly this command (it takes about a minute):
+
+    python3 tools/testing/kunit/kunit.py run --kunitconfig=agent.kunitconfig --build_dir={build_dir} --jobs=8 {suite}
+
+Use it to confirm your fix before you finish."""
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -38,13 +60,24 @@ def main():
     ap.add_argument('--max-turns', type=int, default=30)
     ap.add_argument('--tools', default='Read Glob Grep Edit')
     ap.add_argument('--timeout', type=int, default=1500)
-    ap.add_argument('--out', type=Path, default=HERE.parents[1] / 'runs/fix_bug')
+    ap.add_argument('--out', type=Path, default=None)
+    ap.add_argument('--bench', default='fix_bug', help='receipt bench name and runs/ subfolder')
+    ap.add_argument('--kunit', action='store_true',
+                    help='let the agent build and run the suite (Bash restricted to kunit.py)')
+    ap.add_argument('--build-dir', type=Path, default=None,
+                    help='absolute build dir outside the worktree, used with --kunit')
     args = ap.parse_args()
+    variant = 'kunit' if args.kunit else 'noexec'
+    if args.kunit:
+        assert args.build_dir and args.build_dir.is_absolute(), '--kunit needs an absolute --build-dir'
+        args.tools = args.tools + ' Bash(python3 tools/testing/kunit/kunit.py:*)'
+    args.out = args.out or HERE.parents[1] / 'runs' / args.bench
     tasks = json.loads(args.tasks.read_text())['tasks']
     if args.ids:
         tasks = [t for t in tasks if t['id'] in set(args.ids)]
     args.out.mkdir(parents=True, exist_ok=True)
-    out = args.out / f'runs-{args.model}-{args.effort}-t{args.trial}.jsonl'
+    suffix = '' if variant == 'noexec' else '-' + variant
+    out = args.out / f'runs-{args.model}-{args.effort}{suffix}-t{args.trial}.jsonl'
     kept = []
     if out.exists():
         kept = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
@@ -60,7 +93,14 @@ def main():
             W.seed_mutation(wt, task)
             W.git(wt, '-c', 'user.email=bench@local', '-c', 'user.name=bench',
                   'commit', '-qam', 'seed')
-            prompt = PROMPT.format(suite=task['suite'], failing_output=task['failing_output'])
+            if args.kunit:
+                (Path(wt) / 'agent.kunitconfig').write_text((HERE / 'kunitconfig').read_text())
+            template = PROMPT_HARD if task.get('kind') else PROMPT
+            prompt = template.format(suite=task['suite'], failing_output=task['failing_output'])
+            if args.kunit:
+                prompt = prompt.replace(NOEXEC_SENTENCE, KUNIT_HINT.format(
+                    build_dir=args.build_dir, suite=task['suite']))
+                assert NOEXEC_SENTENCE not in prompt
             start = time.perf_counter()
             try:
                 reply = W.call_claude(prompt, args.model, args.effort, args.max_turns,
@@ -73,7 +113,9 @@ def main():
             patch = W.git(wt, 'diff', 'HEAD').stdout
             status = W.git(wt, 'status', '--porcelain').stdout
             changed = [l[3:].strip() for l in status.splitlines()]
-            record = {'id': task['id'], 'family': 'fix_bug', 'bench': 'fix_bug', 'arm': 'T',
+            changed = [c for c in changed if c != 'agent.kunitconfig']
+            record = {'id': task['id'], 'family': args.bench, 'bench': args.bench, 'arm': 'T',
+                      'kind': task.get('kind', 'single'), 'variant': variant,
                       'model_requested': args.model, 'effort': args.effort,
                       'trial': args.trial, 'tools': args.tools, 'max_turns': args.max_turns,
                       'prompt_chars': len(prompt),

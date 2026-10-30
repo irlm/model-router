@@ -1,0 +1,1732 @@
+{
+ "cells": {
+  "browser_flow / claude-fable-5-1 / low / 1": {
+   "n": 11,
+   "success": 10,
+   "outcomes": {
+    "correct": 10,
+    "wrong": 1
+   },
+   "cost_total": 24.905160000000002,
+   "cost_per_success": 2.4905160000000004,
+   "cost_mean": 2.264105454545455,
+   "cost_p90": 2.3674502500000005,
+   "cost_max": 2.4430715000000007,
+   "turns_mean": 52.27272727272727,
+   "turns_max": 67,
+   "wall_mean": 140.45272727272726,
+   "wall_total": 1544.98
+  },
+  "browser_flow / claude-haiku-5-5 / low / 1": {
+   "n": 11,
+   "success": 11,
+   "outcomes": {
+    "correct": 11
+   },
+   "cost_total": 0.38107989999999997,
+   "cost_per_success": 0.03464362727272727,
+   "cost_mean": 0.034643627272727275,
+   "cost_p90": 0.03908612,
+   "cost_max": 0.0423102,
+   "turns_mean": 47.45454545454545,
+   "turns_max": 57,
+   "wall_mean": 91.27,
+   "wall_total": 1003.97
+  },
+  "browser_flow / claude-sonnet-5-5 / low / 1": {
+   "n": 11,
+   "success": 11,
+   "outcomes": {
+    "correct": 11
+   },
+   "cost_total": 4.6944024,
+   "cost_per_success": 0.42676385454545457,
+   "cost_mean": 0.42676385454545457,
+   "cost_p90": 0.43871260000000006,
+   "cost_max": 0.45536550000000003,
+   "turns_mean": 40.72727272727273,
+   "turns_max": 47,
+   "wall_mean": 76.27818181818182,
+   "wall_total": 839.06
+  },
+  "find_feature / claude-fable-5-1 / low / 1": {
+   "n": 72,
+   "success": 72,
+   "outcomes": {
+    "correct": 72
+   },
+   "cost_total": 41.60874475,
+   "cost_per_success": 0.5778992326388889,
+   "cost_mean": 0.5778992326388889,
+   "cost_p90": 0.5977619999999999,
+   "cost_max": 0.6008637499999999,
+   "turns_mean": 2.5277777777777777,
+   "turns_max": 5,
+   "wall_mean": 8.348194444444445,
+   "wall_total": 601.07
+  },
+  "find_feature / claude-haiku-5-5 / low / 1": {
+   "n": 72,
+   "success": 70,
+   "outcomes": {
+    "correct": 70,
+    "wrong": 2
+   },
+   "cost_total": 0.46975825000000004,
+   "cost_per_success": 0.0067108321428571436,
+   "cost_mean": 0.0065244201388888895,
+   "cost_p90": 0.006957550000000001,
+   "cost_max": 0.00753571,
+   "turns_mean": 2.7916666666666665,
+   "turns_max": 7,
+   "wall_mean": 6.231527777777778,
+   "wall_total": 448.67
+  },
+  "find_feature / claude-haiku-5-5 / low / 2": {
+   "n": 72,
+   "success": 72,
+   "outcomes": {
+    "correct": 72
+   },
+   "cost_total": 0.28872168000000004,
+   "cost_per_success": 0.004010023333333334,
+   "cost_mean": 0.004010023333333334,
+   "cost_p90": 0.0068186,
+   "cost_max": 0.007958320000000001,
+   "turns_mean": 3.0972222222222223,
+   "turns_max": 7,
+   "wall_mean": 6.4470833333333335,
+   "wall_total": 464.19
+  },
+  "find_feature / claude-haiku-5-5 / low / 3": {
+   "n": 72,
+   "success": 72,
+   "outcomes": {
+    "correct": 72
+   },
+   "cost_total": 0.22582219,
+   "cost_per_success": 0.0031364193055555558,
+   "cost_mean": 0.0031364193055555558,
+   "cost_p90": 0.006414250000000001,
+   "cost_max": 0.00705167,
+   "turns_mean": 3.0694444444444446,
+   "turns_max": 10,
+   "wall_mean": 6.470277777777778,
+   "wall_total": 465.86
+  },
+  "find_feature / claude-haiku-5-5 / medium / 1": {
+   "n": 72,
+   "success": 72,
+   "outcomes": {
+    "correct": 72
+   },
+   "cost_total": 0.4713221000000001,
+   "cost_per_success": 0.006546140277777779,
+   "cost_mean": 0.006546140277777779,
+   "cost_p90": 0.007142960000000001,
+   "cost_max": 0.009181980000000003,
+   "turns_mean": 3.1527777777777777,
+   "turns_max": 7,
+   "wall_mean": 6.755972222222223,
+   "wall_total": 486.43
+  },
+  "find_feature / claude-haiku-5-5 / medium / 2": {
+   "n": 72,
+   "success": 70,
+   "outcomes": {
+    "correct": 70,
+    "wrong": 2
+   },
+   "cost_total": 0.28687936,
+   "cost_per_success": 0.004098276571428572,
+   "cost_mean": 0.003984435555555556,
+   "cost_p90": 0.006750690000000001,
+   "cost_max": 0.00778148,
+   "turns_mean": 3.0277777777777777,
+   "turns_max": 10,
+   "wall_mean": 6.794583333333334,
+   "wall_total": 489.21
+  },
+  "find_feature / claude-haiku-5-5 / medium / 3": {
+   "n": 72,
+   "success": 71,
+   "outcomes": {
+    "correct": 71,
+    "wrong": 1
+   },
+   "cost_total": 0.45028247000000005,
+   "cost_per_success": 0.00634200661971831,
+   "cost_mean": 0.006253923194444445,
+   "cost_p90": 0.006899740000000001,
+   "cost_max": 0.00793798,
+   "turns_mean": 2.861111111111111,
+   "turns_max": 5,
+   "wall_mean": 6.558888888888889,
+   "wall_total": 472.24
+  },
+  "find_feature / claude-sonnet-5-5 / low / 1": {
+   "n": 72,
+   "success": 72,
+   "outcomes": {
+    "correct": 72
+   },
+   "cost_total": 8.5804163,
+   "cost_per_success": 0.1191724486111111,
+   "cost_mean": 0.1191724486111111,
+   "cost_p90": 0.1235764,
+   "cost_max": 0.1411579,
+   "turns_mean": 2.388888888888889,
+   "turns_max": 5,
+   "wall_mean": 5.997361111111111,
+   "wall_total": 431.81
+  },
+  "find_feature / claude-sonnet-5-5 / low / 2": {
+   "n": 72,
+   "success": 72,
+   "outcomes": {
+    "correct": 72
+   },
+   "cost_total": 8.306446,
+   "cost_per_success": 0.11536730555555555,
+   "cost_mean": 0.11536730555555555,
+   "cost_p90": 0.11889820000000001,
+   "cost_max": 0.1264786,
+   "turns_mean": 2.3472222222222223,
+   "turns_max": 6,
+   "wall_mean": 6.260416666666667,
+   "wall_total": 450.75
+  },
+  "fix_bug / claude-fable-5-1 / low / 1": {
+   "n": 10,
+   "success": 10,
+   "outcomes": {
+    "fixed": 10
+   },
+   "cost_total": 7.47774975,
+   "cost_per_success": 0.747774975,
+   "cost_mean": 0.747774975,
+   "cost_p90": 0.89097825,
+   "cost_max": 1.0036049999999999,
+   "turns_mean": 4.7,
+   "turns_max": 10,
+   "wall_mean": 25.6,
+   "wall_total": 256.0
+  },
+  "fix_bug / claude-haiku-5-5 / low / 1": {
+   "n": 10,
+   "success": 10,
+   "outcomes": {
+    "fixed": 10
+   },
+   "cost_total": 0.12188353,
+   "cost_per_success": 0.012188353,
+   "cost_mean": 0.012188353,
+   "cost_p90": 0.01511943,
+   "cost_max": 0.02304643,
+   "turns_mean": 5.9,
+   "turns_max": 9,
+   "wall_mean": 28.14,
+   "wall_total": 281.4
+  },
+  "fix_bug / claude-sonnet-5-5 / low / 1": {
+   "n": 10,
+   "success": 10,
+   "outcomes": {
+    "fixed": 10
+   },
+   "cost_total": 1.4944891999999999,
+   "cost_per_success": 0.14944891999999999,
+   "cost_mean": 0.14944891999999999,
+   "cost_p90": 0.1632857,
+   "cost_max": 0.20798569999999997,
+   "turns_mean": 4.6,
+   "turns_max": 9,
+   "wall_mean": 12.057,
+   "wall_total": 120.57000000000001
+  },
+  "fix_bug_hard / claude-fable-5-1 / low / 1": {
+   "n": 21,
+   "success": 16,
+   "outcomes": {
+    "fixed": 16,
+    "still-failing": 5
+   },
+   "cost_total": 18.03235175,
+   "cost_per_success": 1.127021984375,
+   "cost_mean": 0.8586834166666667,
+   "cost_p90": 1.0428252500000001,
+   "cost_max": 1.0863225,
+   "turns_mean": 6.333333333333333,
+   "turns_max": 12,
+   "wall_mean": 31.006190476190476,
+   "wall_total": 651.13
+  },
+  "fix_bug_hard / claude-fable-5-1 / low+kunit / 1": {
+   "n": 21,
+   "success": 21,
+   "outcomes": {
+    "fixed": 21
+   },
+   "cost_total": 18.58943925,
+   "cost_per_success": 0.8852113928571429,
+   "cost_mean": 0.8852113928571429,
+   "cost_p90": 1.0500567499999998,
+   "cost_max": 1.09259425,
+   "turns_mean": 7.9523809523809526,
+   "turns_max": 15,
+   "wall_mean": 48.27428571428572,
+   "wall_total": 1013.76
+  },
+  "fix_bug_hard / claude-haiku-5-5 / low / 1": {
+   "n": 21,
+   "success": 16,
+   "outcomes": {
+    "fixed": 16,
+    "still-failing": 5
+   },
+   "cost_total": 0.25272536,
+   "cost_per_success": 0.015795335,
+   "cost_mean": 0.012034540952380953,
+   "cost_p90": 0.01713549,
+   "cost_max": 0.01792625,
+   "turns_mean": 6.380952380952381,
+   "turns_max": 13,
+   "wall_mean": 26.58238095238095,
+   "wall_total": 558.23
+  },
+  "fix_bug_hard / claude-haiku-5-5 / low+kunit / 1": {
+   "n": 21,
+   "success": 21,
+   "outcomes": {
+    "fixed": 21
+   },
+   "cost_total": 0.30205012000000003,
+   "cost_per_success": 0.01438333904761905,
+   "cost_mean": 0.014383339047619048,
+   "cost_p90": 0.02033441,
+   "cost_max": 0.02317853,
+   "turns_mean": 9.19047619047619,
+   "turns_max": 17,
+   "wall_mean": 46.894285714285715,
+   "wall_total": 984.78
+  },
+  "fix_bug_hard / claude-sonnet-5-5 / low / 1": {
+   "n": 21,
+   "success": 14,
+   "outcomes": {
+    "fixed": 14,
+    "still-failing": 7
+   },
+   "cost_total": 3.5895087,
+   "cost_per_success": 0.2563934785714286,
+   "cost_mean": 0.17092898571428572,
+   "cost_p90": 0.206175,
+   "cost_max": 0.2598777,
+   "turns_mean": 6.476190476190476,
+   "turns_max": 15,
+   "wall_mean": 22.21238095238095,
+   "wall_total": 466.46
+  },
+  "fix_bug_hard / claude-sonnet-5-5 / low+kunit / 1": {
+   "n": 21,
+   "success": 21,
+   "outcomes": {
+    "fixed": 21
+   },
+   "cost_total": 4.1391853,
+   "cost_per_success": 0.19710406190476193,
+   "cost_mean": 0.1971040619047619,
+   "cost_p90": 0.21920099999999998,
+   "cost_max": 0.29730180000000006,
+   "turns_mean": 9.904761904761905,
+   "turns_max": 20,
+   "wall_mean": 39.87,
+   "wall_total": 837.27
+  },
+  "write_tests / claude-fable-5-1 / low / 1": {
+   "n": 10,
+   "success": 4,
+   "outcomes": {
+    "catches-bug": 4,
+    "compile-fail": 1,
+    "fails-on-correct-code": 5
+   },
+   "cost_total": 18.30957275,
+   "cost_per_success": 4.5773931875,
+   "cost_mean": 1.830957275,
+   "cost_p90": 2.51257525,
+   "cost_max": 3.4443145000000004,
+   "turns_mean": 10.9,
+   "turns_max": 31,
+   "wall_mean": 167.784,
+   "wall_total": 1677.8400000000001
+  },
+  "write_tests / claude-fable-5-1 / low+kunit / 1": {
+   "n": 10,
+   "success": 10,
+   "outcomes": {
+    "catches-bug": 10
+   },
+   "cost_total": 15.077895,
+   "cost_per_success": 1.5077895,
+   "cost_mean": 1.5077895,
+   "cost_p90": 1.94134925,
+   "cost_max": 2.29453675,
+   "turns_mean": 8.9,
+   "turns_max": 15,
+   "wall_mean": 133.867,
+   "wall_total": 1338.67
+  },
+  "write_tests / claude-haiku-5-5 / low / 1": {
+   "n": 10,
+   "success": 5,
+   "outcomes": {
+    "catches-bug": 5,
+    "compile-fail": 1,
+    "fails-on-correct-code": 4
+   },
+   "cost_total": 0.24509148,
+   "cost_per_success": 0.049018296,
+   "cost_mean": 0.024509147999999998,
+   "cost_p90": 0.03418184,
+   "cost_max": 0.044422699999999996,
+   "turns_mean": 7,
+   "turns_max": 11,
+   "wall_mean": 93.467,
+   "wall_total": 934.6700000000001
+  },
+  "write_tests / claude-haiku-5-5 / low+kunit / 1": {
+   "n": 10,
+   "success": 10,
+   "outcomes": {
+    "catches-bug": 10
+   },
+   "cost_total": 0.25227692,
+   "cost_per_success": 0.025227692000000003,
+   "cost_mean": 0.025227692,
+   "cost_p90": 0.03029776,
+   "cost_max": 0.039800060000000005,
+   "turns_mean": 11,
+   "turns_max": 21,
+   "wall_mean": 90.929,
+   "wall_total": 909.29
+  },
+  "write_tests / claude-sonnet-5-5 / low / 1": {
+   "n": 10,
+   "success": 7,
+   "outcomes": {
+    "catches-bug": 7,
+    "compile-fail": 1,
+    "fails-on-correct-code": 2
+   },
+   "cost_total": 2.5931628,
+   "cost_per_success": 0.37045182857142855,
+   "cost_mean": 0.25931628,
+   "cost_p90": 0.3219613,
+   "cost_max": 0.3707162,
+   "turns_mean": 6.4,
+   "turns_max": 9,
+   "wall_mean": 50.323,
+   "wall_total": 503.23
+  },
+  "write_tests / claude-sonnet-5-5 / low+kunit / 1": {
+   "n": 10,
+   "success": 10,
+   "outcomes": {
+    "catches-bug": 10
+   },
+   "cost_total": 2.8698018,
+   "cost_per_success": 0.28698018,
+   "cost_mean": 0.28698018,
+   "cost_p90": 0.3812494,
+   "cost_max": 0.3883301,
+   "turns_mean": 9.4,
+   "turns_max": 17,
+   "wall_mean": 65.653,
+   "wall_total": 656.53
+  }
+ },
+ "by_family": {
+  "find_feature / claude-fable-5-1 / low / 1 / callers": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 7.098670749999999,
+   "cost_per_success": 0.5915558958333332,
+   "cost_mean": 0.5915558958333333,
+   "cost_p90": 0.5990432499999999,
+   "cost_max": 0.599302,
+   "turns_mean": 4.25,
+   "turns_max": 5,
+   "wall_mean": 8.831666666666667,
+   "wall_total": 105.98
+  },
+  "find_feature / claude-fable-5-1 / low / 1 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 6.8879235,
+   "cost_per_success": 0.5739936250000001,
+   "cost_mean": 0.5739936250000001,
+   "cost_p90": 0.59371875,
+   "cost_max": 0.60003375,
+   "turns_mean": 2.1666666666666665,
+   "turns_max": 3,
+   "wall_mean": 6.756666666666667,
+   "wall_total": 81.08
+  },
+  "find_feature / claude-fable-5-1 / low / 1 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 13.75400475,
+   "cost_per_success": 0.57308353125,
+   "cost_mean": 0.57308353125,
+   "cost_p90": 0.5887675,
+   "cost_max": 0.59313225,
+   "turns_mean": 2.2916666666666665,
+   "turns_max": 3,
+   "wall_mean": 8.635416666666666,
+   "wall_total": 207.25
+  },
+  "find_feature / claude-fable-5-1 / low / 1 / fields": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 6.9420477499999995,
+   "cost_per_success": 0.5785039791666666,
+   "cost_mean": 0.5785039791666666,
+   "cost_p90": 0.60054675,
+   "cost_max": 0.6008637499999999,
+   "turns_mean": 2.1666666666666665,
+   "turns_max": 3,
+   "wall_mean": 8.224166666666667,
+   "wall_total": 98.69
+  },
+  "find_feature / claude-fable-5-1 / low / 1 / refs": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 6.926098,
+   "cost_per_success": 0.5771748333333333,
+   "cost_mean": 0.5771748333333333,
+   "cost_p90": 0.5848915,
+   "cost_max": 0.59021825,
+   "turns_mean": 2,
+   "turns_max": 2,
+   "wall_mean": 9.005833333333333,
+   "wall_total": 108.07
+  },
+  "find_feature / claude-haiku-5-5 / low / 1 / callers": {
+   "n": 12,
+   "success": 11,
+   "outcomes": {
+    "correct": 11,
+    "wrong": 1
+   },
+   "cost_total": 0.07933639,
+   "cost_per_success": 0.007212399090909091,
+   "cost_mean": 0.006611365833333334,
+   "cost_p90": 0.007142980000000001,
+   "cost_max": 0.0072213799999999995,
+   "turns_mean": 3.9166666666666665,
+   "turns_max": 6,
+   "wall_mean": 6.2875,
+   "wall_total": 75.45
+  },
+  "find_feature / claude-haiku-5-5 / low / 1 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07876686000000001,
+   "cost_per_success": 0.006563905000000001,
+   "cost_mean": 0.006563905,
+   "cost_p90": 0.006976650000000001,
+   "cost_max": 0.00703666,
+   "turns_mean": 2.6666666666666665,
+   "turns_max": 4,
+   "wall_mean": 5.8925,
+   "wall_total": 70.71
+  },
+  "find_feature / claude-haiku-5-5 / low / 1 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 0.15501504000000002,
+   "cost_per_success": 0.006458960000000001,
+   "cost_mean": 0.006458960000000001,
+   "cost_p90": 0.0068836900000000005,
+   "cost_max": 0.00689511,
+   "turns_mean": 2.4583333333333335,
+   "turns_max": 3,
+   "wall_mean": 6.433333333333334,
+   "wall_total": 154.4
+  },
+  "find_feature / claude-haiku-5-5 / low / 1 / fields": {
+   "n": 12,
+   "success": 11,
+   "outcomes": {
+    "correct": 11,
+    "wrong": 1
+   },
+   "cost_total": 0.07825062,
+   "cost_per_success": 0.007113692727272728,
+   "cost_mean": 0.006520885000000001,
+   "cost_p90": 0.00702282,
+   "cost_max": 0.00753571,
+   "turns_mean": 2.3333333333333335,
+   "turns_max": 4,
+   "wall_mean": 5.664166666666667,
+   "wall_total": 67.97
+  },
+  "find_feature / claude-haiku-5-5 / low / 1 / refs": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07838934,
+   "cost_per_success": 0.0065324450000000004,
+   "cost_mean": 0.0065324450000000004,
+   "cost_p90": 0.00694579,
+   "cost_max": 0.006957550000000001,
+   "turns_mean": 2.9166666666666665,
+   "turns_max": 7,
+   "wall_mean": 6.678333333333334,
+   "wall_total": 80.14
+  },
+  "find_feature / claude-haiku-5-5 / low / 2 / callers": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.040457940000000005,
+   "cost_per_success": 0.0033714950000000004,
+   "cost_mean": 0.0033714950000000004,
+   "cost_p90": 0.006556850000000001,
+   "cost_max": 0.00656083,
+   "turns_mean": 4.666666666666667,
+   "turns_max": 6,
+   "wall_mean": 6.55,
+   "wall_total": 78.6
+  },
+  "find_feature / claude-haiku-5-5 / low / 2 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.048736510000000004,
+   "cost_per_success": 0.004061375833333334,
+   "cost_mean": 0.004061375833333334,
+   "cost_p90": 0.006827840000000001,
+   "cost_max": 0.007460520000000001,
+   "turns_mean": 2.75,
+   "turns_max": 4,
+   "wall_mean": 6.770833333333333,
+   "wall_total": 81.25
+  },
+  "find_feature / claude-haiku-5-5 / low / 2 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 0.09644393000000001,
+   "cost_per_success": 0.0040184970833333335,
+   "cost_mean": 0.0040184970833333335,
+   "cost_p90": 0.0073890100000000005,
+   "cost_max": 0.007958320000000001,
+   "turns_mean": 2.875,
+   "turns_max": 5,
+   "wall_mean": 6.863333333333333,
+   "wall_total": 164.72
+  },
+  "find_feature / claude-haiku-5-5 / low / 2 / fields": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07022793000000001,
+   "cost_per_success": 0.005852327500000001,
+   "cost_mean": 0.005852327500000001,
+   "cost_p90": 0.006790150000000001,
+   "cost_max": 0.0068186,
+   "turns_mean": 2.1666666666666665,
+   "turns_max": 3,
+   "wall_mean": 5.3725000000000005,
+   "wall_total": 64.47
+  },
+  "find_feature / claude-haiku-5-5 / low / 2 / refs": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.03285537,
+   "cost_per_success": 0.0027379475000000003,
+   "cost_mean": 0.0027379475000000003,
+   "cost_p90": 0.006339850000000001,
+   "cost_max": 0.00640701,
+   "turns_mean": 3.25,
+   "turns_max": 7,
+   "wall_mean": 6.2625,
+   "wall_total": 75.15
+  },
+  "find_feature / claude-haiku-5-5 / low / 3 / callers": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.031498990000000004,
+   "cost_per_success": 0.0026249158333333336,
+   "cost_mean": 0.0026249158333333336,
+   "cost_p90": 0.006414250000000001,
+   "cost_max": 0.0065756500000000015,
+   "turns_mean": 4.583333333333333,
+   "turns_max": 5,
+   "wall_mean": 6.5408333333333335,
+   "wall_total": 78.49
+  },
+  "find_feature / claude-haiku-5-5 / low / 3 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.0425526,
+   "cost_per_success": 0.0035460500000000002,
+   "cost_mean": 0.0035460500000000002,
+   "cost_p90": 0.00623833,
+   "cost_max": 0.006264930000000001,
+   "turns_mean": 2.3333333333333335,
+   "turns_max": 4,
+   "wall_mean": 6.184166666666667,
+   "wall_total": 74.21
+  },
+  "find_feature / claude-haiku-5-5 / low / 3 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 0.06412237,
+   "cost_per_success": 0.0026717654166666664,
+   "cost_mean": 0.002671765416666667,
+   "cost_p90": 0.0060953100000000005,
+   "cost_max": 0.006861540000000001,
+   "turns_mean": 2.7083333333333335,
+   "turns_max": 5,
+   "wall_mean": 6.8966666666666665,
+   "wall_total": 165.52
+  },
+  "find_feature / claude-haiku-5-5 / low / 3 / fields": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.046328320000000006,
+   "cost_per_success": 0.0038606933333333337,
+   "cost_mean": 0.0038606933333333337,
+   "cost_p90": 0.006604270000000001,
+   "cost_max": 0.00705167,
+   "turns_mean": 2.1666666666666665,
+   "turns_max": 4,
+   "wall_mean": 5.196666666666666,
+   "wall_total": 62.36
+  },
+  "find_feature / claude-haiku-5-5 / low / 3 / refs": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.04131991,
+   "cost_per_success": 0.0034433258333333334,
+   "cost_mean": 0.0034433258333333334,
+   "cost_p90": 0.006452050000000001,
+   "cost_max": 0.006731770000000001,
+   "turns_mean": 3.9166666666666665,
+   "turns_max": 10,
+   "wall_mean": 7.1066666666666665,
+   "wall_total": 85.28
+  },
+  "find_feature / claude-haiku-5-5 / medium / 1 / callers": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07902289000000001,
+   "cost_per_success": 0.006585240833333335,
+   "cost_mean": 0.006585240833333334,
+   "cost_p90": 0.007123750000000001,
+   "cost_max": 0.0073194800000000015,
+   "turns_mean": 4.25,
+   "turns_max": 6,
+   "wall_mean": 6.951666666666667,
+   "wall_total": 83.42
+  },
+  "find_feature / claude-haiku-5-5 / medium / 1 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07704932,
+   "cost_per_success": 0.006420776666666667,
+   "cost_mean": 0.006420776666666668,
+   "cost_p90": 0.007062810000000001,
+   "cost_max": 0.007501890000000001,
+   "turns_mean": 2.6666666666666665,
+   "turns_max": 5,
+   "wall_mean": 6.01,
+   "wall_total": 72.12
+  },
+  "find_feature / claude-haiku-5-5 / medium / 1 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 0.15891714,
+   "cost_per_success": 0.006621547500000001,
+   "cost_mean": 0.006621547500000001,
+   "cost_p90": 0.007331270000000001,
+   "cost_max": 0.009181980000000003,
+   "turns_mean": 2.9166666666666665,
+   "turns_max": 7,
+   "wall_mean": 7.35375,
+   "wall_total": 176.49
+  },
+  "find_feature / claude-haiku-5-5 / medium / 1 / fields": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07762108000000001,
+   "cost_per_success": 0.006468423333333334,
+   "cost_mean": 0.006468423333333334,
+   "cost_p90": 0.007028260000000001,
+   "cost_max": 0.007526230000000001,
+   "turns_mean": 2.3333333333333335,
+   "turns_max": 4,
+   "wall_mean": 5.551666666666667,
+   "wall_total": 66.62
+  },
+  "find_feature / claude-haiku-5-5 / medium / 1 / refs": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07871167000000001,
+   "cost_per_success": 0.006559305833333334,
+   "cost_mean": 0.006559305833333334,
+   "cost_p90": 0.006997070000000001,
+   "cost_max": 0.007043820000000001,
+   "turns_mean": 3.8333333333333335,
+   "turns_max": 7,
+   "wall_mean": 7.3149999999999995,
+   "wall_total": 87.78
+  },
+  "find_feature / claude-haiku-5-5 / medium / 2 / callers": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.02719575,
+   "cost_per_success": 0.0022663125,
+   "cost_mean": 0.0022663125,
+   "cost_p90": 0.00634129,
+   "cost_max": 0.00734464,
+   "turns_mean": 3.0833333333333335,
+   "turns_max": 6,
+   "wall_mean": 6.9725,
+   "wall_total": 83.67
+  },
+  "find_feature / claude-haiku-5-5 / medium / 2 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.05190526000000001,
+   "cost_per_success": 0.004325438333333334,
+   "cost_mean": 0.004325438333333334,
+   "cost_p90": 0.006750690000000001,
+   "cost_max": 0.006879980000000001,
+   "turns_mean": 2.5,
+   "turns_max": 4,
+   "wall_mean": 5.8975,
+   "wall_total": 70.77
+  },
+  "find_feature / claude-haiku-5-5 / medium / 2 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 0.11468752000000002,
+   "cost_per_success": 0.004778646666666667,
+   "cost_mean": 0.004778646666666667,
+   "cost_p90": 0.006433670000000001,
+   "cost_max": 0.007599910000000001,
+   "turns_mean": 2.875,
+   "turns_max": 7,
+   "wall_mean": 7.489166666666667,
+   "wall_total": 179.74
+  },
+  "find_feature / claude-haiku-5-5 / medium / 2 / fields": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.04231401,
+   "cost_per_success": 0.0035261675,
+   "cost_mean": 0.0035261675000000004,
+   "cost_p90": 0.006273910000000001,
+   "cost_max": 0.00687364,
+   "turns_mean": 2.25,
+   "turns_max": 4,
+   "wall_mean": 5.208333333333333,
+   "wall_total": 62.5
+  },
+  "find_feature / claude-haiku-5-5 / medium / 2 / refs": {
+   "n": 12,
+   "success": 10,
+   "outcomes": {
+    "correct": 10,
+    "wrong": 2
+   },
+   "cost_total": 0.05077682,
+   "cost_per_success": 0.005077682,
+   "cost_mean": 0.004231401666666667,
+   "cost_p90": 0.007050270000000001,
+   "cost_max": 0.00778148,
+   "turns_mean": 4.583333333333333,
+   "turns_max": 10,
+   "wall_mean": 7.710833333333333,
+   "wall_total": 92.53
+  },
+  "find_feature / claude-haiku-5-5 / medium / 3 / callers": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07781564,
+   "cost_per_success": 0.006484636666666667,
+   "cost_mean": 0.006484636666666667,
+   "cost_p90": 0.00688037,
+   "cost_max": 0.006899740000000001,
+   "turns_mean": 3.5,
+   "turns_max": 5,
+   "wall_mean": 7.194166666666667,
+   "wall_total": 86.33
+  },
+  "find_feature / claude-haiku-5-5 / medium / 3 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.0771898,
+   "cost_per_success": 0.006432483333333333,
+   "cost_mean": 0.006432483333333334,
+   "cost_p90": 0.00728738,
+   "cost_max": 0.007516320000000001,
+   "turns_mean": 2.5833333333333335,
+   "turns_max": 4,
+   "wall_mean": 6.5633333333333335,
+   "wall_total": 78.76
+  },
+  "find_feature / claude-haiku-5-5 / medium / 3 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 0.14082704000000001,
+   "cost_per_success": 0.005867793333333334,
+   "cost_mean": 0.005867793333333334,
+   "cost_p90": 0.007258320000000001,
+   "cost_max": 0.00793798,
+   "turns_mean": 2.6666666666666665,
+   "turns_max": 5,
+   "wall_mean": 6.694583333333333,
+   "wall_total": 160.67
+  },
+  "find_feature / claude-haiku-5-5 / medium / 3 / fields": {
+   "n": 12,
+   "success": 11,
+   "outcomes": {
+    "correct": 11,
+    "wrong": 1
+   },
+   "cost_total": 0.07719407,
+   "cost_per_success": 0.0070176427272727274,
+   "cost_mean": 0.0064328391666666675,
+   "cost_p90": 0.00698462,
+   "cost_max": 0.00740824,
+   "turns_mean": 2.4166666666666665,
+   "turns_max": 5,
+   "wall_mean": 5.57,
+   "wall_total": 66.84
+  },
+  "find_feature / claude-haiku-5-5 / medium / 3 / refs": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 0.07725592,
+   "cost_per_success": 0.0064379933333333335,
+   "cost_mean": 0.006437993333333334,
+   "cost_p90": 0.00662681,
+   "cost_max": 0.006763030000000001,
+   "turns_mean": 3.3333333333333335,
+   "turns_max": 5,
+   "wall_mean": 6.636666666666667,
+   "wall_total": 79.64
+  },
+  "find_feature / claude-sonnet-5-5 / low / 1 / callers": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 1.4264221,
+   "cost_per_success": 0.11886850833333333,
+   "cost_mean": 0.11886850833333333,
+   "cost_p90": 0.12321779999999999,
+   "cost_max": 0.12343140000000002,
+   "turns_mean": 2.1666666666666665,
+   "turns_max": 3,
+   "wall_mean": 5.983333333333333,
+   "wall_total": 71.8
+  },
+  "find_feature / claude-sonnet-5-5 / low / 1 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 1.459003,
+   "cost_per_success": 0.12158358333333334,
+   "cost_mean": 0.12158358333333333,
+   "cost_p90": 0.1292282,
+   "cost_max": 0.1411579,
+   "turns_mean": 2.75,
+   "turns_max": 5,
+   "wall_mean": 6.2716666666666665,
+   "wall_total": 75.26
+  },
+  "find_feature / claude-sonnet-5-5 / low / 1 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 2.8257636,
+   "cost_per_success": 0.11774015,
+   "cost_mean": 0.11774015,
+   "cost_p90": 0.1216478,
+   "cost_max": 0.1273255,
+   "turns_mean": 2.4166666666666665,
+   "turns_max": 4,
+   "wall_mean": 5.746666666666667,
+   "wall_total": 137.92
+  },
+  "find_feature / claude-sonnet-5-5 / low / 1 / fields": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 1.4246738,
+   "cost_per_success": 0.11872281666666668,
+   "cost_mean": 0.11872281666666668,
+   "cost_p90": 0.124627,
+   "cost_max": 0.1248263,
+   "turns_mean": 2.1666666666666665,
+   "turns_max": 3,
+   "wall_mean": 5.890833333333333,
+   "wall_total": 70.69
+  },
+  "find_feature / claude-sonnet-5-5 / low / 1 / refs": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 1.4445538,
+   "cost_per_success": 0.12037948333333333,
+   "cost_mean": 0.12037948333333333,
+   "cost_p90": 0.1238206,
+   "cost_max": 0.1245535,
+   "turns_mean": 2.4166666666666665,
+   "turns_max": 3,
+   "wall_mean": 6.345,
+   "wall_total": 76.14
+  },
+  "find_feature / claude-sonnet-5-5 / low / 2 / callers": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 1.3953709,
+   "cost_per_success": 0.11628090833333334,
+   "cost_mean": 0.11628090833333334,
+   "cost_p90": 0.11814079999999999,
+   "cost_max": 0.12397929999999999,
+   "turns_mean": 2.8333333333333335,
+   "turns_max": 6,
+   "wall_mean": 6.340833333333333,
+   "wall_total": 76.09
+  },
+  "find_feature / claude-sonnet-5-5 / low / 2 / dispatch": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 1.3877269,
+   "cost_per_success": 0.11564390833333334,
+   "cost_mean": 0.11564390833333334,
+   "cost_p90": 0.1200677,
+   "cost_max": 0.1264786,
+   "turns_mean": 2.3333333333333335,
+   "turns_max": 4,
+   "wall_mean": 6.364166666666667,
+   "wall_total": 76.37
+  },
+  "find_feature / claude-sonnet-5-5 / low / 2 / exists": {
+   "n": 24,
+   "success": 24,
+   "outcomes": {
+    "correct": 24
+   },
+   "cost_total": 2.7498901,
+   "cost_per_success": 0.11457875416666667,
+   "cost_mean": 0.11457875416666667,
+   "cost_p90": 0.11860580000000001,
+   "cost_max": 0.11897980000000001,
+   "turns_mean": 2.3333333333333335,
+   "turns_max": 3,
+   "wall_mean": 6.315416666666667,
+   "wall_total": 151.57
+  },
+  "find_feature / claude-sonnet-5-5 / low / 2 / fields": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 1.3894771,
+   "cost_per_success": 0.11578975833333333,
+   "cost_mean": 0.11578975833333333,
+   "cost_p90": 0.1220134,
+   "cost_max": 0.12203989999999999,
+   "turns_mean": 2.1666666666666665,
+   "turns_max": 3,
+   "wall_mean": 6.083333333333333,
+   "wall_total": 73.0
+  },
+  "find_feature / claude-sonnet-5-5 / low / 2 / refs": {
+   "n": 12,
+   "success": 12,
+   "outcomes": {
+    "correct": 12
+   },
+   "cost_total": 1.383981,
+   "cost_per_success": 0.11533175,
+   "cost_mean": 0.11533175,
+   "cost_p90": 0.1166818,
+   "cost_max": 0.11889820000000001,
+   "turns_mean": 2.0833333333333335,
+   "turns_max": 3,
+   "wall_mean": 6.1433333333333335,
+   "wall_total": 73.72
+  }
+ },
+ "misses": [
+  {
+   "cell": [
+    "browser_flow",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "flow-09-edit-loses-name",
+   "family": "browser_flow",
+   "outcome": "wrong",
+   "detail": "items 7:pass (truth fails ['6', '7']) drove=full",
+   "cost": 2.2595929999999997,
+   "turns": 52,
+   "wall": 144.65
+  },
+  {
+   "cell": [
+    "find_feature",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "fields-06",
+   "family": "fields",
+   "outcome": "wrong",
+   "detail": "",
+   "cost": 0.006344590000000001,
+   "turns": 2,
+   "wall": 6.02
+  },
+  {
+   "cell": [
+    "find_feature",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "callers-10",
+   "family": "callers",
+   "outcome": "wrong",
+   "detail": "lexical-confusion: lib/string_helpers.c has only definition",
+   "cost": 0.006605639999999999,
+   "turns": 5,
+   "wall": 6.23
+  },
+  {
+   "cell": [
+    "find_feature",
+    "claude-haiku-5-5",
+    "medium",
+    2
+   ],
+   "id": "refs-05",
+   "family": "refs",
+   "outcome": "wrong",
+   "detail": "",
+   "cost": 0.00778148,
+   "turns": 10,
+   "wall": 12.42
+  },
+  {
+   "cell": [
+    "find_feature",
+    "claude-haiku-5-5",
+    "medium",
+    2
+   ],
+   "id": "refs-10",
+   "family": "refs",
+   "outcome": "wrong",
+   "detail": "",
+   "cost": 0.00224624,
+   "turns": 4,
+   "wall": 9.72
+  },
+  {
+   "cell": [
+    "find_feature",
+    "claude-haiku-5-5",
+    "medium",
+    3
+   ],
+   "id": "fields-06",
+   "family": "fields",
+   "outcome": "wrong",
+   "detail": "",
+   "cost": 0.00674044,
+   "turns": 3,
+   "wall": 6.67
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-01-get_option+get_options",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.75162525,
+   "turns": 4,
+   "wall": 22.36
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.7469595,
+   "turns": 5,
+   "wall": 23.37
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-04-get_option+_parse_integer_limit",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.7504620000000001,
+   "turns": 4,
+   "wall": 22.68
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "hard-multi-string_helpers-02-string_escape_mem+string_unescape",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.7542129999999999,
+   "turns": 5,
+   "wall": 28.49
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "hard-multi-string-01-strncasecmp+strcspn",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.6414169999999999,
+   "turns": 3,
+   "wall": 9.68
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-02-get_option+get_range",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.00855694,
+   "turns": 3,
+   "wall": 15.01
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.01424001,
+   "turns": 5,
+   "wall": 38.76
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-04-get_option+_parse_integer_limit",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.01048016,
+   "turns": 4,
+   "wall": 28.83
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-string_helpers-02-string_escape_mem+string_unescape",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.00890117,
+   "turns": 4,
+   "wall": 9.62
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-string-01-strncasecmp+strcspn",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.0073977,
+   "turns": 3,
+   "wall": 9.74
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-01-get_option+get_options",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.14412809999999998,
+   "turns": 4,
+   "wall": 18.33
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-02-get_option+get_range",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.14421720000000002,
+   "turns": 4,
+   "wall": 11.35
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.1475515,
+   "turns": 4,
+   "wall": 11.87
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-cmdline-04-get_option+_parse_integer_limit",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.14777410000000002,
+   "turns": 4,
+   "wall": 14.64
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-string_helpers-02-string_escape_mem+string_unescape",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.1463081,
+   "turns": 5,
+   "wall": 19.47
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-string_helpers-03-string_get_size+string_unescape",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.1758518,
+   "turns": 7,
+   "wall": 23.04
+  },
+  {
+   "cell": [
+    "fix_bug_hard",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "hard-multi-string-01-strncasecmp+strcspn",
+   "family": "fix_bug_hard",
+   "outcome": "still-failing",
+   "detail": "",
+   "cost": 0.1338327,
+   "turns": 3,
+   "wall": 18.01
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "test-string-01-strncasecmp",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=19 clean_fail=2 bug_fail=12 detects=True",
+   "cost": 1.2518877499999999,
+   "turns": 4,
+   "wall": 102.84
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "test-string_helpers-02-string_escape_mem",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=26 clean_fail=1 bug_fail=21 detects=True",
+   "cost": 2.51257525,
+   "turns": 31,
+   "wall": 243.3
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "test-string_helpers-03-string_unescape",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=18 clean_fail=1 bug_fail=15 detects=True",
+   "cost": 1.893406,
+   "turns": 11,
+   "wall": 177.83
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "test-cmdline-01-get_option",
+   "family": "write_tests",
+   "outcome": "compile-fail",
+   "detail": "$KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer | $KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer | $KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid ini",
+   "cost": 1.2338032500000002,
+   "turns": 4,
+   "wall": 121.34
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "test-cmdline-02-get_options",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=41 clean_fail=2 bug_fail=30 detects=True",
+   "cost": 1.9620859999999998,
+   "turns": 6,
+   "wall": 194.72
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "test-cmdline-03-memparse",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=22 clean_fail=1 bug_fail=0 detects=False",
+   "cost": 1.55533375,
+   "turns": 8,
+   "wall": 148.57
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "test-string-01-strncasecmp",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=14 clean_fail=2 bug_fail=11 detects=True",
+   "cost": 0.0168148,
+   "turns": 4,
+   "wall": 58.48
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "test-string-02-strcspn",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=16 clean_fail=1 bug_fail=13 detects=True",
+   "cost": 0.01161889,
+   "turns": 5,
+   "wall": 28.39
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "test-string_helpers-02-string_escape_mem",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=20 clean_fail=1 bug_fail=15 detects=True",
+   "cost": 0.044422699999999996,
+   "turns": 11,
+   "wall": 191.81
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "test-string_helpers-03-string_unescape",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=15 clean_fail=2 bug_fail=12 detects=True",
+   "cost": 0.03418184,
+   "turns": 10,
+   "wall": 145.78
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "test-cmdline-01-get_option",
+   "family": "write_tests",
+   "outcome": "compile-fail",
+   "detail": "$KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer",
+   "cost": 0.01952732,
+   "turns": 9,
+   "wall": 64.7
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "test-string_helpers-01-string_get_size",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=11 clean_fail=2 bug_fail=5 detects=True",
+   "cost": 0.2603931,
+   "turns": 9,
+   "wall": 56.39
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "test-string_helpers-02-string_escape_mem",
+   "family": "write_tests",
+   "outcome": "fails-on-correct-code",
+   "detail": "cases=20 clean_fail=1 bug_fail=16 detects=True",
+   "cost": 0.3219613,
+   "turns": 6,
+   "wall": 69.67
+  },
+  {
+   "cell": [
+    "write_tests",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "test-cmdline-01-get_option",
+   "family": "write_tests",
+   "outcome": "compile-fail",
+   "detail": "$KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer | $KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid initializer | $KERNEL_WT/grade-tests/include/kunit/test.h:774:39: error: invalid ini",
+   "cost": 0.249159,
+   "turns": 6,
+   "wall": 44.36
+  }
+ ]
+}

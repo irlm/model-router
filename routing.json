@@ -4,7 +4,8 @@
  "basis": [
   "results/cell1",
   "results/cell2",
-  "results/cell3"
+  "results/cell3",
+  "results/cell4"
  ],
  "prices_verified": "see catalog/models.json",
  "runtime": {
@@ -95,8 +96,46 @@
    },
    "status": "decided"
   },
+  "browser_flow": {
+   "what": "drive a web page through a numbered checklist in a real Chrome tab (Claude-in-Chrome tools only, no source, no network/console); report pass/fail per item",
+   "default": {
+    "model": "haiku",
+    "effort": "low"
+   },
+   "step_up": null,
+   "escalation_rule": null,
+   "why_no_escalation": "haiku matched sonnet item for item; the only miss in 33 runs was fable's lenient reading of one ambiguous item",
+   "checker": "a scripted user (bench/browser_flow/oracle.py) drives the same app and gives the truth vector; the app's action log confirms the flow was really driven",
+   "evidence": {
+    "haiku low": "11/11 correct, 11/11 drove the full flow",
+    "sonnet low": "11/11 correct, 11/11 drove the full flow",
+    "fable low": "10/11 correct, 11/11 drove the full flow",
+    "cold_cost_per_flow_usd": {
+     "haiku": 0.035,
+     "sonnet": 0.427,
+     "fable": 2.26
+    },
+    "wall_s_mean": {
+     "haiku": 91,
+     "sonnet": 76,
+     "fable": 140
+    },
+    "turns_mean": {
+     "haiku": 47,
+     "sonnet": 41,
+     "fable": 52
+    }
+   },
+   "not_measured": [
+    "exploratory testing without a checklist",
+    "visual judgement from screenshots",
+    "JavaScript-heavy, scrolling or slow pages",
+    "more than one trial"
+   ],
+   "status": "decided"
+  },
   "unmeasured": {
-   "what": "everything else (review, design, writing, browser flows, ...)",
+   "what": "everything else (review, design, writing, exploratory browser testing, visual review, ...)",
    "default": {
     "model": "inherit",
     "effort": "inherit"
@@ -109,7 +148,7 @@
   "effort low first; medium bought nothing on the one family where it was swept",
   "give the agent a checker (build, tests) before giving it a bigger model",
   "no blind downgrade where there is no checker",
-  "the fixed prefix (~95k tokens, ~27k written per new session) is most of a short session's bill: count sessions on expensive models, not tokens",
+  "the fixed prefix (~95k tokens, ~27k written per new session) is most of a short session's bill: count sessions on expensive models, not tokens; browser flows (40-50 tool calls) are the exception, there cache reads dominate and tokens per session matter too",
   "user override wins: per-invocation model, then the agent file, then this file"
  ],
  "agents": {
@@ -131,6 +170,13 @@
    "effort": "low",
    "note": "has Bash, so the test runner is in the loop",
    "instruction": "Run every test you write before you finish, and fix the test or the expectation until it passes on the current code. A test you did not run is not a deliverable."
+  },
+  "testing-evidence-collector.md": {
+   "family": "browser_flow",
+   "model": "haiku",
+   "effort": "low",
+   "note": "closest agent to the measured family; its screenshot/visual-review and 'minimum 3-5 issues' parts are not measured",
+   "instruction": "When you are given a page and a checklist, drive every step in order in the browser, judge each item only by what you actually see on screen, and report pass or fail per item with one sentence of evidence for each fail. Do not report a failure you did not observe."
   }
  },
  "recheck_when": [
@@ -139,5 +185,5 @@
   "a routed family's success rate drops in use",
   "a new family is measured"
  ],
- "revised": "2026-10-30 after cell 3"
+ "revised": "2026-10-30 after cell 4"
 }

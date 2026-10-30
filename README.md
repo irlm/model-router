@@ -4,10 +4,12 @@ Which model, at which effort, for which kind of agent work, measured on our own 
 The output is a routing strategy per task family that agents read, with the numbers behind it,
 re-evaluated when a new model appears and repriced when a price changes.
 
-Status: scaffold and first cell (2026-10-29). See `results/` for what has actually run.
+Status: routing v1 decided 2026-10-30 from three families, see `ROUTING.md`. `results/` holds what has actually run.
 
 ## Layout
 
+- `ROUTING.md`, `routing.json`: the decision (model and effort per task family, with the evidence)
+  in prose and for scripts. `apply_agents.py` writes it into the agent files' frontmatter (`--revert` undoes).
 - `catalog/models.json`: models, API prices, verified date and source. Prices are not in the providers'
   model-list APIs, so a new model is "price unknown" until a human fills it in.
 - `catalog/discover.py`: the thing to run after a launch. Lists live models per provider, diffs against the

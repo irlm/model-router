@@ -1,0 +1,64 @@
+{
+ "version": 1,
+ "decided": "2026-10-30",
+ "basis": ["results/cell1", "results/cell2"],
+ "prices_verified": "see catalog/models.json",
+ "runtime": {
+  "subscription": "claude.ai login; cost_usd in receipts is API-equivalent, not a bill",
+  "baseline_before_v1": "every subagent inherited the main model (claude-fable-5-1) at effort xhigh (settings.json effortLevel)",
+  "precedence": ["Agent tool per-invocation model", "agent file frontmatter model/effort", "CLAUDE_CODE_SUBAGENT_MODEL", "main conversation model"]
+ },
+ "families": {
+  "find_feature": {
+   "what": "locate code, callers, fields, dispatch targets in a huge codebase with search tools; no writes",
+   "default": {"model": "haiku", "effort": "low"},
+   "step_up": {"model": "sonnet", "effort": "low", "when": "a 1-in-80 wrong answer is expensive"},
+   "escalation_rule": null,
+   "why_no_escalation": "misses are confident answers, there is no failure signal to trigger on",
+   "evidence": {"haiku low": "214/216 over 3 trials", "haiku medium": "213/216 over 3 trials", "sonnet low": "144/144 over 2 cold trials", "fable low": "72/72",
+                "cold_cost_per_task_usd": {"haiku": 0.0067, "sonnet": 0.119, "fable": 0.578}},
+   "status": "decided"
+  },
+  "fix_bug": {
+   "what": "fix a bug given a failing test that points at the function; no test runs",
+   "default": {"model": "haiku", "effort": "low"},
+   "step_up": {"model": "sonnet", "effort": "low", "when": "the test still fails after the cheap fix (needs a runner to know)"},
+   "escalation_rule": "run haiku, run the suite, escalate to sonnet if it still fails",
+   "evidence": {"all tiers low": "10/10 each", "cold_cost_per_task_usd": {"haiku": 0.012, "sonnet": 0.149, "fable": 0.748}},
+   "status": "provisional: single-site bugs saturated every tier; harder bugs pending (cell 3)"
+  },
+  "write_tests": {
+   "what": "write a test suite for a function; success = builds, passes on real code, fails on a seeded bug",
+   "default": {"model": "haiku", "effort": "low", "requires": "the agent can build and run the tests"},
+   "step_up": null,
+   "without_runner": "do not use any tier: haiku 5/10, sonnet 7/10, fable 4/10, all with wrong expected values",
+   "evidence": {"with runner, all tiers low": "10/10 each", "cold_cost_per_task_usd_with_runner": {"haiku": 0.025, "sonnet": 0.287, "fable": 1.51},
+                "cost_per_success_without_runner_usd": {"haiku": 0.049, "sonnet": 0.370, "fable": 4.58}},
+   "status": "decided"
+  },
+  "unmeasured": {
+   "what": "everything else (review, design, writing, browser flows, ...)",
+   "default": {"model": "inherit", "effort": "inherit"},
+   "why": "no evidence; a cheap model's miss is silent where there is no checker (cell 1), so no blind downgrade",
+   "status": "open"
+  }
+ },
+ "rules": [
+  "effort low first; medium bought nothing on the one family where it was swept",
+  "give the agent a checker (build, tests) before giving it a bigger model",
+  "no blind downgrade where there is no checker",
+  "the fixed prefix (~95k tokens, ~27k written per new session) is most of a short session's bill: count sessions on expensive models, not tokens",
+  "user override wins: per-invocation model, then the agent file, then this file"
+ ],
+ "agents": {
+  "engineering-codebase-onboarding-engineer.md": {"family": "find_feature", "model": "haiku", "effort": "low"},
+  "engineering-minimal-change-engineer.md": {"family": "fix_bug", "model": "haiku", "effort": "low"},
+  "testing-api-tester.md": {"family": "write_tests", "model": "haiku", "effort": "low", "note": "has Bash, so the test runner is in the loop"}
+ },
+ "recheck_when": [
+  "catalog/discover.py reports a new or delisted model id",
+  "a price in catalog/models.json changes",
+  "a routed family's success rate drops in use",
+  "a new family is measured"
+ ]
+}

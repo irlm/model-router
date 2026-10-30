@@ -46,14 +46,16 @@ Fable, and Sonnet already saturated every family.
 ## Where the rules live
 
 - `routing.json`: the same table, for scripts and agents to read.
-- Agent files (`~/.claude/agents/*.md`): `model:` and `effort:` frontmatter, set by
-  `python3 apply_agents.py` and removed by `python3 apply_agents.py --revert`. Applied in v1:
+- Agent files (`~/.claude/agents/*.md`): `model:` and `effort:` frontmatter, plus a marked
+  "Routing rule" paragraph after the frontmatter where cell 3 showed the instruction matters more
+  than the model (run the tests before finishing). Set by `python3 apply_agents.py`, removed by
+  `python3 apply_agents.py --revert`. Applied:
 
   | Agent file | Family | Set to |
   |---|---|---|
   | `engineering-codebase-onboarding-engineer.md` | find_feature | haiku / low |
-  | `engineering-minimal-change-engineer.md` | fix_bug | haiku / low (it has Bash; it should run the tests before it finishes) |
-  | `testing-api-tester.md` | write_tests | haiku / low (it has Bash, so it can run the tests) |
+  | `engineering-minimal-change-engineer.md` | fix_bug | haiku / low, plus: run the covering tests before finishing, keep going if they still fail |
+  | `testing-api-tester.md` | write_tests | haiku / low, plus: run every test you write before finishing |
 
   The other 181 files are untouched. `CLAUDE_CODE_SUBAGENT_MODEL` is not set, on purpose: it
   would downgrade unmeasured families.

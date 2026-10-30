@@ -122,13 +122,15 @@
    "family": "fix_bug",
    "model": "haiku",
    "effort": "low",
-   "note": "has Bash, so the test runner is in the loop; run the tests before finishing"
+   "note": "has Bash, so the test runner is in the loop; run the tests before finishing",
+   "instruction": "Before you finish a fix, run the tests that cover it (the failing test and its suite) and read the result. If anything still fails, keep going: there may be more than one defect. Report the test command and its outcome with your diff."
   },
   "testing-api-tester.md": {
    "family": "write_tests",
    "model": "haiku",
    "effort": "low",
-   "note": "has Bash, so the test runner is in the loop"
+   "note": "has Bash, so the test runner is in the loop",
+   "instruction": "Run every test you write before you finish, and fix the test or the expectation until it passes on the current code. A test you did not run is not a deliverable."
   }
  },
  "recheck_when": [

@@ -1,9 +1,10 @@
 """Apply (or revert) routing.json to the Claude Code agent files.
 
 For each file named in routing.json["agents"], set `model:` and `effort:` in
-the YAML frontmatter. Only those two keys are touched; everything else in the
-file is left byte-identical. `--revert` removes the two keys (no agent file
-had either key before routing v1, verified 2026-10-30 over 184 files).
+the YAML frontmatter and, when the entry has an `instruction`, a marked
+paragraph right after the frontmatter. Nothing else in the file is touched.
+`--revert` removes the two keys and the paragraph (no agent file had either
+key before routing v1, verified 2026-10-30 over 184 files).
 
 Usage: python3 apply_agents.py [--agents-dir ~/.claude/agents] [--revert] [--dry-run]
 """
@@ -13,17 +14,28 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 KEYS = ('model:', 'effort:')
+MARK = '<!-- model-router -->'
 
 
-def rewrite(text, model, effort, revert):
+def rewrite(text, model, effort, revert, instruction=None):
     lines = text.split('\n')
     if lines[0] != '---':
         raise ValueError('no frontmatter')
     end = lines.index('---', 1)
     front = [l for l in lines[1:end] if not l.startswith(KEYS)]
+    body = lines[end + 1:]
+    for i, l in enumerate(body):  # drop an earlier instruction line and its blank line
+        if l.startswith(MARK):
+            del body[i:i + 2 if i + 1 < len(body) and body[i + 1] == '' else i + 1]
+            break
     if not revert:
         front += [f'model: {model}', f'effort: {effort}']
-    return '\n'.join(['---', *front, '---', *lines[end + 1:]])
+        if instruction:
+            lead = 0
+            while lead < len(body) and body[lead] == '':
+                lead += 1
+            body = body[:lead] + [f'{MARK} **Routing rule (model-router, ROUTING.md):** {instruction}', ''] + body[lead:]
+    return '\n'.join(['---', *front, '---', *body])
 
 
 def main():
@@ -40,7 +52,7 @@ def main():
     for name, route in agents.items():
         path = args.agents_dir / name
         before = path.read_text()
-        after = rewrite(before, route['model'], route['effort'], args.revert)
+        after = rewrite(before, route['model'], route['effort'], args.revert, route.get('instruction'))
         state = 'unchanged' if after == before else ('would change' if args.dry_run else 'changed')
         if not args.dry_run and after != before:
             path.write_text(after)

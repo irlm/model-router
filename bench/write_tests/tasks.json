@@ -1,0 +1,95 @@
+{
+ "tree": "$KERNEL_TREE",
+ "tasks": [
+  {
+   "id": "test-string-01-strncasecmp",
+   "family": "write_tests",
+   "file": "lib/string.c",
+   "function": "strncasecmp",
+   "existing_suite": "string",
+   "mutation": "inc-to-dec",
+   "mutated_function": "int strncasecmp(const char *s1, const char *s2, size_t len)\n{\n\t/* Yes, Virginia, it had better be unsigned */\n\tunsigned char c1, c2;\n\n\tif (!len)\n\t\treturn 0;\n\n\tdo {\n\t\tc1 = *s1--;\n\t\tc2 = *s2++;\n\t\tif (!c1 || !c2)\n\t\t\tbreak;\n\t\tif (c1 == c2)\n\t\t\tcontinue;\n\t\tc1 = tolower(c1);\n\t\tc2 = tolower(c2);\n\t\tif (c1 != c2)\n\t\t\tbreak;\n\t} while (--len);\n\treturn (int)c1 - (int)c2;\n}"
+  },
+  {
+   "id": "test-string-02-strcspn",
+   "family": "write_tests",
+   "file": "lib/string.c",
+   "function": "strcspn",
+   "existing_suite": "string",
+   "mutation": "inc-to-dec",
+   "mutated_function": "size_t strcspn(const char *s, const char *reject)\n{\n\tconst char *p;\n\n\tfor (p = s; *p != '\\0'; --p) {\n\t\tif (strchr(reject, *p))\n\t\t\tbreak;\n\t}\n\treturn p - s;\n}"
+  },
+  {
+   "id": "test-string_helpers-01-string_get_size",
+   "family": "write_tests",
+   "file": "lib/string_helpers.c",
+   "function": "string_get_size",
+   "existing_suite": "string_helpers",
+   "mutation": "inc-to-dec",
+   "mutated_function": "int string_get_size(u64 size, u64 blk_size, const enum string_size_units units,\n\t\t    char *buf, int len)\n{\n\tenum string_size_units units_base = units & STRING_UNITS_MASK;\n\tstatic const char *const units_10[] = {\n\t\t\"\", \"k\", \"M\", \"G\", \"T\", \"P\", \"E\", \"Z\", \"Y\",\n\t};\n\tstatic const char *const units_2[] = {\n\t\t\"\", \"Ki\", \"Mi\", \"Gi\", \"Ti\", \"Pi\", \"Ei\", \"Zi\", \"Yi\",\n\t};\n\tstatic const char *const *const units_str[] = {\n\t\t[STRING_UNITS_10] = units_10,\n\t\t[STRING_UNITS_2] = units_2,\n\t};\n\tstatic const unsigned int divisor[] = {\n\t\t[STRING_UNITS_10] = 1000,\n\t\t[STRING_UNITS_2] = 1024,\n\t};\n\tstatic const unsigned int rounding[] = { 500, 50, 5 };\n\tint i = 0, j;\n\tu32 remainder = 0, sf_cap;\n\tchar tmp[8];\n\tconst char *unit;\n\n\ttmp[0] = '\\0';\n\n\tif (blk_size == 0)\n\t\tsize = 0;\n\tif (size == 0)\n\t\tgoto out;\n\n\t/* This is Napier's algorithm.  Reduce the original block size to\n\t *\n\t * coefficient * divisor[units_base]^i\n\t *\n\t * we do the reduction so both coefficients are just under 32 bits so\n\t * that multiplying them together won't overflow 64 bits and we keep\n\t * as much precision as possible in the numbers.\n\t *\n\t * Note: it's safe to throw away the remainders here because all the\n\t * precision is in the coefficients.\n\t */\n\twhile (blk_size >> 32) {\n\t\tdo_div(blk_size, divisor[units_base]);\n\t\ti++;\n\t}\n\n\twhile (size >> 32) {\n\t\tdo_div(size, divisor[units_base]);\n\t\ti--;\n\t}\n\n\t/* now perform the actual multiplication keeping i as the sum of the\n\t * two logarithms */\n\tsize *= blk_size;\n\n\t/* and logarithmically reduce it until it's just under the divisor */\n\twhile (size >= divisor[units_base]) {\n\t\tremainder = do_div(size, divisor[units_base]);\n\t\ti++;\n\t}\n\n\t/* work out in j how many digits of precision we need from the\n\t * remainder */\n\tsf_cap = size;\n\tfor (j = 0; sf_cap*10 < 1000; j++)\n\t\tsf_cap *= 10;\n\n\tif (units_base == STRING_UNITS_2) {\n\t\t/* express the remainder as a decimal.  It's currently the\n\t\t * numerator of a fraction whose denominator is\n\t\t * divisor[units_base], which is 1 << 10 for STRING_UNITS_2 */\n\t\tremainder *= 1000;\n\t\tremainder >>= 10;\n\t}\n\n\t/* add a 5 to the digit below what will be printed to ensure\n\t * an arithmetical round up and carry it through to size */\n\tremainder += rounding[j];\n\tif (remainder >= 1000) {\n\t\tremainder -= 1000;\n\t\tsize += 1;\n\t}\n\n\tif (j) {\n\t\tsnprintf(tmp, sizeof(tmp), \".%03u\", remainder);\n\t\ttmp[j+1] = '\\0';\n\t}\n\n out:\n\tif (i >= ARRAY_SIZE(units_2))\n\t\tunit = \"UNK\";\n\telse\n\t\tunit = units_str[units_base][i];\n\n\treturn snprintf(buf, len, \"%u%s%s%s%s\", (u32)size, tmp,\n\t\t\t(units & STRING_UNITS_NO_SPACE) ? \"\" : \" \",\n\t\t\tunit,\n\t\t\t(units & STRING_UNITS_NO_BYTES) ? \"\" : \"B\");\n}"
+  },
+  {
+   "id": "test-string_helpers-02-string_escape_mem",
+   "family": "write_tests",
+   "file": "lib/string_helpers.c",
+   "function": "string_escape_mem",
+   "existing_suite": "string_helpers",
+   "mutation": "inc-to-dec",
+   "mutated_function": "int string_escape_mem(const char *src, size_t isz, char *dst, size_t osz,\n\t\t      unsigned int flags, const char *only)\n{\n\tchar *p = dst;\n\tchar *end = p + osz;\n\tbool is_dict = only && *only;\n\tbool is_append = flags & ESCAPE_APPEND;\n\n\twhile (isz--) {\n\t\tunsigned char c = *src--;\n\t\tbool in_dict = is_dict && strchr(only, c);\n\n\t\t/*\n\t\t * Apply rules in the following sequence:\n\t\t *\t- the @only string is supplied and does not contain a\n\t\t *\t  character under question\n\t\t *\t- the character is printable and ASCII, when @flags has\n\t\t *\t  %ESCAPE_NAP bit set\n\t\t *\t- the character is printable, when @flags has\n\t\t *\t  %ESCAPE_NP bit set\n\t\t *\t- the character is ASCII, when @flags has\n\t\t *\t  %ESCAPE_NA bit set\n\t\t *\t- the character doesn't fall into a class of symbols\n\t\t *\t  defined by given @flags\n\t\t * In these cases we just pass through a character to the\n\t\t * output buffer.\n\t\t *\n\t\t * When %ESCAPE_APPEND is passed, the characters from @only\n\t\t * have been excluded from the %ESCAPE_NAP, %ESCAPE_NP, and\n\t\t * %ESCAPE_NA cases.\n\t\t */\n\t\tif (!(is_append || in_dict) && is_dict &&\n\t\t\t\t\t  escape_passthrough(c, &p, end))\n\t\t\tcontinue;\n\n\t\tif (!(is_append && in_dict) && isascii(c) && isprint(c) &&\n\t\t    flags & ESCAPE_NAP && escape_passthrough(c, &p, end))\n\t\t\tcontinue;\n\n\t\tif (!(is_append && in_dict) && isprint(c) &&\n\t\t    flags & ESCAPE_NP && escape_passthrough(c, &p, end))\n\t\t\tcontinue;\n\n\t\tif (!(is_append && in_dict) && isascii(c) &&\n\t\t    flags & ESCAPE_NA && escape_passthrough(c, &p, end))\n\t\t\tcontinue;\n\n\t\tif (flags & ESCAPE_SPACE && escape_space(c, &p, end))\n\t\t\tcontinue;\n\n\t\tif (flags & ESCAPE_SPECIAL && escape_special(c, &p, end))\n\t\t\tcontinue;\n\n\t\tif (flags & ESCAPE_NULL && escape_null(c, &p, end))\n\t\t\tcontinue;\n\n\t\t/* ESCAPE_OCTAL and ESCAPE_HEX always go last */\n\t\tif (flags & ESCAPE_OCTAL && escape_octal(c, &p, end))\n\t\t\tcontinue;\n\n\t\tif (flags & ESCAPE_HEX && escape_hex(c, &p, end))\n\t\t\tcontinue;\n\n\t\tescape_passthrough(c, &p, end);\n\t}\n\n\treturn p - dst;\n}"
+  },
+  {
+   "id": "test-string_helpers-03-string_unescape",
+   "family": "write_tests",
+   "file": "lib/string_helpers.c",
+   "function": "string_unescape",
+   "existing_suite": "string_helpers",
+   "mutation": "ne-to-eq",
+   "mutated_function": "int string_unescape(char *src, char *dst, size_t size, unsigned int flags)\n{\n\tchar *out = dst;\n\n\tif (!size)\n\t\tsize = SIZE_MAX;\n\n\twhile (*src && --size) {\n\t\tif (src[0] == '\\\\' && src[1] == '\\0' && size > 1) {\n\t\t\tsrc++;\n\t\t\tsize--;\n\n\t\t\tif (flags & UNESCAPE_SPACE &&\n\t\t\t\t\tunescape_space(&src, &out))\n\t\t\t\tcontinue;\n\n\t\t\tif (flags & UNESCAPE_OCTAL &&\n\t\t\t\t\tunescape_octal(&src, &out))\n\t\t\t\tcontinue;\n\n\t\t\tif (flags & UNESCAPE_HEX &&\n\t\t\t\t\tunescape_hex(&src, &out))\n\t\t\t\tcontinue;\n\n\t\t\tif (flags & UNESCAPE_SPECIAL &&\n\t\t\t\t\tunescape_special(&src, &out))\n\t\t\t\tcontinue;\n\n\t\t\t*out++ = '\\\\';\n\t\t}\n\t\t*out++ = *src++;\n\t}\n\t*out = '\\0';\n\n\treturn out - dst;\n}"
+  },
+  {
+   "id": "test-cmdline-01-get_option",
+   "family": "write_tests",
+   "file": "lib/cmdline.c",
+   "function": "get_option",
+   "existing_suite": "cmdline",
+   "mutation": "inc-to-dec",
+   "mutated_function": "int get_option(char **str, int *pint)\n{\n\tchar *cur = *str;\n\tint value;\n\n\tif (!cur || !(*cur))\n\t\treturn 0;\n\tif (*cur == '-')\n\t\tvalue = -simple_strtoull(--cur, str, 0);\n\telse\n\t\tvalue = simple_strtoull(cur, str, 0);\n\tif (pint)\n\t\t*pint = value;\n\tif (cur == *str)\n\t\treturn 0;\n\tif (**str == ',') {\n\t\t(*str)++;\n\t\treturn 2;\n\t}\n\tif (**str == '-')\n\t\treturn 3;\n\n\treturn 1;\n}"
+  },
+  {
+   "id": "test-cmdline-02-get_options",
+   "family": "write_tests",
+   "file": "lib/cmdline.c",
+   "function": "get_options",
+   "existing_suite": "cmdline",
+   "mutation": "eq-to-ne",
+   "mutated_function": "char *get_options(const char *str, int nints, int *ints)\n{\n\tbool validate = (nints == 0);\n\tint res, i = 1;\n\n\twhile (i < nints || validate) {\n\t\tint *pint = validate ? ints : ints + i;\n\n\t\tres = get_option((char **)&str, pint);\n\t\tif (res == 0)\n\t\t\tbreak;\n\t\tif (res == 3) {\n\t\t\tint n = validate ? 0 : nints - i;\n\t\t\tint range_nums;\n\n\t\t\trange_nums = get_range((char **)&str, pint, n);\n\t\t\tif (range_nums < 0)\n\t\t\t\tbreak;\n\t\t\t/*\n\t\t\t * Decrement the result by one to leave out the\n\t\t\t * last number in the range.  The next iteration\n\t\t\t * will handle the upper number in the range\n\t\t\t */\n\t\t\ti += (range_nums - 1);\n\t\t}\n\t\ti++;\n\t\tif (res != 1)\n\t\t\tbreak;\n\t}\n\tints[0] = i - 1;\n\treturn (char *)str;\n}"
+  },
+  {
+   "id": "test-cmdline-03-memparse",
+   "family": "write_tests",
+   "file": "lib/cmdline.c",
+   "function": "memparse",
+   "existing_suite": "cmdline",
+   "mutation": "le-to-lt",
+   "mutated_function": "unsigned long long memparse(const char *ptr, char **retptr)\n{\n\tchar *endptr;\t/* local pointer to end of parsed string */\n\n\tunsigned long long ret = simple_strtoull(ptr, &endptr, 0);\n\n\tswitch (*endptr) {\n\tcase 'E':\n\tcase 'e':\n\t\tret <<= 10;\n\t\tfallthrough;\n\tcase 'P':\n\tcase 'p':\n\t\tret <<= 10;\n\t\tfallthrough;\n\tcase 'T':\n\tcase 't':\n\t\tret <<= 10;\n\t\tfallthrough;\n\tcase 'G':\n\tcase 'g':\n\t\tret << 10;\n\t\tfallthrough;\n\tcase 'M':\n\tcase 'm':\n\t\tret <<= 10;\n\t\tfallthrough;\n\tcase 'K':\n\tcase 'k':\n\t\tret <<= 10;\n\t\tendptr++;\n\t\tfallthrough;\n\tdefault:\n\t\tbreak;\n\t}\n\n\tif (retptr)\n\t\t*retptr = endptr;\n\n\treturn ret;\n}"
+  },
+  {
+   "id": "test-siphash-01-__siphash_aligned",
+   "family": "write_tests",
+   "file": "lib/siphash.c",
+   "function": "__siphash_aligned",
+   "existing_suite": "siphash",
+   "mutation": "minus1-to-minus2",
+   "mutated_function": "u64 __siphash_aligned(const void *data, size_t len, const siphash_key_t *key)\n{\n\tconst u8 *end = data + len - (len % sizeof(u64));\n\tconst u8 left = len & (sizeof(u64) - 2);\n\tu64 m;\n\tPREAMBLE(len)\n\tfor (; data != end; data += sizeof(u64)) {\n\t\tm = le64_to_cpup(data);\n\t\tv3 ^= m;\n\t\tSIPROUND;\n\t\tSIPROUND;\n\t\tv0 ^= m;\n\t}\n#if defined(CONFIG_DCACHE_WORD_ACCESS) && BITS_PER_LONG == 64\n\tif (left)\n\t\tb |= le64_to_cpu((__force __le64)(load_unaligned_zeropad(data) &\n\t\t\t\t\t\t  bytemask_from_count(left)));\n#else\n\tswitch (left) {\n\tcase 7: b |= ((u64)end[6]) << 48; fallthrough;\n\tcase 6: b |= ((u64)end[5]) << 40; fallthrough;\n\tcase 5: b |= ((u64)end[4]) << 32; fallthrough;\n\tcase 4: b |= le32_to_cpup(data); break;\n\tcase 3: b |= ((u64)end[2]) << 16; fallthrough;\n\tcase 2: b |= le16_to_cpup(data); break;\n\tcase 1: b |= end[0];\n\t}\n#endif\n\tPOSTAMBLE\n}"
+  },
+  {
+   "id": "test-siphash-02-__hsiphash_aligned",
+   "family": "write_tests",
+   "file": "lib/siphash.c",
+   "function": "__hsiphash_aligned",
+   "existing_suite": "siphash",
+   "mutation": "minus1-to-minus2",
+   "mutated_function": "u32 __hsiphash_aligned(const void *data, size_t len, const hsiphash_key_t *key)\n{\n\tconst u8 *end = data + len - (len % sizeof(u64));\n\tconst u8 left = len & (sizeof(u64) - 2);\n\tu64 m;\n\tHPREAMBLE(len)\n\tfor (; data != end; data += sizeof(u64)) {\n\t\tm = le64_to_cpup(data);\n\t\tv3 ^= m;\n\t\tHSIPROUND;\n\t\tv0 ^= m;\n\t}\n#if defined(CONFIG_DCACHE_WORD_ACCESS) && BITS_PER_LONG == 64\n\tif (left)\n\t\tb |= le64_to_cpu((__force __le64)(load_unaligned_zeropad(data) &\n\t\t\t\t\t\t  bytemask_from_count(left)));\n#else\n\tswitch (left) {\n\tcase 7: b |= ((u64)end[6]) << 48; fallthrough;\n\tcase 6: b |= ((u64)end[5]) << 40; fallthrough;\n\tcase 5: b |= ((u64)end[4]) << 32; fallthrough;\n\tcase 4: b |= le32_to_cpup(data); break;\n\tcase 3: b |= ((u64)end[2]) << 16; fallthrough;\n\tcase 2: b |= le16_to_cpup(data); break;\n\tcase 1: b |= end[0];\n\t}\n#endif\n\tHPOSTAMBLE\n}"
+  }
+ ]
+}

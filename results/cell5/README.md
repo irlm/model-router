@@ -63,7 +63,15 @@ misses are of two kinds, below.
 | claude-fable-5-1 (rerun of the one lost flow only) | 1 of 1 | 1 of 1 | 1 | $3.03 | 56 | 408 s | 3.50M | 7.5k |
 
 Over both trials: Haiku 28/30, Sonnet 25/30, Fable 15/16. Among flows the browser let finish:
-Haiku 28/28, Fable 15/15, Sonnet 25/29. Mean cost per flow over everything run: Haiku
+Haiku 28/28, Fable 15/15, Sonnet 25/29.
+
+**Reruns (trial 3).** After the cause of the disconnects was known (below), the three flows cut
+short in trials 1 and 2 that had not yet been rerun were run once more: Haiku on
+`add-ignores-quantity` and `cancel-no-status`, Sonnet on `cart-shows-cost-price`. All three drove
+the full flow and matched the scripted user ($0.039, $0.036, $0.542; 120 s, 204 s, 168 s). With
+Fable's rerun from trial 2, every cut flow now has a finished, correct run. Totals over every run:
+Haiku 30 correct of 32 (30/30 finished), Sonnet 26 of 31 (26/30 finished), Fable 15 of 16 (15/15
+finished). Mean cost per flow over everything run: Haiku
 $0.038, Sonnet $0.476, Fable $2.55; mean wall 147 s / 131 s / 222 s. Trial 2 was slower
 for the same turn counts (Haiku 181 s against 112 s), so the browser or the machine was slower, not
 the model.
@@ -93,13 +101,13 @@ Trial 2:
 
 Three of the four coincide with a browser action recorded as a permission denial (a zoom, a
 screenshot, a click), which fits an action sent to a tab the extension no longer had. None of the
-55 cell-4 runs disconnected; 4 of 76 did here, on all three tiers. The runs share the user's real
-Chrome, and the user was at the machine during both trials; a tab group closed by hand would look
-exactly like this, and that was not ruled out. The grader labels these
+55 cell-4 runs disconnected; 4 of 76 did here, on all three tiers. Cause, found after the runs: the
+user closed the browser by mistake while the trials ran. The runs share the user's real Chrome, so
+a closed window takes the extension's tab with it. The grader labels these
 `incomplete` (the vector differs and the request log shows the flow did not finish) rather than
 `wrong`; it is a mechanical label from the log, and `incomplete` still does not count as success.
 The right response is a harness retry of that flow, not a bigger model: the models were honest
-about it on every tier, and Fable's rerun of its lost flow was correct.
+about it on every tier, and all four flows were rerun afterwards and every rerun finished and was correct.
 
 ## Four Sonnet verdicts that over-reached (three in trial 1, one in trial 2)
 
@@ -146,5 +154,6 @@ tier; the planted defect itself was never missed by a model that finished the fl
   "warehouse not built" note. Real app behaviour, and no model was distracted by it.
 - The agents read the DOM as text. The visual parts of the store (the product grid, the chart on
   the analytics pages) were not judged from pixels.
-- Four disconnects in 76 runs is too few to say what triggers them, and the user's own use of the
-  same Chrome during the runs was not ruled out. The retry rule covers either cause.
+- The four disconnects were the shared Chrome being closed by hand, so they say nothing about the
+  extension's own reliability. The retry rule still stands: in real use the browser is shared with a
+  person too.

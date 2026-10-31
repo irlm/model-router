@@ -148,6 +148,22 @@
    "wall_mean": 181.19133333333335,
    "wall_total": 2717.87
   },
+  "own_app_flow / claude-haiku-5-5 / low / 3": {
+   "n": 2,
+   "success": 2,
+   "outcomes": {
+    "correct": 2
+   },
+   "cost_total": 0.07483184000000001,
+   "cost_per_success": 0.037415920000000005,
+   "cost_mean": 0.037415920000000005,
+   "cost_p90": 0.03865769,
+   "cost_max": 0.03865769,
+   "turns_mean": 45,
+   "turns_max": 45,
+   "wall_mean": 162.215,
+   "wall_total": 324.43
+  },
   "own_app_flow / claude-sonnet-5-5 / low / 1": {
    "n": 15,
    "success": 12,
@@ -182,6 +198,22 @@
    "turns_max": 43,
    "wall_mean": 139.33466666666666,
    "wall_total": 2090.02
+  },
+  "own_app_flow / claude-sonnet-5-5 / low / 3": {
+   "n": 1,
+   "success": 1,
+   "outcomes": {
+    "correct": 1
+   },
+   "cost_total": 0.5418527000000001,
+   "cost_per_success": 0.5418527000000001,
+   "cost_mean": 0.5418527000000001,
+   "cost_p90": 0.5418527000000001,
+   "cost_max": 0.5418527000000001,
+   "turns_mean": 44,
+   "turns_max": 44,
+   "wall_mean": 167.58,
+   "wall_total": 167.58
   },
   "find_feature / claude-fable-5-1 / low / 1": {
    "n": 72,

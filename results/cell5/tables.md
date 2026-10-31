@@ -11,8 +11,10 @@
 | own_app_flow | claude-fable-5-1 | low | 2 | 1 | 1 | correct 1 | 3.03 | 3.0342 | 3.0342 | 3.0342 | 56.0 | 56 | 408.3 |
 | own_app_flow | claude-haiku-5-5 | low | 1 | 15 | 14 | correct 14, incomplete 1 | 0.56 | 0.0401 | 0.0431 | 0.0469 | 42.5 | 51 | 112.1 |
 | own_app_flow | claude-haiku-5-5 | low | 2 | 15 | 14 | correct 14, incomplete 1 | 0.56 | 0.0403 | 0.0428 | 0.0433 | 40.9 | 48 | 181.2 |
+| own_app_flow | claude-haiku-5-5 | low | 3 | 2 | 2 | correct 2 | 0.07 | 0.0374 | 0.0387 | 0.0387 | 45.0 | 45 | 162.2 |
 | own_app_flow | claude-sonnet-5-5 | low | 1 | 15 | 12 | correct 12, wrong 3 | 7.33 | 0.6106 | 0.5170 | 0.5230 | 43.3 | 50 | 123.6 |
 | own_app_flow | claude-sonnet-5-5 | low | 2 | 15 | 13 | correct 13, incomplete 1, wrong 1 | 6.97 | 0.5358 | 0.4931 | 0.4973 | 38.7 | 43 | 139.3 |
+| own_app_flow | claude-sonnet-5-5 | low | 3 | 1 | 1 | correct 1 | 0.54 | 0.5419 | 0.5419 | 0.5419 | 44.0 | 44 | 167.6 |
 | find_feature | claude-fable-5-1 | low | 1 | 72 | 72 | correct 72 | 41.61 | 0.5779 | 0.5978 | 0.6009 | 2.5 | 5 | 8.3 |
 | find_feature | claude-haiku-5-5 | low | 1 | 72 | 70 | correct 70, wrong 2 | 0.47 | 0.0067 | 0.0070 | 0.0075 | 2.8 | 7 | 6.2 |
 | find_feature | claude-haiku-5-5 | low | 2 | 72 | 72 | correct 72 | 0.29 | 0.0040 | 0.0068 | 0.0080 | 3.1 | 7 | 6.4 |

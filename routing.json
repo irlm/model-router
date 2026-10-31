@@ -137,17 +137,17 @@
    "retry_rule": "re-run a flow whose request log shows it did not finish (grade.py drove != full): a browser disconnect, not a model miss; do not step up",
    "evidence_own_app": {
     "what": "the author's own Go web store at a pinned commit, 15 flows (14 planted defects plus clean), 10 items, truth from the fixture's scripted user, bench/own_app_flow/oracle.py, a local file (results/cell5)",
-    "haiku low": "28/30 over 2 trials; both misses were browser disconnects (flow unfinished); 28/28 among finished flows",
-    "sonnet low": "25/30 over 2 trials; one browser disconnect, four extra fails on the item next to the defect; every planted defect flagged in every finished flow",
-    "fable low": "15/16: one trial 14/15 (the miss a browser disconnect) plus a rerun of that flow, correct",
+    "haiku low": "30 correct of 32 runs (2 trials plus 2 reruns); both misses were the shared browser closed mid-flow, both flows rerun correct; 30/30 among finished flows",
+    "sonnet low": "26 correct of 31 runs; one browser cut (rerun correct), four extra fails on the item next to the defect; every planted defect flagged in every finished flow; 26/30 among finished flows",
+    "fable low": "15 correct of 16 runs: one trial 14/15 (the miss a browser cut) plus a rerun of that flow, correct; 15/15 among finished flows",
     "cold_cost_per_flow_usd": {
      "haiku": 0.038,
-     "sonnet": 0.476,
+     "sonnet": 0.479,
      "fable": 2.55
     },
     "wall_s_mean": {
-     "haiku": 147,
-     "sonnet": 131,
+     "haiku": 148,
+     "sonnet": 133,
      "fable": 222
     },
     "turns_mean": {
@@ -160,7 +160,7 @@
      "sonnet": "1.15M",
      "fable": "2.33M"
     },
-    "browser_disconnects": "4 of 76 runs (haiku 2, sonnet 1, fable 1); the user's own use of the shared Chrome was not ruled out"
+    "browser_disconnects": "4 of 76 runs (haiku 2, sonnet 1, fable 1): the user closed the shared Chrome by mistake during the runs; each flow was rerun afterwards"
    }
   },
   "unmeasured": {

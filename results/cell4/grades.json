@@ -98,6 +98,22 @@
    "wall_mean": 209.384,
    "wall_total": 3140.76
   },
+  "own_app_flow / claude-fable-5-1 / low / 2": {
+   "n": 1,
+   "success": 1,
+   "outcomes": {
+    "correct": 1
+   },
+   "cost_total": 3.0342240000000005,
+   "cost_per_success": 3.0342240000000005,
+   "cost_mean": 3.0342240000000005,
+   "cost_p90": 3.0342240000000005,
+   "cost_max": 3.0342240000000005,
+   "turns_mean": 56,
+   "turns_max": 56,
+   "wall_mean": 408.3,
+   "wall_total": 408.3
+  },
   "own_app_flow / claude-haiku-5-5 / low / 1": {
    "n": 15,
    "success": 14,
@@ -115,6 +131,23 @@
    "wall_mean": 112.11266666666667,
    "wall_total": 1681.69
   },
+  "own_app_flow / claude-haiku-5-5 / low / 2": {
+   "n": 15,
+   "success": 14,
+   "outcomes": {
+    "correct": 14,
+    "incomplete": 1
+   },
+   "cost_total": 0.56470041,
+   "cost_per_success": 0.04033574357142857,
+   "cost_mean": 0.037646694,
+   "cost_p90": 0.04277666,
+   "cost_max": 0.043259839999999994,
+   "turns_mean": 40.93333333333333,
+   "turns_max": 48,
+   "wall_mean": 181.19133333333335,
+   "wall_total": 2717.87
+  },
   "own_app_flow / claude-sonnet-5-5 / low / 1": {
    "n": 15,
    "success": 12,
@@ -131,6 +164,24 @@
    "turns_max": 50,
    "wall_mean": 123.606,
    "wall_total": 1854.09
+  },
+  "own_app_flow / claude-sonnet-5-5 / low / 2": {
+   "n": 15,
+   "success": 13,
+   "outcomes": {
+    "correct": 13,
+    "incomplete": 1,
+    "wrong": 1
+   },
+   "cost_total": 6.9651466,
+   "cost_per_success": 0.5357805076923077,
+   "cost_mean": 0.46434310666666667,
+   "cost_p90": 0.4931222999999999,
+   "cost_max": 0.49729260000000003,
+   "turns_mean": 38.733333333333334,
+   "turns_max": 43,
+   "wall_mean": 139.33466666666666,
+   "wall_total": 2090.02
   },
   "find_feature / claude-fable-5-1 / low / 1": {
    "n": 72,
@@ -1304,6 +1355,21 @@
   {
    "cell": [
     "own_app_flow",
+    "claude-haiku-5-5",
+    "low",
+    2
+   ],
+   "id": "store-14-cancel-no-status",
+   "family": "own_app_flow",
+   "outcome": "incomplete",
+   "detail": "items 8:fail (truth fails ['9', '10']) drove=partial",
+   "cost": 0.04271206,
+   "turns": 48,
+   "wall": 147.85
+  },
+  {
+   "cell": [
+    "own_app_flow",
     "claude-sonnet-5-5",
     "low",
     1
@@ -1345,6 +1411,36 @@
    "cost": 0.5169718999999999,
    "turns": 46,
    "wall": 169.2
+  },
+  {
+   "cell": [
+    "own_app_flow",
+    "claude-sonnet-5-5",
+    "low",
+    2
+   ],
+   "id": "store-05-cart-shows-cost-price",
+   "family": "own_app_flow",
+   "outcome": "incomplete",
+   "detail": "items 1:fail,2:fail,3:fail,4:fail,8:fail,9:fail,10:fail (truth fails ['5', '6', '7']) drove=none",
+   "cost": 0.32038140000000004,
+   "turns": 14,
+   "wall": 28.76
+  },
+  {
+   "cell": [
+    "own_app_flow",
+    "claude-sonnet-5-5",
+    "low",
+    2
+   ],
+   "id": "store-10-update-ignored",
+   "family": "own_app_flow",
+   "outcome": "wrong",
+   "detail": "items 9:fail (truth fails ['7', '8', '10']) drove=full",
+   "cost": 0.4899451999999999,
+   "turns": 43,
+   "wall": 198.24
   },
   {
    "cell": [

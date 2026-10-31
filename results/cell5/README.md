@@ -3,7 +3,8 @@
 The browser-flow family of cell 4 repeated on a real application: the Go store of the user's
 author's own Go store (Postgres, server-rendered templates, one
 small `app.js`), at commit `24211d9`. 15 flows (14 planted defects plus a clean store), a numbered
-10-item checklist, three models at effort low, one trial each (plus the repeat trials below). The
+10-item checklist, three models at effort low: two trials for Haiku and Sonnet, one for Fable plus
+a rerun of its one lost flow. The
 agent is a customer: search, open two products, add them to the cart, change a quantity, read the
 estimate, place an order with PayPal, cancel it, check the orders list. Truth comes from a scripted
 user (`bench/own_app_flow/oracle.py`) that drives the same store over HTTP. A run is `correct`
@@ -53,9 +54,23 @@ benchmark's toy apps to one of the user's own projects. This cell is that test f
 model missed a defect in a flow it finished, and all three reported the clean store clean. The
 misses are of two kinds, below.
 
-## Two flows the browser cut short (Haiku 1, Fable 1)
+## Trial 2 (run about two hours later, same browser)
 
-Both are the Chrome extension losing its tab, not a judgement.
+| Model | Correct / 15 | Planted defect flagged | Flow finished / 15 | Cost per flow (min to max) | Turns (min to max) | Wall (min to max) | Cache-read tokens per flow | Output tokens per flow |
+|---|---|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | 14 | 14 of 14 finished | 14 | $0.038 ($0.032 to $0.043) | 41 (23 to 48) | 181 s (103 to 340) | 1.68M | 6.4k |
+| claude-sonnet-5-5 | 13 | 14 of 14 finished | 14 | $0.464 ($0.320 to $0.497) | 39 (14 to 43) | 139 s (29 to 212) | 1.04M | 4.1k |
+| claude-fable-5-1 (rerun of the one lost flow only) | 1 of 1 | 1 of 1 | 1 | $3.03 | 56 | 408 s | 3.50M | 7.5k |
+
+Over both trials: Haiku 28/30, Sonnet 25/30, Fable 15/16. Among flows the browser let finish:
+Haiku 28/28, Fable 15/15, Sonnet 25/29. Mean cost per flow over everything run: Haiku
+$0.038, Sonnet $0.476, Fable $2.55; mean wall 147 s / 131 s / 222 s. Trial 2 was slower
+for the same turn counts (Haiku 181 s against 112 s), so the browser or the machine was slower, not
+the model.
+
+## Four flows the browser cut short (Haiku 2, Sonnet 1, Fable 1)
+
+All four are the Chrome extension losing its tab, not a judgement. Trial 1:
 
 - **Fable, `update-ignored`.** After the product page, Fable's reloads returned a browser error
   page for about 30 seconds. The store's request log stops at that product page and shows no
@@ -67,27 +82,39 @@ Both are the Chrome extension losing its tab, not a judgement.
   extension disconnected" and the tab was unreachable. Haiku answered `not_run` for items 4 to 10
   and asked whether to restart from step 1. In a headless session nobody answers.
 
-Each of the two coincides with one `computer` action (a zoom, a screenshot) recorded as a
-permission denial, which fits an action sent to a tab the extension no longer had. None of the 55
-cell-4 runs disconnected; 2 of 45 did here, on bigger pages. The grader now labels these
+Trial 2:
+
+- **Sonnet, `cart-shows-cost-price`.** The store answered the first home-page request and then
+  nothing: the browser showed an error page on both of Sonnet's attempts. Sonnet stopped after 14
+  turns and reported every item fail, with the note "not because of anything seen in the store".
+- **Haiku, `cancel-no-status`.** Haiku drove the flow to "Place order"; the store log shows the
+  checkout and the order page served. Then "the browser tab group was reset before the result page
+  could be read" and the tab was closed. Haiku reported 8 as fail and 9 and 10 as not reached.
+
+Three of the four coincide with a browser action recorded as a permission denial (a zoom, a
+screenshot, a click), which fits an action sent to a tab the extension no longer had. None of the
+55 cell-4 runs disconnected; 4 of 76 did here, on all three tiers. The runs share the user's real
+Chrome, and the user was at the machine during both trials; a tab group closed by hand would look
+exactly like this, and that was not ruled out. The grader labels these
 `incomplete` (the vector differs and the request log shows the flow did not finish) rather than
 `wrong`; it is a mechanical label from the log, and `incomplete` still does not count as success.
-The right response is a harness retry of that flow, not a bigger model: the model's honesty here
-was fine on both tiers.
+The right response is a harness retry of that flow, not a bigger model: the models were honest
+about it on every tier, and Fable's rerun of its lost flow was correct.
 
-## Three Sonnet verdicts that over-reached
+## Four Sonnet verdicts that over-reached (three in trial 1, one in trial 2)
 
-Sonnet drove all 15 flows to the end and flagged every planted defect, but in three flows it also
-failed the item after the one the defect belongs to:
+Sonnet flagged every planted defect in every flow it finished, but in four flows it also failed
+the item after the one the defect belongs to:
 
 | Flow | Truth fails | Sonnet failed | Sonnet's reason for the extra fail |
 |---|---|---|---|
 | subtotal-skips-last | 6, 7 | 5, 6, 7 | "the Apexnest row's line total was $49.98 but the cart's Estimate ignored the Nordnest line" (item 5 checks only the rows, and the rows were right) |
 | payment-method-ignored | 8 | 8, 9 | "the payment row read card refunded rather than paypal" (item 9 asks for status cancelled, the message, and payment status refunded; all three held) |
 | order-tax-doubled | 8, 10 | 8, 9, 10 | "the payment amount was $57.27, not $54.12" (item 9 does not mention the amount) |
+| update-ignored (trial 2) | 7, 8, 10 | 7, 8, 9, 10 | "the order shows the card payment refunded and not a PayPal one" (Sonnet also said it could not change the payment method; the planted defect does not touch payment, so the PayPal choice was most likely lost in its own form handling; item 9 still checks only status, message and "refunded") |
 
 The pattern is the same each time: a defect already reported under its own item is carried into
-the next item. Haiku and Fable, on the same three flows, matched the scripted user exactly. One can
+the next item. Haiku and Fable, on the same flows, matched the scripted user exactly. One can
 defend Sonnet's readings as a customer (a refund of the wrong amount is a real complaint), but the
 checklist names the fields each item checks, and the scripted user is the oracle. In cell 4 Fable
 made the opposite slip (a lenient reading of one item). Rubric-boundary slips happen on every
@@ -96,15 +123,16 @@ tier; the planted defect itself was never missed by a model that finished the fl
 ## Reading
 
 1. **The family transfers to the user's own app.** On the real store Haiku judged every flow it
-   finished exactly as the scripted user did, as it had on the toy app. Fable did the same. The
+   finished exactly as the scripted user did, 28 of 28 over two trials, as it had on the toy app.
+   Fable did the same, 15 of 15. Sonnet was the one tier with judgement misses, 4 of 29. The
    checklist shape (numbered items, named fields, a server-rendered page read as text) is what
    makes a cheap tier safe, not the size of the app behind it.
 2. **Cost per flow is 13x Haiku for Sonnet and 68x for Fable, and Fable takes twice as long.**
    Cache reads dominate again: about $0.017 of Haiku's $0.037, $0.23 of Sonnet's $0.49, $2.33 of
    Fable's $2.52. The pages are bigger than cell 4's, so Fable's context per turn grew to 2.3M
    cache-read tokens per flow.
-3. **The new failure mode is the browser, not the model.** Two of 45 flows lost the extension tab.
-   A bigger model does not fix that (one of the two was Fable). The request log gives a mechanical
+3. **The new failure mode is the browser, not the model.** Four of 76 flows lost the extension tab,
+   on all three tiers. A bigger model does not fix that. The request log gives a mechanical
    signal (`drove` is not `full`), so the rule is: retry an unfinished flow, do not step up.
 4. **Routing decision:** unchanged, `haiku`, `low`, now with evidence from the user's own project.
    Add the retry rule to the family, and tell the agent to say which steps did not run when the
@@ -112,11 +140,11 @@ tier; the planted defect itself was never missed by a model that finished the fl
 
 ## Limits
 
-- One trial per model (see the repeat trials below for what was re-run). 15 flows, one customer,
+- Two trials for Haiku and Sonnet, one for Fable plus a rerun of one flow. 15 flows, one customer,
   one pair of products. Anthropic's bar for a production cutover is about 50 cases and 5 trials.
 - The store was run without its DuckDB warehouse, so the home and product pages carry a
   "warehouse not built" note. Real app behaviour, and no model was distracted by it.
 - The agents read the DOM as text. The visual parts of the store (the product grid, the chart on
   the analytics pages) were not judged from pixels.
-- Two disconnects in 45 runs is too few to say what triggers them. Both happened on a `computer`
-  action; the cell-4 flows used fewer of those.
+- Four disconnects in 76 runs is too few to say what triggers them, and the user's own use of the
+  same Chrome during the runs was not ruled out. The retry rule covers either cause.

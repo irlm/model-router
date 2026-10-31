@@ -105,7 +105,7 @@
    },
    "step_up": null,
    "escalation_rule": null,
-   "why_no_escalation": "haiku matched sonnet item for item on both apps; the misses were one lenient reading by fable, three over-strict readings by sonnet, and two browser disconnects; no model missed a planted defect in a flow it finished",
+   "why_no_escalation": "haiku matched sonnet item for item on both apps; the misses were one lenient reading by fable, four over-strict readings by sonnet, and four browser disconnects in 76 store runs on all three tiers; no model missed a planted defect in a flow it finished",
    "checker": "a scripted user (bench/browser_flow/oracle.py) drives the same app and gives the truth vector; the app's action log confirms the flow was really driven",
    "evidence": {
     "haiku low": "33/33 correct over 3 trials, full flow driven every time",
@@ -137,29 +137,30 @@
    "retry_rule": "re-run a flow whose request log shows it did not finish (grade.py drove != full): a browser disconnect, not a model miss; do not step up",
    "evidence_own_app": {
     "what": "the author's own Go web store at a pinned commit, 15 flows (14 planted defects plus clean), 10 items, truth from the fixture's scripted user, bench/own_app_flow/oracle.py, a local file (results/cell5)",
-    "haiku low": "14/15 correct; the miss was a browser disconnect (flow unfinished, not_run reported)",
-    "sonnet low": "12/15 correct; all 15 flows finished and every defect flagged; three extra fails on the item next to the defect",
-    "fable low": "14/15 correct; the miss was a browser disconnect (flow unfinished)",
+    "haiku low": "28/30 over 2 trials; both misses were browser disconnects (flow unfinished); 28/28 among finished flows",
+    "sonnet low": "25/30 over 2 trials; one browser disconnect, four extra fails on the item next to the defect; every planted defect flagged in every finished flow",
+    "fable low": "15/16: one trial 14/15 (the miss a browser disconnect) plus a rerun of that flow, correct",
     "cold_cost_per_flow_usd": {
-     "haiku": 0.037,
-     "sonnet": 0.489,
-     "fable": 2.52
+     "haiku": 0.038,
+     "sonnet": 0.476,
+     "fable": 2.55
     },
     "wall_s_mean": {
-     "haiku": 112,
-     "sonnet": 124,
-     "fable": 209
+     "haiku": 147,
+     "sonnet": 131,
+     "fable": 222
     },
     "turns_mean": {
-     "haiku": 43,
-     "sonnet": 43,
-     "fable": 41
+     "haiku": 42,
+     "sonnet": 41,
+     "fable": 42
     },
     "cache_read_tokens_per_flow": {
      "haiku": "1.68M",
      "sonnet": "1.15M",
      "fable": "2.33M"
-    }
+    },
+    "browser_disconnects": "4 of 76 runs (haiku 2, sonnet 1, fable 1); the user's own use of the shared Chrome was not ruled out"
    }
   },
   "unmeasured": {

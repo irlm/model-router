@@ -19,7 +19,7 @@ and none of the three measured families needed it.
 | **Find a feature in a huge codebase.** Locate code, callers, struct fields, dispatch targets with search tools. No writes. | `haiku`, `low` | `sonnet`, `low`, when a 1-in-80 wrong answer costs more than 18x the session | None. Misses are confident answers, so there is no failure signal to trigger on. | Haiku 214/216 over 3 trials (98.8%; medium effort 213/216, bought nothing). Sonnet 144/144 over 2 cold trials. Fable 72/72. Cold cost per task $0.0067 / $0.119 / $0.578. |
 | **Fix a bug with a failing test.** The test names the failing case; the agent reads and edits. | `haiku`, `low`, **with the test runner in the loop** | None needed | Not needed with the runner: 21/21 at every tier. Without a runner no tier is reliable when there may be more than one defect, and a bigger model fails the same way. | Single-site bugs: 10/10 on every tier, no runs ($0.012 / $0.149 / $0.748 per task). Hard tier, 11 hidden-helper and 10 two-site bugs: with runner 21/21 on every tier ($0.014 / $0.197 / $0.885 per task); without runner 16 / 14 / 16 of 21, every miss a partial fix that stopped after one defect (`results/cell3`). |
 | **Write tests for a function.** Success = builds, passes on the real code, fails on a seeded bug. | `haiku`, `low`, **with the test runner in the loop** | None needed | Not needed: with the runner every tier is 10/10 | With runner 10/10 on every tier at $0.025 / $0.287 / $1.51 per task. Without runner 5 / 7 / 4 of 10, cost per success $0.049 / $0.370 / $4.58. Every tier ships wrong expected values when it cannot run. |
-| **Drive a web page through a checklist in a real browser.** Sign in, add, edit, delete, sign out through the Chrome extension tools; judge each numbered item by what is on screen; report pass/fail per item. | `haiku`, `low` | None needed. Retry a flow whose request log shows it did not finish (a browser disconnect); do not step up. | None: Haiku matched Sonnet item for item on both apps. The misses were one lenient reading by Fable, three over-strict readings by Sonnet, and two browser disconnects (one Haiku, one Fable); no model missed a planted defect in a flow it finished. | Toy app, 11 flows (10 planted defects plus a clean app, 9 items, truth from a scripted user): Haiku 33/33 over 3 trials, Sonnet 11/11, Fable 10/11; every run drove the whole flow. Cost per flow $0.035 / $0.427 / $2.26; wall 91 s / 76 s / 140 s (`results/cell4`). The user's own Go store (own-app), 15 flows (14 defects plus clean, 10 items): Haiku 14/15, Sonnet 12/15, Fable 14/15; the Haiku and Fable misses were browser disconnects, Sonnet's three an extra fail on the item next to the defect. Cost per flow $0.037 / $0.49 / $2.52; wall 112 s / 124 s / 209 s (`results/cell5`). |
+| **Drive a web page through a checklist in a real browser.** Sign in, add, edit, delete, sign out through the Chrome extension tools; judge each numbered item by what is on screen; report pass/fail per item. | `haiku`, `low` | None needed. Retry a flow whose request log shows it did not finish (a browser disconnect); do not step up. | None: Haiku matched Sonnet item for item on both apps. The misses were one lenient reading by Fable, four over-strict readings by Sonnet, and four browser disconnects in 76 store runs, on all three tiers; no model missed a planted defect in a flow it finished. | Toy app, 11 flows (10 planted defects plus a clean app, 9 items, truth from a scripted user): Haiku 33/33 over 3 trials, Sonnet 11/11, Fable 10/11; every run drove the whole flow. Cost per flow $0.035 / $0.427 / $2.26; wall 91 s / 76 s / 140 s (`results/cell4`). The user's own Go store (own-app), 15 flows (14 defects plus clean, 10 items): Haiku 28/30 over 2 trials, Sonnet 25/30 over 2 trials, Fable 15/16 (one trial plus a rerun of its lost flow). Every Haiku and Fable miss was a browser disconnect; among flows that finished Haiku 28/28, Fable 15/15, Sonnet 25/29 (an extra fail on the item next to the defect). Cost per flow $0.038 / $0.48 / $2.55; wall 147 s / 131 s / 222 s (`results/cell5`). |
 | **Everything else** (review, design, writing, exploratory browser testing, data work) | `inherit` (unchanged) | | | No evidence. Not routed. |
 
 Prices are list API prices from `catalog/models.json` (Haiku 5.5 $0.10/$0.50, Sonnet 5.5 $2/$10,
@@ -46,7 +46,7 @@ Fable, and Sonnet already saturated every family.
    matter as much as the session count. Both point at Haiku.
 5. **Retry before step-up when the run did not finish.** A browser disconnect or a tool failure
    shows in the checker's log (cell 5: `drove` not `full`). That run gets a retry on the same tier;
-   a bigger model does not fix a lost browser tab (one of the two disconnects was on Fable).
+   a bigger model does not fix a lost browser tab (the four disconnects fell on all three tiers).
 6. **The user overrides.** Precedence, from the Claude Code docs: the per-invocation `model`
    on an Agent call, then the agent file's `model`/`effort`, then `CLAUDE_CODE_SUBAGENT_MODEL`,
    then the main conversation's model. Anything above this file wins.
@@ -77,13 +77,14 @@ Fable, and Sonnet already saturated every family.
   browser family has had that test: cell 5 repeated it on the user's own Go store (Postgres,
   server-rendered), with a scripted user as the checker, and the decision held.
 - The browser row is three Haiku trials and one Sonnet and Fable trial of 11 toy-app flows, plus
-  one trial of 15 flows on the user's store, all with an explicit numbered checklist. The agent file it
+  two trials of 15 flows on the user's store, all with an explicit numbered checklist. The agent file it
   is applied to (`testing-evidence-collector.md`) also asks for Playwright screenshots, visual
   judgement and "a minimum of 3 to 5 issues" per report; none of that was measured. If that agent
   is used for visual review rather than checklist flows, treat it as unmeasured.
 - The `claude` CLI is logged in with a claude.ai subscription. `cost_usd` in the receipts is the
   API-equivalent price, not a bill; on a subscription the saving is rate-limit headroom.
-- Cells 2, 3, 4 and 5 are one trial per cell (cell 4 has three Haiku trials), 10 to 21 tasks per family. Anthropic's bar for a production
+- Cells 2 and 3 are one trial per cell, cell 4 has three Haiku trials, cell 5 two trials for Haiku
+  and Sonnet; 10 to 21 tasks per family. Anthropic's bar for a production
   cutover is about 50 cases and 5 trials. The find-feature family is past that bar for Haiku; the
   other two are calibrations that all pointed the same way.
 

@@ -8,8 +8,11 @@
 | browser_flow | claude-haiku-5-5 | low | 3 | 11 | 11 | correct 11 | 0.35 | 0.0321 | 0.0351 | 0.0362 | 45.0 | 59 | 83.2 |
 | browser_flow | claude-sonnet-5-5 | low | 1 | 11 | 11 | correct 11 | 4.69 | 0.4268 | 0.4387 | 0.4554 | 40.7 | 47 | 76.3 |
 | own_app_flow | claude-fable-5-1 | low | 1 | 15 | 14 | correct 14, incomplete 1 | 37.80 | 2.6997 | 2.6806 | 2.7184 | 41.1 | 46 | 209.4 |
+| own_app_flow | claude-fable-5-1 | low | 2 | 1 | 1 | correct 1 | 3.03 | 3.0342 | 3.0342 | 3.0342 | 56.0 | 56 | 408.3 |
 | own_app_flow | claude-haiku-5-5 | low | 1 | 15 | 14 | correct 14, incomplete 1 | 0.56 | 0.0401 | 0.0431 | 0.0469 | 42.5 | 51 | 112.1 |
+| own_app_flow | claude-haiku-5-5 | low | 2 | 15 | 14 | correct 14, incomplete 1 | 0.56 | 0.0403 | 0.0428 | 0.0433 | 40.9 | 48 | 181.2 |
 | own_app_flow | claude-sonnet-5-5 | low | 1 | 15 | 12 | correct 12, wrong 3 | 7.33 | 0.6106 | 0.5170 | 0.5230 | 43.3 | 50 | 123.6 |
+| own_app_flow | claude-sonnet-5-5 | low | 2 | 15 | 13 | correct 13, incomplete 1, wrong 1 | 6.97 | 0.5358 | 0.4931 | 0.4973 | 38.7 | 43 | 139.3 |
 | find_feature | claude-fable-5-1 | low | 1 | 72 | 72 | correct 72 | 41.61 | 0.5779 | 0.5978 | 0.6009 | 2.5 | 5 | 8.3 |
 | find_feature | claude-haiku-5-5 | low | 1 | 72 | 70 | correct 70, wrong 2 | 0.47 | 0.0067 | 0.0070 | 0.0075 | 2.8 | 7 | 6.2 |
 | find_feature | claude-haiku-5-5 | low | 2 | 72 | 72 | correct 72 | 0.29 | 0.0040 | 0.0068 | 0.0080 | 3.1 | 7 | 6.4 |
@@ -92,9 +95,12 @@
 | browser_flow | claude-fable-5-1 | low | 1 | flow-09-edit-loses-name | wrong | items 7:pass (truth fails ['6', '7']) drove=full |
 | own_app_flow | claude-fable-5-1 | low | 1 | store-10-update-ignored | incomplete | items 3:fail,4:fail,5:fail,6:fail,9:fail (truth fails ['7', '8', '10']) drove=none |
 | own_app_flow | claude-haiku-5-5 | low | 1 | store-04-add-ignores-quantity | incomplete | items 4:not_run,5:not_run,6:not_run,7:not_run,8:not_run,9:not_run,10:not_run (truth fails ['3', '4', '5', '6']) drove=pa |
+| own_app_flow | claude-haiku-5-5 | low | 2 | store-14-cancel-no-status | incomplete | items 8:fail (truth fails ['9', '10']) drove=partial |
 | own_app_flow | claude-sonnet-5-5 | low | 1 | store-06-subtotal-skips-last | wrong | items 5:fail (truth fails ['6', '7']) drove=full |
 | own_app_flow | claude-sonnet-5-5 | low | 1 | store-11-payment-method-ignored | wrong | items 9:fail (truth fails ['8']) drove=full |
 | own_app_flow | claude-sonnet-5-5 | low | 1 | store-12-order-tax-doubled | wrong | items 9:fail (truth fails ['8', '10']) drove=full |
+| own_app_flow | claude-sonnet-5-5 | low | 2 | store-05-cart-shows-cost-price | incomplete | items 1:fail,2:fail,3:fail,4:fail,8:fail,9:fail,10:fail (truth fails ['5', '6', '7']) drove=none |
+| own_app_flow | claude-sonnet-5-5 | low | 2 | store-10-update-ignored | wrong | items 9:fail (truth fails ['7', '8', '10']) drove=full |
 | find_feature | claude-haiku-5-5 | low | 1 | fields-06 | wrong |  |
 | find_feature | claude-haiku-5-5 | low | 1 | callers-10 | wrong | lexical-confusion: lib/string_helpers.c has only definition |
 | find_feature | claude-haiku-5-5 | medium | 2 | refs-05 | wrong |  |

@@ -195,6 +195,27 @@ def main():
                 f['requires'] = d['default']['requires']
             f['step_up'] = d['step_up']
         f['decided'] = {k: d[k] for k in ('bar', 'rule', 'evidence', 'n_tasks', 'default_rate') if k in d}
+    # Agent files: Claude Code can only name Anthropic models, so each agent gets the cheapest
+    # Anthropic candidate above its family's bar; if a non-Anthropic model won the family, say so.
+    for name, route in j.get('agents', {}).items():
+        d = decided.get(route.get('family'))
+        if not d or not d.get('default'):
+            continue
+        fam = FAMILIES[route['family']]
+        cands = candidates(cells, fam)
+        bar = d['bar']
+        anth = sorted((k for k, v in cands.items() if v['covers'] and v['cost_per_success'] is not None
+                       and v['rate'] >= bar and k[0] in ALIAS),
+                      key=lambda k: (cands[k]['cost_per_success'], cands[k]['wall_mean'] or 0))
+        if not anth:
+            continue
+        eff, needs = split_effort(anth[0][1])
+        route['model'], route['effort'] = ALIAS[anth[0][0]], eff
+        if anth[0][0] != d['default']['model_id']:
+            route['note_provider'] = (f"the family's cheapest candidate is {d['default']['model_id']}, which a Claude Code agent file "
+                                      f"cannot name; applied the cheapest Anthropic candidate above the bar instead")
+        else:
+            route.pop('note_provider', None)
     j['decided_by'] = f'decide.py --margin {args.margin} --min-trials {args.min_trials} (catalog prices)'
     j['plan_for_unmeasured_models'] = plan
     rp.write_text(json.dumps(j, indent=1, ensure_ascii=False) + '\n')

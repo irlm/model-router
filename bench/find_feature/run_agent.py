@@ -1,41 +1,25 @@
 """Run one cell of the find-feature family: one model x one effort, agent
 with file/search tools inside the pinned Linux v6.12 tree, web off.
 Receipt-first and resumable: rerunning skips tasks already recorded
-without an operational error.
+without an operational error. `--harness codex` runs the same tasks through
+the OpenAI Codex CLI (bench/common/harness.py); the receipt shape is the same.
 
 Usage:
   python3 run_agent.py --model claude-haiku-5-5 --effort low \
       --tasks tasks/lexical.json tasks/semantic.json --out ../../runs
+  python3 run_agent.py --model gpt-6-luna --effort low --harness codex
   python3 run_agent.py ... --ids exists-real-01 callers-01   # smoke
 """
 import argparse
 import json
-import subprocess
+import sys
 import time
 from pathlib import Path
 
 import run_retrieval  # build_prompt_t, restore_tree (K3 arm T contract)
 
-
-def call_claude(prompt, model, effort, max_turns, tools, timeout, tree):
-    cmd = ['claude', '-p', '--output-format', 'json', '--model', model,
-           '--max-turns', str(max_turns), '--effort', effort,
-           '--allowed-tools', tools]
-    proc = subprocess.run(cmd, cwd=tree, input=prompt, text=True,
-                          capture_output=True, timeout=timeout)
-    try:
-        data = json.loads(proc.stdout)
-    except ValueError:
-        return {'text': proc.stdout[-2000:], 'stderr': proc.stderr[-500:],
-                'usage': None, 'cost_usd': None,
-                'operational_error': 'invalid-endpoint-response'}
-    return {'text': data.get('result', ''), 'usage': data.get('usage'),
-            'cost_usd': data.get('total_cost_usd'),
-            'num_turns': data.get('num_turns'),
-            'duration_ms': data.get('duration_ms'),
-            'duration_api_ms': data.get('duration_api_ms'),
-            'model_used': ','.join(sorted((data.get('modelUsage') or {}).keys())),
-            'operational_error': 'endpoint-error' if data.get('is_error') else None}
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'common'))
+import harness  # noqa: E402
 
 
 def load_tasks(files, ids, limit):
@@ -71,6 +55,7 @@ def main():
     ap.add_argument('--tools', default='Read Glob Grep')
     ap.add_argument('--timeout', type=int, default=900)
     ap.add_argument('--out', type=Path, default=here.parents[1] / 'runs/find_feature')
+    ap.add_argument('--harness', default='claude', choices=sorted(harness.ADAPTERS))
     args = ap.parse_args()
 
     tree, tasks = load_tasks(args.tasks, args.ids, args.limit)
@@ -89,9 +74,8 @@ def main():
             prompt = run_retrieval.build_prompt_t(task)
             start = time.perf_counter()
             try:
-                reply = call_claude(prompt, args.model, args.effort,
-                                    args.max_turns, args.tools,
-                                    args.timeout, tree)
+                reply = harness.run(args.harness, prompt, args.model, args.effort,
+                                    args.max_turns, args.tools, args.timeout, tree)
             except Exception as error:  # timeout etc.
                 reply = {'text': '', 'usage': None, 'cost_usd': None,
                          'operational_error': type(error).__name__}
@@ -100,6 +84,7 @@ def main():
             record = {'id': task['id'], 'family': task['family'],
                       'bench': 'find_feature', 'arm': 'T',
                       'model_requested': args.model, 'effort': args.effort,
+                      'harness': args.harness,
                       'trial': args.trial, 'tools': args.tools,
                       'max_turns': args.max_turns,
                       'prompt_chars': len(prompt),

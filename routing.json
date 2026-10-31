@@ -5,7 +5,8 @@
   "results/cell1",
   "results/cell2",
   "results/cell3",
-  "results/cell4"
+  "results/cell4",
+  "results/cell5"
  ],
  "prices_verified": "see catalog/models.json",
  "runtime": {
@@ -97,14 +98,14 @@
    "status": "decided"
   },
   "browser_flow": {
-   "what": "drive a web page through a numbered checklist in a real Chrome tab (Claude-in-Chrome tools only, no source, no network/console); report pass/fail per item",
+   "what": "drive a web page through a numbered checklist in a real Chrome tab (Claude-in-Chrome tools only, no source, no network/console); report pass/fail per item; measured on a toy app (cell 4) and on the author's own Go web store (cell 5)",
    "default": {
     "model": "haiku",
     "effort": "low"
    },
    "step_up": null,
    "escalation_rule": null,
-   "why_no_escalation": "haiku matched sonnet item for item; the only miss in 33 runs was fable's lenient reading of one ambiguous item",
+   "why_no_escalation": "haiku matched sonnet item for item on both apps; the misses were one lenient reading by fable, three over-strict readings by sonnet, and two browser disconnects; no model missed a planted defect in a flow it finished",
    "checker": "a scripted user (bench/browser_flow/oracle.py) drives the same app and gives the truth vector; the app's action log confirms the flow was really driven",
    "evidence": {
     "haiku low": "33/33 correct over 3 trials, full flow driven every time",
@@ -130,9 +131,36 @@
     "exploratory testing without a checklist",
     "visual judgement from screenshots",
     "JavaScript-heavy, scrolling or slow pages",
-    "more than one trial for sonnet and fable"
+    "more than one trial for sonnet and fable on the toy app"
    ],
-   "status": "decided"
+   "status": "decided",
+   "retry_rule": "re-run a flow whose request log shows it did not finish (grade.py drove != full): a browser disconnect, not a model miss; do not step up",
+   "evidence_own_app": {
+    "what": "the author's own Go web store at a pinned commit, 15 flows (14 planted defects plus clean), 10 items, truth from the fixture's scripted user, bench/own_app_flow/oracle.py, a local file (results/cell5)",
+    "haiku low": "14/15 correct; the miss was a browser disconnect (flow unfinished, not_run reported)",
+    "sonnet low": "12/15 correct; all 15 flows finished and every defect flagged; three extra fails on the item next to the defect",
+    "fable low": "14/15 correct; the miss was a browser disconnect (flow unfinished)",
+    "cold_cost_per_flow_usd": {
+     "haiku": 0.037,
+     "sonnet": 0.489,
+     "fable": 2.52
+    },
+    "wall_s_mean": {
+     "haiku": 112,
+     "sonnet": 124,
+     "fable": 209
+    },
+    "turns_mean": {
+     "haiku": 43,
+     "sonnet": 43,
+     "fable": 41
+    },
+    "cache_read_tokens_per_flow": {
+     "haiku": "1.68M",
+     "sonnet": "1.15M",
+     "fable": "2.33M"
+    }
+   }
   },
   "unmeasured": {
    "what": "everything else (review, design, writing, exploratory browser testing, visual review, ...)",
@@ -149,7 +177,8 @@
   "give the agent a checker (build, tests) before giving it a bigger model",
   "no blind downgrade where there is no checker",
   "the fixed prefix (~95k tokens, ~27k written per new session) is most of a short session's bill: count sessions on expensive models, not tokens; browser flows (40-50 tool calls) are the exception, there cache reads dominate and tokens per session matter too",
-  "user override wins: per-invocation model, then the agent file, then this file"
+  "user override wins: per-invocation model, then the agent file, then this file",
+  "a run the checker shows did not finish (browser disconnect, tool failure) gets a retry on the same tier, not a bigger model"
  ],
  "agents": {
   "engineering-codebase-onboarding-engineer.md": {
@@ -176,7 +205,7 @@
    "model": "haiku",
    "effort": "low",
    "note": "closest agent to the measured family; its screenshot/visual-review and 'minimum 3-5 issues' parts are not measured",
-   "instruction": "When you are given a page and a checklist, drive every step in order in the browser, judge each item only by what you actually see on screen, and report pass or fail per item with one sentence of evidence for each fail. Do not report a failure you did not observe."
+   "instruction": "When you are given a page and a checklist, drive every step in order in the browser, judge each item only by what you actually see on screen, and report pass or fail per item with one sentence of evidence for each fail. Do not report a failure you did not observe. If the browser disconnects or a step cannot be run, mark those items not_run and say where the flow stopped, so the caller can retry."
   }
  },
  "recheck_when": [
@@ -185,5 +214,5 @@
   "a routed family's success rate drops in use",
   "a new family is measured"
  ],
- "revised": "2026-10-30 after cell 4"
+ "revised": "2026-10-30 after cell 5"
 }

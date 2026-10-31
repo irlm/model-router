@@ -1,6 +1,7 @@
 """Grade browser-flow receipts: the agent's pass/fail vector against the truth
 vector the scripted user observed. Outcomes: correct | wrong (detail: items
-that differ) | unparseable | operational. Also reports `drove`: whether the
+that differ) | incomplete (differs, and the app log shows the flow was not
+finished) | unparseable | operational. Also reports `drove`: whether the
 app's action log shows the full flow (2 sign-ins, 3 adds, 1 edit, 1 delete,
 1 logout), part of it, or nothing. Cheap, so report.py calls it inline.
 """
@@ -43,7 +44,11 @@ def grade_one(task, record):
         return 'unparseable', str(e)[:80]
     truth = task['truth']
     wrong = [k for k in truth if results.get(k) != truth[k]]
+    d = drove(record.get('state'))
     if not wrong:
-        return 'correct', f'drove={drove(record.get("state"))}'
+        return 'correct', f'drove={d}'
     said = ','.join(f'{k}:{results.get(k, "?")}' for k in wrong)
-    return 'wrong', f'items {said} (truth fails {task["fails"]}) drove={drove(record.get("state"))}'
+    # A vector that differs when the app log shows the flow was never finished is
+    # a browser or extension failure, not a judgement: `incomplete`, not `wrong`.
+    outcome = 'wrong' if d == 'full' else 'incomplete'
+    return outcome, f'items {said} (truth fails {task["fails"]}) drove={d}'

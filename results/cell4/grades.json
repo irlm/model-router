@@ -33,6 +33,38 @@
    "wall_mean": 91.27,
    "wall_total": 1003.97
   },
+  "browser_flow / claude-haiku-5-5 / low / 2": {
+   "n": 11,
+   "success": 11,
+   "outcomes": {
+    "correct": 11
+   },
+   "cost_total": 0.37796312000000004,
+   "cost_per_success": 0.03436028363636364,
+   "cost_mean": 0.03436028363636364,
+   "cost_p90": 0.03735265,
+   "cost_max": 0.042287269999999995,
+   "turns_mean": 48.27272727272727,
+   "turns_max": 56,
+   "wall_mean": 82.07181818181819,
+   "wall_total": 902.79
+  },
+  "browser_flow / claude-haiku-5-5 / low / 3": {
+   "n": 11,
+   "success": 11,
+   "outcomes": {
+    "correct": 11
+   },
+   "cost_total": 0.35342699,
+   "cost_per_success": 0.03212972636363636,
+   "cost_mean": 0.03212972636363636,
+   "cost_p90": 0.03511254999999999,
+   "cost_max": 0.03620452,
+   "turns_mean": 45,
+   "turns_max": 59,
+   "wall_mean": 83.21,
+   "wall_total": 915.31
+  },
   "browser_flow / claude-sonnet-5-5 / low / 1": {
    "n": 11,
    "success": 11,
@@ -48,6 +80,57 @@
    "turns_max": 47,
    "wall_mean": 76.27818181818182,
    "wall_total": 839.06
+  },
+  "own_app_flow / claude-fable-5-1 / low / 1": {
+   "n": 15,
+   "success": 14,
+   "outcomes": {
+    "correct": 14,
+    "incomplete": 1
+   },
+   "cost_total": 37.79602250000001,
+   "cost_per_success": 2.699715892857143,
+   "cost_mean": 2.5197348333333336,
+   "cost_p90": 2.6806362500000014,
+   "cost_max": 2.7183562500000003,
+   "turns_mean": 41.06666666666667,
+   "turns_max": 46,
+   "wall_mean": 209.384,
+   "wall_total": 3140.76
+  },
+  "own_app_flow / claude-haiku-5-5 / low / 1": {
+   "n": 15,
+   "success": 14,
+   "outcomes": {
+    "correct": 14,
+    "incomplete": 1
+   },
+   "cost_total": 0.56145038,
+   "cost_per_success": 0.040103598571428575,
+   "cost_mean": 0.03743002533333333,
+   "cost_p90": 0.04311477000000002,
+   "cost_max": 0.04691983000000001,
+   "turns_mean": 42.53333333333333,
+   "turns_max": 51,
+   "wall_mean": 112.11266666666667,
+   "wall_total": 1681.69
+  },
+  "own_app_flow / claude-sonnet-5-5 / low / 1": {
+   "n": 15,
+   "success": 12,
+   "outcomes": {
+    "correct": 12,
+    "wrong": 3
+   },
+   "cost_total": 7.3277389,
+   "cost_per_success": 0.6106449083333333,
+   "cost_mean": 0.48851592666666666,
+   "cost_p90": 0.5169718999999999,
+   "cost_max": 0.5230026999999999,
+   "turns_mean": 43.266666666666666,
+   "turns_max": 50,
+   "wall_mean": 123.606,
+   "wall_total": 1854.09
   },
   "find_feature / claude-fable-5-1 / low / 1": {
    "n": 72,
@@ -1187,6 +1270,81 @@
    "cost": 2.2595929999999997,
    "turns": 52,
    "wall": 144.65
+  },
+  {
+   "cell": [
+    "own_app_flow",
+    "claude-fable-5-1",
+    "low",
+    1
+   ],
+   "id": "store-10-update-ignored",
+   "family": "own_app_flow",
+   "outcome": "incomplete",
+   "detail": "items 3:fail,4:fail,5:fail,6:fail,9:fail (truth fails ['7', '8', '10']) drove=none",
+   "cost": 2.405263250000001,
+   "turns": 30,
+   "wall": 150.16
+  },
+  {
+   "cell": [
+    "own_app_flow",
+    "claude-haiku-5-5",
+    "low",
+    1
+   ],
+   "id": "store-04-add-ignores-quantity",
+   "family": "own_app_flow",
+   "outcome": "incomplete",
+   "detail": "items 4:not_run,5:not_run,6:not_run,7:not_run,8:not_run,9:not_run,10:not_run (truth fails ['3', '4', '5', '6']) drove=partial",
+   "cost": 0.030575579999999995,
+   "turns": 31,
+   "wall": 88.37
+  },
+  {
+   "cell": [
+    "own_app_flow",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "store-06-subtotal-skips-last",
+   "family": "own_app_flow",
+   "outcome": "wrong",
+   "detail": "items 5:fail (truth fails ['6', '7']) drove=full",
+   "cost": 0.48710250000000005,
+   "turns": 40,
+   "wall": 145.58
+  },
+  {
+   "cell": [
+    "own_app_flow",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "store-11-payment-method-ignored",
+   "family": "own_app_flow",
+   "outcome": "wrong",
+   "detail": "items 9:fail (truth fails ['8']) drove=full",
+   "cost": 0.5157476,
+   "turns": 48,
+   "wall": 160.63
+  },
+  {
+   "cell": [
+    "own_app_flow",
+    "claude-sonnet-5-5",
+    "low",
+    1
+   ],
+   "id": "store-12-order-tax-doubled",
+   "family": "own_app_flow",
+   "outcome": "wrong",
+   "detail": "items 9:fail (truth fails ['8', '10']) drove=full",
+   "cost": 0.5169718999999999,
+   "turns": 46,
+   "wall": 169.2
   },
   {
    "cell": [

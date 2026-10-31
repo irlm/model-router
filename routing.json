@@ -6,7 +6,9 @@
   "results/cell2",
   "results/cell3",
   "results/cell4",
-  "results/cell5"
+  "results/cell5",
+  "results/cell6",
+  "results/cell7"
  ],
  "prices_verified": "see catalog/models.json",
  "runtime": {
@@ -28,8 +30,10 @@
    },
    "step_up": {
     "model": "sonnet",
+    "model_id": "claude-sonnet-5-5",
     "effort": "low",
-    "when": "a 1-in-80 wrong answer is expensive"
+    "requires": [],
+    "cost_per_success": 0.1173
    },
    "escalation_rule": null,
    "why_no_escalation": "misses are confident answers, there is no failure signal to trigger on",
@@ -44,14 +48,91 @@
      "fable": 0.578
     }
    },
-   "status": "decided"
+   "status": "decided",
+   "decided": {
+    "bar": 0.98,
+    "rule": "cheapest candidate with rate >= best - 0.02 by cost per success; harness-lost runs excluded from the rate",
+    "evidence": {
+     "claude-fable-5-1 low": {
+      "n": 72,
+      "success": 72,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 0.5779,
+      "cost_total": 41.6087,
+      "wall_mean": 8.3482,
+      "trials": {
+       "find_feature": 1
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low": {
+      "n": 216,
+      "success": 214,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.9907,
+      "cost_per_success": 0.0046,
+      "cost_total": 0.9843,
+      "wall_mean": 6.383,
+      "trials": {
+       "find_feature": 3
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 medium": {
+      "n": 216,
+      "success": 213,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.9861,
+      "cost_per_success": 0.0057,
+      "cost_total": 1.2085,
+      "wall_mean": 6.7031,
+      "trials": {
+       "find_feature": 3
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low": {
+      "n": 144,
+      "success": 144,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 0.1173,
+      "cost_total": 16.8869,
+      "wall_mean": 6.1289,
+      "trials": {
+       "find_feature": 2
+      },
+      "covers": true
+     },
+     "gpt-6-luna low": {
+      "n": 216,
+      "success": 209,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.9676,
+      "cost_per_success": 0.0005,
+      "cost_total": 0.1123,
+      "wall_mean": 4.3725,
+      "trials": {
+       "find_feature": 3
+      },
+      "covers": true
+     }
+    },
+    "n_tasks": 72,
+    "default_rate": 0.9907407407407407
+   }
   },
   "fix_bug": {
    "what": "fix a bug given a failing test; the agent reads, edits and can run the suite",
    "default": {
     "model": "haiku",
-    "effort": "low",
-    "requires": "the agent can build and run the tests"
+    "effort": "low"
    },
    "step_up": null,
    "escalation_rule": null,
@@ -71,14 +152,108 @@
      "fable": 1.127
     }
    },
-   "status": "decided"
+   "status": "decided",
+   "requires": [
+    "the test runner in the loop (KUnit)"
+   ],
+   "decided": {
+    "bar": 0.98,
+    "rule": "cheapest candidate with rate >= best - 0.02 by cost per success; harness-lost runs excluded from the rate",
+    "evidence": {
+     "claude-fable-5-1 low": {
+      "n": 21,
+      "success": 16,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.7619,
+      "cost_per_success": 1.127,
+      "cost_total": 18.0324,
+      "wall_mean": 31.0062,
+      "trials": {
+       "fix_bug_hard": 1
+      },
+      "covers": true
+     },
+     "claude-fable-5-1 low+kunit": {
+      "n": 42,
+      "success": 42,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 0.8948,
+      "cost_total": 37.5833,
+      "wall_mean": 45.9633,
+      "trials": {
+       "fix_bug_hard": 2
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low": {
+      "n": 21,
+      "success": 16,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.7619,
+      "cost_per_success": 0.0158,
+      "cost_total": 0.2527,
+      "wall_mean": 26.5824,
+      "trials": {
+       "fix_bug_hard": 1
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low+kunit": {
+      "n": 63,
+      "success": 63,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 0.0145,
+      "cost_total": 0.911,
+      "wall_mean": 40.7243,
+      "trials": {
+       "fix_bug_hard": 3
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low": {
+      "n": 21,
+      "success": 14,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.6667,
+      "cost_per_success": 0.2564,
+      "cost_total": 3.5895,
+      "wall_mean": 22.2124,
+      "trials": {
+       "fix_bug_hard": 1
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low+kunit": {
+      "n": 42,
+      "success": 42,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 0.1902,
+      "cost_total": 7.9899,
+      "wall_mean": 33.606,
+      "trials": {
+       "fix_bug_hard": 2
+      },
+      "covers": true
+     }
+    },
+    "n_tasks": 21,
+    "default_rate": 1.0
+   }
   },
   "write_tests": {
    "what": "write a test suite for a function; success = builds, passes on real code, fails on a seeded bug",
    "default": {
     "model": "haiku",
-    "effort": "low",
-    "requires": "the agent can build and run the tests"
+    "effort": "low"
    },
    "step_up": null,
    "without_runner": "do not use any tier: haiku 5/10, sonnet 7/10, fable 4/10, all with wrong expected values",
@@ -95,7 +270,102 @@
      "fable": 4.58
     }
    },
-   "status": "decided"
+   "status": "decided",
+   "requires": [
+    "the test runner in the loop (KUnit)"
+   ],
+   "decided": {
+    "bar": 0.98,
+    "rule": "cheapest candidate with rate >= best - 0.02 by cost per success; harness-lost runs excluded from the rate",
+    "evidence": {
+     "claude-fable-5-1 low": {
+      "n": 10,
+      "success": 4,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.4,
+      "cost_per_success": 4.5774,
+      "cost_total": 18.3096,
+      "wall_mean": 167.784,
+      "trials": {
+       "write_tests": 1
+      },
+      "covers": true
+     },
+     "claude-fable-5-1 low+kunit": {
+      "n": 20,
+      "success": 20,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 1.5736,
+      "cost_total": 31.4729,
+      "wall_mean": 149.293,
+      "trials": {
+       "write_tests": 2
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low": {
+      "n": 10,
+      "success": 5,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.5,
+      "cost_per_success": 0.049,
+      "cost_total": 0.2451,
+      "wall_mean": 93.467,
+      "trials": {
+       "write_tests": 1
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low+kunit": {
+      "n": 30,
+      "success": 30,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 0.0259,
+      "cost_total": 0.7759,
+      "wall_mean": 98.637,
+      "trials": {
+       "write_tests": 3
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low": {
+      "n": 10,
+      "success": 7,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.7,
+      "cost_per_success": 0.3705,
+      "cost_total": 2.5932,
+      "wall_mean": 50.323,
+      "trials": {
+       "write_tests": 1
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low+kunit": {
+      "n": 20,
+      "success": 20,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 0.2792,
+      "cost_total": 5.5847,
+      "wall_mean": 66.3955,
+      "trials": {
+       "write_tests": 2
+      },
+      "covers": true
+     }
+    },
+    "n_tasks": 10,
+    "default_rate": 1.0
+   }
   },
   "browser_flow": {
    "what": "drive a web page through a numbered checklist in a real Chrome tab (Claude-in-Chrome tools only, no source, no network/console); report pass/fail per item; measured on a toy app (cell 4) and on the author's own Go web store (cell 5)",
@@ -161,6 +431,59 @@
      "fable": "2.33M"
     },
     "browser_disconnects": "4 of 76 runs (haiku 2, sonnet 1, fable 1): the user closed the shared Chrome by mistake during the runs; each flow was rerun afterwards"
+   },
+   "decided": {
+    "bar": 0.98,
+    "rule": "cheapest candidate with rate >= best - 0.02 by cost per success; harness-lost runs excluded from the rate",
+    "evidence": {
+     "claude-fable-5-1 low": {
+      "n": 27,
+      "success": 25,
+      "not_model": 1,
+      "pending": 0,
+      "rate": 0.9615,
+      "cost_per_success": 2.6294,
+      "cost_total": 65.7354,
+      "wall_mean": 188.6681,
+      "trials": {
+       "browser_flow": 1,
+       "own_app_flow": 2
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low": {
+      "n": 65,
+      "success": 63,
+      "not_model": 2,
+      "pending": 0,
+      "rate": 1.0,
+      "cost_per_success": 0.0367,
+      "cost_total": 2.3135,
+      "wall_mean": 116.0932,
+      "trials": {
+       "browser_flow": 3,
+       "own_app_flow": 3
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low": {
+      "n": 42,
+      "success": 37,
+      "not_model": 1,
+      "pending": 0,
+      "rate": 0.9024,
+      "cost_per_success": 0.5278,
+      "cost_total": 19.5291,
+      "wall_mean": 117.875,
+      "trials": {
+       "browser_flow": 1,
+       "own_app_flow": 3
+      },
+      "covers": true
+     }
+    },
+    "n_tasks": 26,
+    "default_rate": 1.0
    }
   },
   "unmeasured": {
@@ -215,5 +538,152 @@
   "a routed family's success rate drops in use",
   "a new family is measured"
  ],
- "revised": "2026-10-30 after cell 5"
+ "revised": "2026-10-30 after cells 6 and 7; defaults written by decide.py",
+ "decided_by": "decide.py --margin 0.02 --min-trials 1 (catalog prices)",
+ "plan_for_unmeasured_models": [
+  {
+   "model": "claude-opus-5-5",
+   "provider": "anthropic",
+   "list_price_in_plus_out_per_mtok": 24.0,
+   "families": [
+    {
+     "family": "write_tests",
+     "run": false,
+     "n_tasks": 10,
+     "expected_cost_usd": 9.29,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "fix_bug",
+     "run": false,
+     "n_tasks": 21,
+     "expected_cost_usd": 10.65,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "find_feature",
+     "run": false,
+     "n_tasks": 72,
+     "expected_cost_usd": 11.94,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "browser_flow",
+     "run": false,
+     "n_tasks": 26,
+     "expected_cost_usd": 28.89,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    }
+   ],
+   "harness": "claude"
+  },
+  {
+   "model": "openai:gpt-6.1-sol",
+   "provider": "openai",
+   "list_price_in_plus_out_per_mtok": 12.0,
+   "families": [
+    {
+     "family": "write_tests",
+     "run": false,
+     "n_tasks": 10,
+     "expected_cost_usd": 4.64,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "fix_bug",
+     "run": false,
+     "n_tasks": 21,
+     "expected_cost_usd": 5.32,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "find_feature",
+     "run": false,
+     "n_tasks": 72,
+     "expected_cost_usd": 5.97,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "browser_flow",
+     "run": false,
+     "n_tasks": 26,
+     "expected_cost_usd": 14.45,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    }
+   ],
+   "harness": "needs a harness adapter (bench/common/harness.py)"
+  },
+  {
+   "model": "openai:gpt-6-astra",
+   "provider": "openai",
+   "list_price_in_plus_out_per_mtok": 60.0,
+   "families": [
+    {
+     "family": "write_tests",
+     "run": false,
+     "n_tasks": 10,
+     "expected_cost_usd": 25.86,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "fix_bug",
+     "run": false,
+     "n_tasks": 21,
+     "expected_cost_usd": 30.37,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "find_feature",
+     "run": false,
+     "n_tasks": 72,
+     "expected_cost_usd": 32.81,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "browser_flow",
+     "run": false,
+     "n_tasks": 26,
+     "expected_cost_usd": 92.54,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    }
+   ],
+   "harness": "needs a harness adapter (bench/common/harness.py)"
+  },
+  {
+   "model": "openai:gpt-5.3-codex",
+   "provider": "openai",
+   "list_price_in_plus_out_per_mtok": 15.75,
+   "families": [
+    {
+     "family": "write_tests",
+     "run": false,
+     "n_tasks": 10,
+     "expected_cost_usd": 5.55,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "fix_bug",
+     "run": false,
+     "n_tasks": 21,
+     "expected_cost_usd": 5.86,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "find_feature",
+     "run": false,
+     "n_tasks": 72,
+     "expected_cost_usd": 5.95,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "browser_flow",
+     "run": false,
+     "n_tasks": 26,
+     "expected_cost_usd": 17.07,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    }
+   ],
+   "harness": "needs a harness adapter (bench/common/harness.py)"
+  }
+ ]
 }

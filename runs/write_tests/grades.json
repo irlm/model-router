@@ -358,5 +358,245 @@
   "detail": "cases=10 failing_on_bug=8",
   "kunit_cases": 10,
   "test_bytes": 12405
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=13 failing_on_bug=11",
+  "kunit_cases": 13,
+  "test_bytes": 12572
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=14 failing_on_bug=12",
+  "kunit_cases": 14,
+  "test_bytes": 7490
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=14 failing_on_bug=8",
+  "kunit_cases": 14,
+  "test_bytes": 6600
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=15 failing_on_bug=12",
+  "kunit_cases": 15,
+  "test_bytes": 5430
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=18 failing_on_bug=3",
+  "kunit_cases": 18,
+  "test_bytes": 8396
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=12 failing_on_bug=6",
+  "kunit_cases": 12,
+  "test_bytes": 4727
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=17 failing_on_bug=14",
+  "kunit_cases": 17,
+  "test_bytes": 4783
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=7 failing_on_bug=4",
+  "kunit_cases": 7,
+  "test_bytes": 5872
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "catches-bug",
+  "detail": "cases=22 failing_on_bug=20",
+  "kunit_cases": 22,
+  "test_bytes": 8872
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-string_helpers-03-string_unescape": {
+  "outcome": "catches-bug",
+  "detail": "cases=12 failing_on_bug=10",
+  "kunit_cases": 12,
+  "test_bytes": 5892
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-cmdline-01-get_option": {
+  "outcome": "catches-bug",
+  "detail": "cases=17 failing_on_bug=4",
+  "kunit_cases": 17,
+  "test_bytes": 4759
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=17 failing_on_bug=10",
+  "kunit_cases": 17,
+  "test_bytes": 3457
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=11 (kernel crashed on bug: \".152s total, 0.001s configuring, 6.145s building, 0.005s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 11,
+  "test_bytes": 4246
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=9 failing_on_bug=5",
+  "kunit_cases": 10,
+  "test_bytes": 5436
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=11 failing_on_bug=7",
+  "kunit_cases": 12,
+  "test_bytes": 6605
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=9 failing_on_bug=4",
+  "kunit_cases": 9,
+  "test_bytes": 10011
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "catches-bug",
+  "detail": "cases=25 failing_on_bug=21",
+  "kunit_cases": 25,
+  "test_bytes": 18793
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-string_helpers-03-string_unescape": {
+  "outcome": "catches-bug",
+  "detail": "cases=30 failing_on_bug=25",
+  "kunit_cases": 30,
+  "test_bytes": 19352
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-cmdline-01-get_option": {
+  "outcome": "catches-bug",
+  "detail": "cases=12 failing_on_bug=6",
+  "kunit_cases": 12,
+  "test_bytes": 6500
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=26 failing_on_bug=18",
+  "kunit_cases": 26,
+  "test_bytes": 12130
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=16 (kernel crashed on bug: \".334s total, 0.001s configuring, 3.328s building, 0.005s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 16,
+  "test_bytes": 7745
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=13 failing_on_bug=5",
+  "kunit_cases": 13,
+  "test_bytes": 14828
+ },
+ "claude-fable-5-1 / low+kunit / 2 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=12 failing_on_bug=5",
+  "kunit_cases": 12,
+  "test_bytes": 12049
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "catches-bug",
+  "detail": "cases=25 failing_on_bug=16",
+  "kunit_cases": 25,
+  "test_bytes": 11159
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-string_helpers-03-string_unescape": {
+  "outcome": "catches-bug",
+  "detail": "cases=20 failing_on_bug=13",
+  "kunit_cases": 20,
+  "test_bytes": 9509
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-cmdline-01-get_option": {
+  "outcome": "catches-bug",
+  "detail": "cases=25 failing_on_bug=7",
+  "kunit_cases": 25,
+  "test_bytes": 7217
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=24 failing_on_bug=10",
+  "kunit_cases": 24,
+  "test_bytes": 9775
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=12 (kernel crashed on bug: \".305s total, 0.001s configuring, 3.299s building, 0.005s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 12,
+  "test_bytes": 5988
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=9 failing_on_bug=6",
+  "kunit_cases": 9,
+  "test_bytes": 7156
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=10 failing_on_bug=9",
+  "kunit_cases": 10,
+  "test_bytes": 9640
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=17 failing_on_bug=9",
+  "kunit_cases": 17,
+  "test_bytes": 8520
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-string-02-strcspn": {
+  "outcome": "catches-bug",
+  "detail": "cases=17 failing_on_bug=14",
+  "kunit_cases": 17,
+  "test_bytes": 6828
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-string_helpers-01-string_get_size": {
+  "outcome": "catches-bug",
+  "detail": "cases=14 failing_on_bug=4",
+  "kunit_cases": 14,
+  "test_bytes": 9197
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-string_helpers-02-string_escape_mem": {
+  "outcome": "catches-bug",
+  "detail": "cases=31 failing_on_bug=20",
+  "kunit_cases": 31,
+  "test_bytes": 11085
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-string_helpers-03-string_unescape": {
+  "outcome": "catches-bug",
+  "detail": "cases=19 failing_on_bug=13",
+  "kunit_cases": 19,
+  "test_bytes": 9991
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-cmdline-01-get_option": {
+  "outcome": "catches-bug",
+  "detail": "cases=23 failing_on_bug=5",
+  "kunit_cases": 23,
+  "test_bytes": 6865
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-cmdline-02-get_options": {
+  "outcome": "catches-bug",
+  "detail": "cases=35 failing_on_bug=17",
+  "kunit_cases": 35,
+  "test_bytes": 8411
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-cmdline-03-memparse": {
+  "outcome": "catches-bug",
+  "detail": "cases=23 (kernel crashed on bug: \".651s total, 0.001s configuring, 3.645s building, 0.005s running\\n\\nstty: 'standard input': Inappropriate ioctl for device\")",
+  "kunit_cases": 23,
+  "test_bytes": 8463
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-siphash-01-__siphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=8 failing_on_bug=4",
+  "kunit_cases": 8,
+  "test_bytes": 10073
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / test-siphash-02-__hsiphash_aligned": {
+  "outcome": "catches-bug",
+  "detail": "cases=7 failing_on_bug=4",
+  "kunit_cases": 7,
+  "test_bytes": 6811
  }
 }

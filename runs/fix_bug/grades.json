@@ -148,5 +148,205 @@
   "outcome": "fixed",
   "detail": "",
   "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-string-01-strncasecmp": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-string-02-strcspn": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-string_helpers-01-string_get_size": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-string_helpers-02-string_escape_mem": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-string_helpers-03-string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-cmdline-01-get_option": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-cmdline-02-get_options": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-cmdline-03-memparse": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-siphash-01-__siphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low / 2 / edit-siphash-02-__hsiphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-string-01-strncasecmp": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-string-02-strcspn": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-string_helpers-01-string_get_size": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-string_helpers-02-string_escape_mem": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-string_helpers-03-string_unescape": {
+  "outcome": "still-failing",
+  "detail": "",
+  "patch_lines": 12
+ },
+ "claude-haiku-5-5 / low / 2 / edit-cmdline-01-get_option": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-cmdline-02-get_options": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-cmdline-03-memparse": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-siphash-01-__siphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 2 / edit-siphash-02-__hsiphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-string-01-strncasecmp": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-string-02-strcspn": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-string_helpers-01-string_get_size": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-string_helpers-02-string_escape_mem": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-string_helpers-03-string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-cmdline-01-get_option": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-cmdline-02-get_options": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-cmdline-03-memparse": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-siphash-01-__siphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low / 2 / edit-siphash-02-__hsiphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-string-01-strncasecmp": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-string-02-strcspn": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-string_helpers-01-string_get_size": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-string_helpers-02-string_escape_mem": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-string_helpers-03-string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-cmdline-01-get_option": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-cmdline-02-get_options": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-cmdline-03-memparse": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-siphash-01-__siphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 3 / edit-siphash-02-__hsiphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
  }
 }

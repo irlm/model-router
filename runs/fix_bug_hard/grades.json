@@ -628,5 +628,425 @@
   "outcome": "fixed",
   "detail": "",
   "patch_lines": 22
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-cmdline-01-get_range": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-cmdline-02-_parse_integer_limit": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-cmdline-03-_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-string_helpers-01-unescape_octal": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-string_helpers-02-unescape_hex": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-string_helpers-03-escape_passthrough": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-string_helpers-04-escape_space": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-string_helpers-05-escape_special": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-string_helpers-06-escape_null": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-string_helpers-07-escape_octal": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-hidden-string_helpers-08-escape_hex": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 26
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 26
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-fable-5-1 / low+kunit / 2 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-cmdline-01-get_range": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-cmdline-02-_parse_integer_limit": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-cmdline-03-_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-string_helpers-01-unescape_octal": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-string_helpers-02-unescape_hex": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-string_helpers-03-escape_passthrough": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-string_helpers-04-escape_space": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-string_helpers-05-escape_special": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-string_helpers-06-escape_null": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-string_helpers-07-escape_octal": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-hidden-string_helpers-08-escape_hex": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 26
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 26
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 2 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-cmdline-01-get_range": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-cmdline-02-_parse_integer_limit": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-cmdline-03-_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-string_helpers-01-unescape_octal": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-string_helpers-02-unescape_hex": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-string_helpers-03-escape_passthrough": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-string_helpers-04-escape_space": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-string_helpers-05-escape_special": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-string_helpers-06-escape_null": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-string_helpers-07-escape_octal": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-hidden-string_helpers-08-escape_hex": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 26
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 26
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-sonnet-5-5 / low+kunit / 2 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-cmdline-01-get_range": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-cmdline-02-_parse_integer_limit": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-cmdline-03-_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-string_helpers-01-unescape_octal": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-string_helpers-02-unescape_hex": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-string_helpers-03-escape_passthrough": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-string_helpers-04-escape_space": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-string_helpers-05-escape_special": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-string_helpers-06-escape_null": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-string_helpers-07-escape_octal": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-hidden-string_helpers-08-escape_hex": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-cmdline-01-get_option+get_options": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-cmdline-02-get_option+get_range": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-cmdline-03-get_option+_parse_integer_fixup_radix": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 26
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-cmdline-04-get_option+_parse_integer_limit": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 26
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-string_helpers-01-string_get_size+string_escape_mem": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-string_helpers-02-string_escape_mem+string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-string_helpers-03-string_get_size+string_unescape": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-string_helpers-04-string_get_size+escape_passthrough": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-string-01-strncasecmp+strcspn": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
+ },
+ "claude-haiku-5-5 / low+kunit / 3 / hard-multi-siphash-01-__siphash_aligned+__hsiphash_aligned": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 22
  }
 }

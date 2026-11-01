@@ -6,12 +6,31 @@ that routing is still applied and still true here, and lets you re-check it with
 
 What you see:
 
-- A status line under the prompt: `router ok · v1.1 · 3 families checkable here · Claude Code 2.1.316 · 12:01`,
-  or `router: 2 to check · /router` when something is worth doing.
-- `/router` opens a pane: the families table (default model and effort, evidence, cost per
-  success, whether the family's regression sample can run on this machine, the last check),
-  the agent files (applied or drifted), price freshness, the ledger dates, the timer, and
-  the list of things to check.
+- A status line under the prompt: `router: 5h 37% · 7d 62% · 2 suggestions · /router · 12:01`.
+  The percentages are the subscription's rate-limit windows as the last API response reported
+  them. Then the count of things to check and of suggestions, or `router ok`.
+- `/router` opens a pane with, top to bottom: the rate-limit windows; the families table (default
+  model and effort, evidence, cost per success, whether the family's regression sample can run on
+  this machine, the last check); the agent files (applied or drifted), price freshness, ledger
+  dates, the timer; the things to check; what the last 30 days consumed (main sessions by model
+  and effort, subagent calls by kind); and the suggestions.
+
+Suggestions say where the same work could consume less of the subscription. Catalog prices are
+API-equivalent dollars, which on a subscription measure rate-limit headroom. Each suggestion
+carries its evidence and a kind:
+
+- `measured`: a decided family covers that kind of work (a fact lookup on a general-purpose
+  agent instead of the routed Web Researcher).
+- `extrapolated`: measured on the benchmark's tasks, applied to sessions it did not measure
+  (main sessions at xhigh effort: the sweep found xhigh costs 1.3 to 1.5 times low for the same
+  fixes, on tasks every effort solved).
+- `unmeasured`: the stake is known, no cheaper model is (research reports on general-purpose
+  agents; Fable in main sessions, where the measured families saw Opus equal at 37 to 40 percent
+  of the cost). These say what to measure next, or what to try and compare in the next ledger.
+
+The numbers come from `tools/consumption.py` (the local transcripts, last 30 days, with the
+effort of each request) and the rules in `tools/status.py`, where every ratio is a named
+constant with the cell it came from.
 
 Buttons and verbs (`/router <verb>`):
 

@@ -15,6 +15,12 @@ const STATUS = {
   ledger: { usage_last: '2026-11-01', regress_last: { date: '2026-11-01', claude: '2.1.316' } },
   timer: { kind: 'systemd', installed: true, next: 'Tue 2026-12-01 09:00:00 EST' },
   advice: ['prices verified 40 days ago: check the sources'],
+  usage: { days: 30, since: '2026-10-02', main_total: 517.2, main_out_cost: 133.1,
+    main_rows: [{ model: 'claude-opus-5-5', effort: 'medium', msgs: 2152, cost: 258.86, out_cost: 53.1 }],
+    subagents_total: 74.75, subagent_calls: 20, by_class: { 'research-synthesis': { n: 19, cost: 73.12, types: { 'general-purpose': 19 } } },
+    previous: { since: '2026-09-02', main_total: 491.9, subagents_total: 7.8 } },
+  suggestions: [{ id: 'effort', kind: 'extrapolated', title: 'main sessions at high/xhigh effort: $225 in 30 days', stake: 225,
+    saving: [72, 72], basis: 'results/cell8 sweep', action: 'claude --effort low' }],
 }
 
 const PANE = {
@@ -44,7 +50,9 @@ test('/router check prints the table and the status line counts the advice', asy
   expect(text).toContain('find_feature haiku low          214/216  0.0046  yes  ok 6/6')
   expect(text).toContain('fix_bug      haiku low +kunit   16/21    0.0158  no   -')
   expect(text).toContain('  - prices verified 40 days ago')
-  expect(pinned.at(-1)).toContain('router: 1 to check')
+  expect(pinned.at(-1)).toContain('1 to check · 1 suggestion')
+  expect(text).toContain('* [extrapolated] main sessions at high/xhigh effort: $225 in 30 days: saves $72')
+  expect(text).toContain('subagents research-synthesis    19 calls  $  73.12  general-purpose x19')
 
   for (const surface of ['terminal', 'desktop', 'vscode', 'mobile'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })

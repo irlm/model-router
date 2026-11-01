@@ -24,10 +24,38 @@ export type StatusJson = {
   ledger: { usage_last: string | null; regress_last: { date: string | null; claude: string | null } | null }
   timer: { kind: string; installed?: boolean; next?: string; note?: string }
   advice: string[]
+  usage?: Usage
+  suggestions?: Suggestion[]
 }
 
+/** The last 30 days of interactive work, catalog-priced: headroom on a subscription. */
+export type Usage = {
+  days: number
+  since: string
+  main_total: number
+  main_out_cost: number
+  main_rows: { model: string; effort: string; msgs: number; cost: number; out_cost: number }[]
+  subagents_total: number
+  subagent_calls: number
+  by_class: Record<string, { n: number; cost: number; types: Record<string, number> }>
+  previous: { since: string; main_total: number; subagents_total: number }
+}
+
+/** One place the window could have consumed less for the same work, with its evidence. */
+export type Suggestion = {
+  id: string
+  kind: 'measured' | 'extrapolated' | 'unmeasured'
+  title: string
+  stake: number
+  saving: [number, number] | null
+  basis: string
+  action: string
+}
+
+export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
+
 /** The last status read: the JSON when the script ran, else why not. */
-export type Status = { at: number; json: StatusJson | null; error: string | null }
+export type Status = { at: number; json: StatusJson | null; error: string | null; rateLimits: RateLimit[] }
 
 /** One command the widget is running or last ran, with its output. */
 export type Job = { name: string; lines: string[]; isRunning: boolean; exitCode: number | null; startedAt: number }

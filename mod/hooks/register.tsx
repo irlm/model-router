@@ -1,12 +1,13 @@
 import { atom, read, update } from 'claude-code'
 import type { Hook, Register } from 'claude-code'
 
-import type { Job, Status, StatusJson } from '../types'
+import type { Job, RateLimit, Status, StatusJson } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
 
 const PANE = 'model-router'
-const status = atom({ plugin: 'model-router', key: 'status' } as const, null, { shape: 'status-1' })
+// status-2: the rate-limit windows and the consumption block joined the value
+const status = atom({ plugin: 'model-router', key: 'status' } as const, null, { shape: 'status-2' })
 const job = atom({ plugin: 'model-router', key: 'job' } as const, null, { shape: 'job-1' })
 
 // What the buttons and /router <verb> run, from the checkout's root.
@@ -22,11 +23,18 @@ const clock = (ms: number) => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-/** The status line under the prompt: one line, the to-do count first. */
-const statusLine = (s: StatusJson, at: number) => {
-  if (s.advice.length > 0) return `router: ${s.advice.length} to check · /router · ${clock(at)}`
-  const here = s.families.filter(f => f.can_run).length
-  return `router ok · v${s.routing.version} · ${here} families checkable here · Claude Code ${s.claude ?? '?'} · ${clock(at)}`
+const windowName = (kind: string) => (kind === 'five_hour' ? '5h' : kind === 'seven_day' ? '7d' : kind)
+
+const limitsText = (limits: RateLimit[]) => limits.map(l => `${windowName(l.kind)} ${Math.round(l.percentUsed)}%`).join(' · ')
+
+/** The status line under the prompt: the rate-limit windows, then what is worth doing. */
+const statusLine = (s: StatusJson, limits: RateLimit[], at: number) => {
+  const parts = [limitsText(limits)]
+  const n = s.suggestions?.length ?? 0
+  if (s.advice.length > 0) parts.push(`${s.advice.length} to check`)
+  if (n > 0) parts.push(`${n} suggestion${n > 1 ? 's' : ''}`)
+  if (s.advice.length === 0 && n === 0) parts.push(`router ok · v${s.routing.version}`)
+  return `router: ${parts.filter(Boolean).join(' · ')} · /router · ${clock(at)}`
 }
 
 /** The pane's body and /router check's text: the same lines. */
@@ -62,6 +70,27 @@ const summaryLines = (s: StatusJson, at: number): string[] => {
   )
   if (s.advice.length === 0) lines.push('nothing to do')
   else lines.push('to check:', ...s.advice.map(a => `  - ${a}`))
+  const u = s.usage
+  if (u) {
+    lines.push(
+      '',
+      `consumption, last ${u.days} days since ${u.since} (catalog $ = headroom on a subscription):`,
+      `  main sessions $${u.main_total.toFixed(0)} (output $${u.main_out_cost.toFixed(0)}) · subagents $${u.subagents_total.toFixed(0)} in ${u.subagent_calls} calls · previous ${u.days} days: main $${u.previous.main_total.toFixed(0)}, subagents $${u.previous.subagents_total.toFixed(0)}`,
+    )
+    for (const r of u.main_rows.slice(0, 6)) {
+      lines.push(`  ${r.model.padEnd(30)}${r.effort.padEnd(8)}${String(r.msgs).padStart(5)} msgs  $${r.cost.toFixed(2).padStart(7)}`)
+    }
+    for (const [cls, b] of Object.entries(u.by_class).sort((a, b) => b[1].cost - a[1].cost)) {
+      const types = Object.entries(b.types).map(([t, n]) => `${t} x${n}`).join(', ')
+      lines.push(`  subagents ${cls.padEnd(20)}${String(b.n).padStart(4)} calls  $${b.cost.toFixed(2).padStart(7)}  ${types}`)
+    }
+  }
+  const sug = s.suggestions ?? []
+  lines.push('', sug.length === 0 ? 'suggestions: none from the last window' : 'suggestions (catalog $ per window; the kind says how far the evidence reaches):')
+  for (const g of sug) {
+    const sv = g.saving === null ? 'saving unknown' : g.saving[0] === g.saving[1] ? `saves $${g.saving[0].toFixed(0)}` : `saves $${g.saving[0].toFixed(0)}-${g.saving[1].toFixed(0)}`
+    lines.push(`* [${g.kind}] ${g.title}: ${sv}`, `    basis: ${g.basis}`, `    do: ${g.action}`)
+  }
   return lines
 }
 
@@ -93,6 +122,16 @@ async function findPython($: Dollar) {
   throw new Error('no Python 3 on PATH: set "Python command" in /config (model-router)')
 }
 
+/** The rate-limit windows the last API response reported; none when the host does not say. */
+async function readLimits($: Dollar): Promise<RateLimit[]> {
+  try {
+    const u = await $.session.usage()
+    return u.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
+  } catch {
+    return []
+  }
+}
+
 async function refresh($: Dollar, fetch = false) {
   const at = await $.clock.now()
   try {
@@ -104,11 +143,13 @@ async function refresh($: Dollar, fetch = false) {
     const r = await $.process.run(argv, { cwd: repo, timeoutMs: 180000 })
     if (r.exitCode !== 0) throw new Error(`status.py exit ${r.exitCode}: ${r.stderr.trim().split('\n').pop() ?? ''}`)
     const json = JSON.parse(r.stdout) as StatusJson
-    await update($, status, () => ({ at, json, error: null }))
-    $.ui.status(statusLine(json, at))
+    const rateLimits = await readLimits($)
+    await update($, status, () => ({ at, json, error: null, rateLimits }))
+    $.ui.status(statusLine(json, rateLimits, at))
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
-    await update($, status, () => ({ at, json: null, error }))
+    const rateLimits = await readLimits($)
+    await update($, status, () => ({ at, json: null, error, rateLimits }))
     $.ui.status(`router: ${error}`)
   }
 }
@@ -207,7 +248,11 @@ export const register: Register = (on, options) => {
     const s = await read($, status)
     const j = await read($, job)
     const busy = j?.isRunning === true
-    const body = s?.json ? summaryLines(s.json, s.at) : [s?.error ?? 'reading the checkout…']
+    const limits = s?.rateLimits ?? []
+    const body = [
+      ...(limits.length ? [`rate limits: ${limits.map(l => `${windowName(l.kind)} ${l.percentUsed}% used${l.resetsAt ? ', resets ' + clock(Date.parse(l.resetsAt)) : ''}`).join(' · ')}`] : []),
+      ...(s?.json ? summaryLines(s.json, s.at) : [s?.error ?? 'reading the checkout…']),
+    ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     const logRoom = Math.max(3, rows - body.length - 3)
     const log = j ? j.lines.slice(-logRoom) : []
@@ -222,7 +267,13 @@ export const register: Register = (on, options) => {
           <Button key="pull" hotkey="p" dimColor={busy} onPress={() => { void runJob($, 'pull') }}>Pull</Button>
         </Box>
         {body.map(line => (
-          <Text color={line.startsWith('  - ') ? 'yellow' : undefined} dimColor={line === ''}>{line === '' ? ' ' : line}</Text>
+          <Text
+            color={line.startsWith('  - ') ? 'yellow' : line.startsWith('* [measured]') ? 'green' : line.startsWith('* [') ? 'cyan' : undefined}
+            weight={line.startsWith('* [') || line.startsWith('rate limits:') ? 'bold' : undefined}
+            dimColor={line === '' || line.startsWith('    basis:')}
+          >
+            {line === '' ? ' ' : line}
+          </Text>
         ))}
         {j && (
           <Text weight="bold">

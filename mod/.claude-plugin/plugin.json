@@ -1,7 +1,7 @@
 {
   "name": "model-router",
-  "version": "0.1.0",
-  "description": "Model router widget: which model and effort each kind of agent work runs on, whether that is still true on this machine, and one key to re-check it.",
+  "version": "0.2.0",
+  "description": "Model router widget: rate-limit headroom, what the last 30 days consumed and where cheaper would do the same work, the routing status, and one key to re-check it.",
   "author": {
     "name": "irlm"
   },

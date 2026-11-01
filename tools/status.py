@@ -22,11 +22,21 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE / 'tools'))
 import decide  # noqa: E402
+import consumption  # noqa: E402
 
 ADVICE_PRICE_DAYS = 30     # prices verified longer ago than this: check the sources
 ADVICE_LEDGER_DAYS = 35    # no usage ledger for this long: write one
 ADVICE_REGRESS_DAYS = 60   # no regression check for this long: run one
+USAGE_DAYS = 30            # the consumption window the suggestions are computed on
+# Cost of a task at this effort divided by its cost at low, measured on results/cell8 repo_fix
+# (24 tasks, every effort solved every task): the only effort sweep with more than one tier.
+EFFORT_RATIO = {'xhigh': {'claude-opus-5-5': 1.30, 'claude-fable-5-1': 1.52}, 'high': {'claude-opus-5-5': 1.06, 'claude-fable-5-1': 1.16}}
+# Opus 5.5 cost per success divided by Fable 5.1's on the families where both were run at the same effort:
+# repo_fix 0.178/0.481 = 0.37, web_research 0.12/0.30 = 0.40 (results/cell8), same results on both.
+OPUS_OVER_FABLE = (0.37, 0.40)
+WEB_RESEARCHER_COST = 0.022   # Haiku low per fact lookup, 76/78 correct (results/cell8)
 AGENTS_DIR = Path.home() / '.claude/agents'
 UNUSED_DIR = Path.home() / '.claude/agents.unused'
 
@@ -181,6 +191,60 @@ def days_since(iso, today):
         return None
 
 
+def suggest(usage, agents):
+    """Where the last USAGE_DAYS days could have consumed less for the same work, each with its evidence.
+
+    kind: measured (a decided family covers it), extrapolated (measured on the benchmark's tasks,
+    applied to sessions it did not measure) or unmeasured (the stake is known, no cheaper model is)."""
+    out = []
+    rows = usage['main']['rows']
+    # 1. effort above low in main sessions
+    hi = [r for r in rows if r['effort'] in EFFORT_RATIO]
+    if hi:
+        spend = sum(r['cost'] for r in hi)
+        lo = hi_ = 0.0
+        for r in hi:
+            ratios = EFFORT_RATIO[r['effort']]
+            rr = ratios.get(r['model'].split(' ')[0])
+            rs = [rr] if rr else list(ratios.values())
+            lo += r['cost'] * (1 - 1 / max(rs)) if rr else r['cost'] * (1 - 1 / min(rs))
+            hi_ += r['cost'] * (1 - 1 / min(rs)) if rr else r['cost'] * (1 - 1 / max(rs))
+        lo, hi_ = min(lo, hi_), max(lo, hi_)
+        out.append({'id': 'effort', 'kind': 'extrapolated', 'stake': round(spend, 2), 'saving': [round(lo, 2), round(hi_, 2)],
+                    'title': f"main sessions at high/xhigh effort: ${spend:.0f} in {USAGE_DAYS} days",
+                    'basis': 'results/cell8: xhigh cost 1.30x (Opus) to 1.52x (Fable) of low, high 1.06x to 1.16x, same 24/24 fixes at every effort; '
+                             'your sessions were not measured, so this is the sweep\'s ratio applied to them',
+                    'action': 'start routine sessions with `claude --effort low` (or set effortLevel in settings.json); the next ledger shows the change'})
+    # 2. fact lookups that did not go through the routed Web Researcher
+    bc = usage['subagents']['by_class']
+    fl = bc.get('fact-lookup')
+    if fl and any(t != 'Web Researcher' for t in fl['types']):
+        n = sum(v for t, v in fl['types'].items() if t != 'Web Researcher')
+        cost = fl['cost']
+        out.append({'id': 'lookups', 'kind': 'measured', 'stake': cost, 'saving': [round(max(0.0, cost - n * WEB_RESEARCHER_COST), 2)] * 2,
+                    'title': f"{n} fact lookups ran on general-purpose agents (${cost:.2f})",
+                    'basis': f'web_research family: Haiku low 76/78 correct with sources at ${WEB_RESEARCHER_COST} each (results/cell8)',
+                    'action': 'ask for the Web Researcher agent for lookups (model haiku, effort low in ~/.claude/agents/web-researcher.md)'})
+    # 3. research synthesis: the stake is known, no cheaper model is
+    rs = bc.get('research-synthesis')
+    if rs and rs['n']:
+        out.append({'id': 'synthesis', 'kind': 'unmeasured', 'stake': rs['cost'], 'saving': None,
+                    'title': f"{rs['n']} research reports on general-purpose agents at the session model (${rs['cost']:.2f})",
+                    'basis': 'no family grades report writing yet; the fact-lookup result (Haiku 76/78) does not transfer to synthesis',
+                    'action': f"worth measuring next: a synthesis rubric family (GAPS.md open item); until then no blind downgrade"})
+    # 4. Fable in main sessions where the measured families saw Opus equal
+    fable = [r for r in rows if r['model'].startswith('claude-fable-5-1')]
+    if fable:
+        spend = sum(r['cost'] for r in fable)
+        out.append({'id': 'tier', 'kind': 'unmeasured', 'stake': round(spend, 2),
+                    'saving': [round(spend * (1 - OPUS_OVER_FABLE[1]), 2), round(spend * (1 - OPUS_OVER_FABLE[0]), 2)],
+                    'title': f"main sessions on Fable 5.1: ${spend:.0f} in {USAGE_DAYS} days",
+                    'basis': 'on the measured families Opus 5.5 matched Fable (24/24 and 26/26) at 37-40% of the cost (results/cell8); '
+                             'main-session work is not measured, so the saving is what it would be if that held',
+                    'action': 'try `claude --model opus` for routine sessions and compare the next ledger; keep Fable where you see the difference'})
+    return out
+
+
 def collect(fetch=False):
     today = datetime.date.today()
     routing = json.loads((HERE / 'routing.json').read_text())
@@ -202,12 +266,13 @@ def collect(fetch=False):
               for mid, m in catalog['models'].items()]
     oldest = min((m['verified'] for m in models if m['verified']), default=None)
     reg = last_regress()
-    usage = last_usage()
     git = git_state(fetch)
     agents = agents_state(routing)
     timer = timer_state()
     for f in families:
         f['last_check'] = (reg or {}).get('rows', {}).get(f['name'])
+    usage = consumption.collect(USAGE_DAYS)
+    suggestions = suggest(usage, agents)
 
     advice = []
     if version and reg and reg.get('claude') and reg['claude'] != version:
@@ -230,19 +295,30 @@ def collect(fetch=False):
     for a in agents['routed']:
         if a['state'] != 'applied':
             advice.append(f"agent {a['file']} is {a['state']} (want {a['want']}, have {a['have']}): /router apply")
-    if usage is None or (days_since(usage, today) or 0) > ADVICE_LEDGER_DAYS:
-        advice.append(f"no usage ledger since {usage}: /router ledger")
+    usage_last = last_usage()
+    if usage_last is None or (days_since(usage_last, today) or 0) > ADVICE_LEDGER_DAYS:
+        advice.append(f"no usage ledger since {usage_last}: /router ledger")
     if timer.get('kind') == 'systemd' and not timer.get('installed'):
         advice.append('ledger timer not installed: bash tools/install_ledger_timer.sh')
     if not version:
         advice.append('claude CLI not found on PATH: nothing can run here')
+    unpriced = [r for r in usage['main']['rows'] if r['model'].endswith('(no price)')]
+    if unpriced:
+        advice.append(f"{sum(r['msgs'] for r in unpriced)} messages in {USAGE_DAYS} days on model ids without a catalog price "
+                      f"({', '.join(sorted(set(r['model'].split(' ')[0] for r in unpriced)))}): totals understate; add them to catalog/models.json")
 
     return {'at': datetime.datetime.now().isoformat(timespec='minutes'), 'platform': platform.system(), 'host': platform.node(),
             'python': sys.version.split()[0], 'claude': version, 'repo': git,
             'routing': {'version': routing.get('version'), 'decided': routing.get('decided')},
             'families': families, 'agents': agents,
             'catalog': {'verified_oldest': oldest, 'age_days': age, 'models': models, 'fees_verified': (catalog.get('fees') or {}).get('verified')},
-            'ledger': {'usage_last': usage, 'regress_last': reg}, 'timer': timer, 'advice': advice,
+            'ledger': {'usage_last': last_usage(), 'regress_last': reg}, 'timer': timer, 'advice': advice,
+            'usage': {'days': usage['days'], 'since': usage['since'], 'main_total': usage['main']['total'], 'main_out_cost': usage['main']['out_cost'],
+                      'main_rows': [{k: r[k] for k in ('model', 'effort', 'msgs', 'cost', 'out_cost')} for r in usage['main']['rows'] if r['cost'] >= 0.5 or r['model'].endswith('(no price)')],
+                      'subagents_total': usage['subagents']['total'], 'subagent_calls': len(usage['subagents']['calls']),
+                      'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types']} for k, v in usage['subagents']['by_class'].items()},
+                      'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
+            'suggestions': suggestions,
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}
 
 
@@ -268,6 +344,21 @@ def text(s):
             f"ledger: usage {s['ledger']['usage_last']}, regress {(s['ledger']['regress_last'] or {}).get('date')} "
             f"on {(s['ledger']['regress_last'] or {}).get('claude')}   timer: {s['timer'].get('next') or s['timer'].get('note')}", '']
     out += ['advice: nothing to do'] if not s['advice'] else ['advice:'] + [f"  - {x}" for x in s['advice']]
+    u = s['usage']
+    out += ['', f"consumption, last {u['days']} days since {u['since']} (catalog $ = headroom on a subscription): "
+                f"main ${u['main_total']:.0f} (output ${u['main_out_cost']:.0f}), subagents ${u['subagents_total']:.0f} in {u['subagent_calls']} calls; "
+                f"previous {u['days']} days: main ${u['previous']['main_total']:.0f}, subagents ${u['previous']['subagents_total']:.0f}"]
+    for r in u['main_rows'][:8]:
+        out.append(f"  {r['model']:<32}{r['effort']:<8}{r['msgs']:>6} msgs  ${r['cost']:>7.2f}")
+    for cls, b in sorted(u['by_class'].items(), key=lambda kv: -kv[1]['cost']):
+        out.append(f"  subagents {cls:<22}{b['n']:>4} calls ${b['cost']:>7.2f}  " + ', '.join(f'{t} x{n}' for t, n in b['types'].items()))
+    out.append('')
+    if not s['suggestions']:
+        out.append('suggestions: none from the last window')
+    for g in s['suggestions']:
+        sv = (f"saves ${g['saving'][0]:.0f}-{g['saving'][1]:.0f}" if g['saving'] and g['saving'][0] != g['saving'][1]
+              else f"saves ${g['saving'][0]:.0f}" if g['saving'] else 'saving unknown')
+        out += [f"[{g['kind']}] {g['title']}: {sv} per {u['days']} days", f"    basis: {g['basis']}", f"    do: {g['action']}"]
     return '\n'.join(out)
 
 

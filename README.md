@@ -26,9 +26,10 @@ apply_agents.py          writes the decision into ~/.claude/agents/*.md (--rever
 regress.py               after a Claude Code update or monthly: each default on a small sample, binomial check
 tools/ledger.py          monthly: what this machine actually ran (subagent calls, tokens, cost), from the transcripts
 tools/prune_agents.py    moves the agent files no transcript ever called out of the prefix (reversible)
-tools/status.py          where the routing stands on this machine, and what is worth doing (text or --json)
+tools/status.py          where the routing stands on this machine, what is worth doing, and the suggestions (text or --json)
+tools/consumption.py     the last 30 days of interactive work by model and effort, every Agent call priced and classified
 tools/update.py          re-check: regress.py on every family whose fixtures exist here, then commit and push
-mod/                     the Claude Code widget: status line + /router pane over the two scripts above
+mod/                     the Claude Code widget: status line + /router pane over the scripts above
 ```
 
 ## The widget
@@ -46,6 +47,12 @@ that has this repository cloned, Python 3 and the `claude` CLI, at the prompt of
 
 The checkout path is an option in `/config` (default `~/Projects/Github/model-router`).
 `mod/README.md` has the rest; `claude plugin validate mod` and `claude plugin test mod` check it.
+
+The pane also shows the subscription's rate-limit windows, what the last 30 days consumed (main
+sessions by model and effort from the transcripts, each Agent call priced and classified) and
+suggestions: where the same work could consume less, each labelled `measured`, `extrapolated`
+or `unmeasured` with the cell its number comes from. The monthly ledger keeps the same 30-day
+table, so a change of habit shows up as a change between entries.
 
 - **Receipts hold tokens, not dollars.** A price change is a catalog edit plus `report.py`; nothing
   is re-run. `report.py --prices other.json` prices everything under a what-if catalog.

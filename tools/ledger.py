@@ -37,8 +37,10 @@ def main():
     scan = subprocess.run([sys.executable, str(HERE / 'tools/usage_scan.py')], capture_output=True, text=True, cwd=HERE)
     if scan.returncode != 0:
         sys.exit(f'usage_scan failed:\n{scan.stderr}')
+    window = subprocess.run([sys.executable, str(HERE / 'tools/consumption.py')], capture_output=True, text=True, cwd=HERE)
     out.write_text(f"# Usage ledger, {today}\n\nClaude Code {claude_version()}. Catalog-equivalent prices (catalog/models.json); "
-                   "on a subscription they measure rate-limit headroom, not a bill.\n\n```\n" + scan.stdout + "```\n")
+                   "on a subscription they measure rate-limit headroom, not a bill.\n\n```\n" + scan.stdout + "```\n\n"
+                   "## Last 30 days by model and effort\n\n```\n" + (window.stdout if window.returncode == 0 else window.stderr) + "```\n")
     print(f'wrote {out.relative_to(HERE)}')
     if args.commit:
         git = shutil.which('git') or 'git'

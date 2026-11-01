@@ -18,3 +18,12 @@ Claude Code updated itself to 2.1.316 between the two pairs, so the pairs were r
 The agent list was about 17k tokens of every request (matches `results/cell1/PREFIX.md`), 40-44% of this
 minimal prefix. It is paid on every turn of every session as a cache read, and again as a cache write
 whenever the cache has expired. Reverse with `python3 tools/prune_agents.py --revert`.
+
+## Connectors are the other variable (2026-11-01)
+
+The same trivial call measured 22,688 and 24,617 tokens minutes apart. The difference is the
+claude.ai Claude Docs connector: when it connects before the first request, its instructions
+and three tool definitions (about 1,900 tokens) are in the prompt; when it does not, they are
+not. The widget plugin (`mod/`) adds nothing: with `--strict-mcp-config` the figure is 22,688
+with the plugin enabled and 22,690 disabled. `regress.py` now measures the prefix with MCP
+servers skipped, so the ledger tracks the agent files and the engine, not connector timing.

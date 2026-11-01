@@ -51,13 +51,20 @@ def claude_version():
 
 
 def prefix_tokens(n=2):
-    """Total input tokens of a one-turn Haiku call from an empty directory, n times."""
+    """Total input tokens of a one-turn Haiku call from an empty directory, n times.
+
+    MCP servers are skipped: a claude.ai connector (Claude Docs) adds ~1,900 tokens of
+    instructions and tool definitions whenever it connects before the first request,
+    which made the figure jump between runs (measured 2026-11-01: 22,688 vs 24,617,
+    plugin on or off made no difference)."""
     cwd = tempfile.mkdtemp(prefix='prefix_')
+    (Path(cwd) / 'no-mcp.json').write_text('{"mcpServers": {}}')
     rows = []
     for _ in range(n):
         try:
             p = subprocess.run([CLAUDE, '-p', '--output-format', 'json', '--model', 'claude-haiku-5-5', '--effort', 'low',
-                                '--max-turns', '1', '--allowed-tools', 'Read'], input='Reply with the single word OK.',
+                                '--max-turns', '1', '--allowed-tools', 'Read', '--strict-mcp-config', '--mcp-config', 'no-mcp.json'],
+                               input='Reply with the single word OK.',
                                capture_output=True, text=True, timeout=180, cwd=cwd)
             u = json.loads(p.stdout)['usage']
             rows.append(u['input_tokens'] + u['cache_creation_input_tokens'] + u['cache_read_input_tokens'])
@@ -107,7 +114,7 @@ def main():
     lines = [f'# Regression check {tag}', '', f'Claude Code {version}, sample {args.sample} tasks per family, seed {args.seed}, alpha {args.alpha}.', '']
     if not args.no_prefix:
         pre = prefix_tokens()
-        lines += [f"Fixed prefix of a trivial Haiku call (input + cache write + cache read): {', '.join(str(x) for x in pre)} tokens.", '']
+        lines += [f"Fixed prefix of a trivial Haiku call (input + cache write + cache read; MCP servers skipped): {', '.join(str(x) for x in pre)} tokens.", '']
     lines += ['| Family | Default | Sample | Successes | Decided rate (95% CI) | P(this few) | Verdict | Cost $ |', '|---|---|---|---|---|---|---|---|']
     for fam in [f.strip() for f in args.families.split(',') if f.strip()]:
         rf = routing['families'].get(fam) or {}

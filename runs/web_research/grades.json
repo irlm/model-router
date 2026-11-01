@@ -1,0 +1,286 @@
+{
+ "claude-fable-5-1 / low / 1 / wr-01": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-02": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-03": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-04": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-05": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-06": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-07": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-08": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-09": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-10": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-11": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-12": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-13": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-14": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-15": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-16": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-17": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-fable-5-1 / low / 1 / wr-18": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / xhigh / 1 / wr-01": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-fable-5-1 / xhigh / 1 / wr-02": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-fable-5-1 / xhigh / 1 / wr-03": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-01": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-02": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-03": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-04": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-05": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-06": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-07": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-08": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-09": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-10": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-11": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-12": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-13": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-14": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-15": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-16": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-17": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-18": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 2 / wr-01": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 2 / wr-02": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 2 / wr-03": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-01": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-02": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-03": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-04": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-05": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-06": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-07": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-08": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-09": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-10": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-opus-5-5 / low / 1 / wr-11": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-01": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-02": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-03": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-04": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-05": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-06": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-07": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-08": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-09": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-10": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-11": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-12": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-13": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-14": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-15": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-16": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-17": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-sonnet-5-5 / low / 1 / wr-18": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ }
+}

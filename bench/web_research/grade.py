@@ -5,6 +5,7 @@ pattern) in its visible text. Outcomes:
   correct          right answer, a cited page states it
   right-unsourced  right answer, but no cited page fetches and states it (made-up or wrong URL)
   wrong            answer does not match
+  stale            live-* tasks only: an older version than the source shows now (answered from memory)
   unparseable      no JSON object with "answer" and "sources"
   operational      the harness failed
 Fetched pages are cached in runs/web_research/fetch_cache.json so regrading
@@ -80,6 +81,41 @@ def extract_json(text):
     raise ValueError('no JSON object with an answer key')
 
 
+def live_truth(task, cache):
+    """Fetch the live source and extract the current version string; cached per grading run."""
+    spec = task['live']
+    key = 'live:' + spec['url']
+    if key in cache:
+        return cache[key]
+    req = urllib.request.Request(spec['url'], headers={'User-Agent': UA, 'Accept': 'application/json,*/*'})
+    with urllib.request.urlopen(req, timeout=25) as resp:
+        raw = resp.read(3_000_000).decode('utf-8', 'replace')
+    pick = spec['pick']
+    if spec['kind'] == 'json':
+        j = json.loads(raw)
+        if pick == 'max_current_latestMinor':
+            cur = [v for v in j if v.get('current') and v.get('supported')]
+            best = max(cur, key=lambda v: int(v['major']))
+            val = f"{best['major']}.{best['latestMinor']}"
+        elif pick == 'first_lts_version':
+            val = next(v['version'] for v in j if v.get('lts'))
+        else:
+            val = j
+            for part in re.findall(r'\[(\d+)\]|([A-Za-z_]+)', pick):
+                val = val[int(part[0])] if part[0] else val[part[1]]
+            val = str(val)
+    else:  # toml-rust: [pkg.rust] version = "1.95.0 (hash date)"
+        m = re.search(r'\[pkg\.rust\]\s*version\s*=\s*"([^"\s]+)', raw)
+        val = m.group(1)
+    val = re.sub(r'^(go|v)', '', val)
+    cache[key] = val
+    return val
+
+
+def versions_in(text):
+    return re.findall(r'\b\d+\.\d+(?:\.\d+)?\b', text)
+
+
 def page_states(task, text):
     ok = any(re.search(p, text, re.I) for p in task['evidence_patterns'])
     return ok and all(re.search(p, text, re.I) for p in task.get('evidence_also', []))
@@ -95,6 +131,15 @@ def grade_one(task, record, cache):
     answer = str(obj.get('answer', ''))
     sources = obj.get('sources') or []
     sources = [s for s in sources if isinstance(s, str)][:6]
+    if task.get('live'):
+        try:
+            truth = live_truth(task, cache)
+        except Exception as e:  # noqa: BLE001
+            return 'operational', f'live source failed: {type(e).__name__}: {str(e)[:100]}'
+        task = dict(task, answer_patterns=[re.escape(truth) + r'\b'], evidence_patterns=[re.escape(truth)])
+        if not re.search(task['answer_patterns'][0], answer):
+            given = versions_in(answer)
+            return ('stale' if given else 'wrong'), f'answer: {answer[:80]}; current: {truth}'
     if not any(re.search(p, answer, re.I) for p in task['answer_patterns']):
         return 'wrong', f'answer: {answer[:100]}'
     states = []
@@ -119,6 +164,13 @@ def main():
     if args.self_test:
         bad = 0
         for t in tasks.values():
+            if t.get('live'):
+                try:
+                    print(f"{t['id']} live truth now: {live_truth(t, cache)}")
+                except Exception as e:  # noqa: BLE001
+                    print(f"{t['id']} live source FAILED: {type(e).__name__}: {str(e)[:100]}")
+                    bad += 1
+                continue
             entry = fetch(t['truth_url'], cache)
             ok = page_states(t, entry.get('text', ''))
             ans = any(re.search(p, t['answer'], re.I) for p in t['answer_patterns'])

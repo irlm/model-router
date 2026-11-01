@@ -27,3 +27,8 @@ and three tool definitions (about 1,900 tokens) are in the prompt; when it does 
 not. The widget plugin (`mod/`) adds nothing: with `--strict-mcp-config` the figure is 22,688
 with the plugin enabled and 22,690 disabled. `regress.py` now measures the prefix with MCP
 servers skipped, so the ledger tracks the agent files and the engine, not connector timing.
+
+A second small variable: when any `.git` directory sits above the measurement directory, even an
+empty one (an empty `/tmp/.git` appeared and vanished on this machine on 2026-11-01), Claude Code
+adds a git status section of about 90 tokens. `regress.py` records `git-above-cwd` instead of a
+number when that is the case. Clean figures on 2026-11-01: 22,684 to 22,692 tokens.

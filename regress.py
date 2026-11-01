@@ -58,12 +58,17 @@ def prefix_tokens(n=2):
     which made the figure jump between runs (measured 2026-11-01: 22,688 vs 24,617,
     plugin on or off made no difference)."""
     cwd = tempfile.mkdtemp(prefix='prefix_')
-    (Path(cwd) / 'no-mcp.json').write_text('{"mcpServers": {}}')
+    no_mcp = Path(tempfile.mkdtemp(prefix='prefix_cfg_')) / 'no-mcp.json'   # outside cwd: a file in cwd costs ~90 tokens
+    no_mcp.write_text('{"mcpServers": {}}')
     rows = []
     for _ in range(n):
+        if any((parent / '.git').exists() for parent in Path(cwd).parents):
+            # Claude Code adds a gitStatus section (~90 tokens) when a .git sits above the cwd, even an empty one
+            rows.append('git-above-cwd')
+            continue
         try:
             p = subprocess.run([CLAUDE, '-p', '--output-format', 'json', '--model', 'claude-haiku-5-5', '--effort', 'low',
-                                '--max-turns', '1', '--allowed-tools', 'Read', '--strict-mcp-config', '--mcp-config', 'no-mcp.json'],
+                                '--max-turns', '1', '--allowed-tools', 'Read', '--strict-mcp-config', '--mcp-config', str(no_mcp)],
                                input='Reply with the single word OK.',
                                capture_output=True, text=True, timeout=180, cwd=cwd)
             u = json.loads(p.stdout)['usage']

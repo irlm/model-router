@@ -8,8 +8,15 @@ Hard tier (cell 3): --tasks tasks-hard.json --bench fix_bug_hard. The hard promp
 does not say how many defects there are. --kunit lets the agent build and run the
 suite (Bash restricted to kunit.py, absolute --build-dir outside the worktree).
 
+--harness codex runs the same tasks through the OpenAI Codex CLI
+(bench/common/harness.py) in a workspace-write sandbox; with --kunit the build
+dir is an extra writable root, but the UML kernel cannot boot in Codex's sandbox
+(ptrace is blocked), so --kunit through Codex also needs --codex-full-access,
+which drops the sandbox. Same receipt shape, plus `harness`.
+
 Usage: python3 run_agent.py --model M --effort E --worktree DIR [--trial N] [--ids ...]
        [--tasks tasks-hard.json --bench fix_bug_hard] [--kunit --build-dir DIR]
+       [--harness claude|codex [--codex-full-access]]
 """
 import argparse
 import json
@@ -19,6 +26,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / 'common'))
+import harness  # noqa: E402
 import worktree as W  # noqa: E402
 
 PROMPT = """You are working inside a full checkout of the Linux kernel v6.12 (your current working directory).
@@ -66,7 +74,15 @@ def main():
                     help='let the agent build and run the suite (Bash restricted to kunit.py)')
     ap.add_argument('--build-dir', type=Path, default=None,
                     help='absolute build dir outside the worktree, used with --kunit')
+    ap.add_argument('--harness', default='claude', choices=harness.harnesses(need=('write',)))
+    ap.add_argument('--codex-full-access', action='store_true',
+                    help='with --harness codex: no sandbox at all (danger-full-access). Needed for --kunit, '
+                         'because the Codex sandbox blocks ptrace and the UML kernel cannot boot in it. '
+                         'The model then runs as your user on the whole machine, not just in the worktree.')
     args = ap.parse_args()
+    if args.harness == 'codex' and args.kunit and not args.codex_full_access:
+        ap.error('--kunit through codex needs --codex-full-access: the Codex sandbox blocks ptrace, '
+                 'so KUnit\'s UML kernel cannot boot inside it (bench/common/harness.py)')
     variant = 'kunit' if args.kunit else 'noexec'
     if args.kunit:
         assert args.build_dir and args.build_dir.is_absolute(), '--kunit needs an absolute --build-dir'
@@ -103,8 +119,10 @@ def main():
                 assert NOEXEC_SENTENCE not in prompt
             start = time.perf_counter()
             try:
-                reply = W.call_claude(prompt, args.model, args.effort, args.max_turns,
-                                      args.tools, args.timeout, wt)
+                reply = harness.run(args.harness, prompt, args.model, args.effort, args.max_turns,
+                                    args.tools, args.timeout, wt, write=True,
+                                    writable=[args.build_dir] if args.kunit else [],
+                                    unsandboxed=args.codex_full_access)
             except Exception as error:
                 reply = {'text': '', 'usage': None, 'cost_usd': None,
                          'operational_error': type(error).__name__}
@@ -117,6 +135,7 @@ def main():
             record = {'id': task['id'], 'family': args.bench, 'bench': args.bench, 'arm': 'T',
                       'kind': task.get('kind', 'single'), 'variant': variant,
                       'model_requested': args.model, 'effort': args.effort,
+                      'harness': args.harness,
                       'trial': args.trial, 'tools': args.tools, 'max_turns': args.max_turns,
                       'prompt_chars': len(prompt),
                       'wall_seconds': round(time.perf_counter() - start, 2),

@@ -1,5 +1,5 @@
-"""Shared helpers: git worktree reset, seeding a K2 mutation, claude -p call."""
-import json
+"""Shared helpers: git worktree reset, seeding a K2 mutation, a KUnit run.
+The agent call lives in harness.py."""
 import subprocess
 from pathlib import Path
 
@@ -42,26 +42,6 @@ def seed_mutation(wt, task):
 def is_test_path(path):
     p = path.lower()
     return any(x in p for x in TEST_PATTERNS)
-
-
-def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd):
-    cmd = ['claude', '-p', '--output-format', 'json', '--model', model,
-           '--max-turns', str(max_turns), '--effort', effort,
-           '--allowed-tools', tools]
-    proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True,
-                          capture_output=True, timeout=timeout)
-    try:
-        data = json.loads(proc.stdout)
-    except ValueError:
-        return {'text': proc.stdout[-2000:], 'stderr': proc.stderr[-500:],
-                'usage': None, 'cost_usd': None,
-                'operational_error': 'invalid-endpoint-response'}
-    return {'text': data.get('result', ''), 'usage': data.get('usage'),
-            'cost_usd': data.get('total_cost_usd'),
-            'num_turns': data.get('num_turns'),
-            'duration_ms': data.get('duration_ms'),
-            'model_used': ','.join(sorted((data.get('modelUsage') or {}).keys())),
-            'operational_error': 'endpoint-error' if data.get('is_error') else None}
 
 
 def run_suite(wt, build_dir, kunitconfig, suite_glob='', timeout=900, jobs=8):

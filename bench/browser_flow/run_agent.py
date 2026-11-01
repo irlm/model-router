@@ -5,6 +5,9 @@ drive the user's Chrome through the Claude in Chrome extension (headless
 then record its verdicts, the app's action log and the usual usage receipt.
 Sequential: the extension is one shared browser.
 
+--harness picks the agent program (bench/common/harness.py); only harnesses
+with a browser are offered, which today means Claude Code.
+
 Usage: python3 run_agent.py --model M --effort E [--trial N] [--ids ...] [--max-turns 80]
 """
 import argparse
@@ -16,6 +19,9 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / 'common'))
+import harness  # noqa: E402
+
 TOOLS = ' '.join('mcp__claude-in-chrome__' + t for t in (
     'tabs_context_mcp', 'tabs_create_mcp', 'tabs_close_mcp', 'navigate', 'read_page',
     'get_page_text', 'find', 'form_input', 'computer', 'browser_batch', 'resize_window'))
@@ -43,22 +49,6 @@ def start_app(port, defect):
     raise RuntimeError(f'app did not start on {port}')
 
 
-def call_claude(prompt, model, effort, max_turns, timeout, cwd):
-    cmd = ['claude', '-p', '--chrome', '--output-format', 'json', '--model', model,
-           '--max-turns', str(max_turns), '--effort', effort, '--allowed-tools', TOOLS]
-    proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, capture_output=True, timeout=timeout)
-    try:
-        data = json.loads(proc.stdout)
-    except ValueError:
-        return {'text': proc.stdout[-2000:], 'stderr': proc.stderr[-500:], 'usage': None, 'cost_usd': None,
-                'operational_error': 'invalid-endpoint-response'}
-    return {'text': data.get('result', ''), 'usage': data.get('usage'), 'cost_usd': data.get('total_cost_usd'),
-            'num_turns': data.get('num_turns'), 'duration_ms': data.get('duration_ms'),
-            'permission_denials': data.get('permission_denials'),
-            'model_used': ','.join(sorted((data.get('modelUsage') or {}).keys())),
-            'operational_error': 'endpoint-error' if data.get('is_error') else None}
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--model', required=True)
@@ -70,6 +60,7 @@ def main():
     ap.add_argument('--timeout', type=int, default=1800)
     ap.add_argument('--base-port', type=int, default=8800)
     ap.add_argument('--out', type=Path, default=HERE.parents[1] / 'runs/browser_flow')
+    ap.add_argument('--harness', default='claude', choices=harness.harnesses(need=('browser',)))
     args = ap.parse_args()
     spec = json.loads(args.tasks.read_text())
     tasks = spec['tasks']
@@ -96,7 +87,8 @@ def main():
             prompt = PROMPT.format(url=url, checklist=checklist)
             start = time.perf_counter()
             try:
-                reply = call_claude(prompt, args.model, args.effort, args.max_turns, args.timeout, cwd)
+                reply = harness.run(args.harness, prompt, args.model, args.effort, args.max_turns,
+                                    TOOLS, args.timeout, cwd, chrome=True)
             except Exception as error:
                 reply = {'text': '', 'usage': None, 'cost_usd': None, 'operational_error': type(error).__name__}
             if not reply.get('operational_error') and not (reply.get('text') or '').strip():
@@ -109,7 +101,8 @@ def main():
             proc.wait()
             record = {'id': task['id'], 'family': 'browser_flow', 'bench': 'browser_flow', 'arm': 'T',
                       'driver': 'claude-in-chrome', 'defect': task['defect'],
-                      'model_requested': args.model, 'effort': args.effort, 'trial': args.trial,
+                      'model_requested': args.model, 'effort': args.effort, 'harness': args.harness,
+                      'trial': args.trial,
                       'tools': TOOLS, 'max_turns': args.max_turns, 'prompt_chars': len(prompt),
                       'wall_seconds': round(time.perf_counter() - start, 2), 'state': state, **reply}
             sink.write(json.dumps(record) + '\n')

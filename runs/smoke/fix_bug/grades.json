@@ -3,5 +3,15 @@
   "outcome": "fixed",
   "detail": "",
   "patch_lines": 13
+ },
+ "claude-haiku-5-5 / low / 9 / edit-string-01-strncasecmp": {
+  "outcome": "fixed",
+  "detail": "",
+  "patch_lines": 13
+ },
+ "gpt-6-luna / low / 9 / edit-string-01-strncasecmp": {
+  "outcome": "no-change",
+  "detail": "empty patch",
+  "patch_lines": 0
  }
 }

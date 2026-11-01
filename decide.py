@@ -38,6 +38,7 @@ FAMILIES = {
     'browser_flow': {'benches': ['browser_flow', 'own_app_flow'], 'what': 'drive a web page through a checklist in a real browser'},
 }
 ALIAS = {'claude-haiku-5-5': 'haiku', 'claude-sonnet-5-5': 'sonnet', 'claude-opus-5-5': 'opus', 'claude-fable-5-1': 'fable'}
+HARNESS_FOR = {'anthropic': 'claude', 'openai': 'codex'}  # provider -> adapter in bench/common/harness.py
 REQUIRES = {'kunit': 'the test runner in the loop (KUnit)'}
 
 
@@ -130,7 +131,7 @@ def plan_new_models(cat, fams_decided, cells):
                          else 'dearer than the current default and the default is at the ceiling; it cannot change the decision'})
         rows.sort(key=lambda x: (not x['run'], x.get('expected_cost_usd', 0)))
         plan.append({'model': mid, 'provider': entry.get('provider'), 'list_price_in_plus_out_per_mtok': list_price(entry), 'families': rows,
-                     'harness': 'claude' if entry.get('provider') == 'anthropic' else 'needs a harness adapter (bench/common/harness.py)'})
+                     'harness': HARNESS_FOR.get(entry.get('provider'), 'needs a harness adapter (bench/common/harness.py)')})
     return plan
 
 

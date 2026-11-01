@@ -1,0 +1,14 @@
+{
+ "claude-haiku-5-5 / low+kunit / 9 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=15 failing_on_bug=12",
+  "kunit_cases": 15,
+  "test_bytes": 7449
+ },
+ "gpt-6-luna / low+kunit / 9 / test-string-01-strncasecmp": {
+  "outcome": "catches-bug",
+  "detail": "cases=5 failing_on_bug=4",
+  "kunit_cases": 5,
+  "test_bytes": 2882
+ }
+}

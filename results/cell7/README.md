@@ -57,7 +57,12 @@ call too. Haiku opened the files and kept them. The seventh miss is one abstenti
 
 ## Limits
 
-- One family, one model, one provider. The code families need a worktree per model and a build
-  directory; the browser families need the Claude-in-Chrome tools, which Codex does not have.
+- One family, one model, one provider. Since 2026-10-31 every runner takes `--harness`: the code
+  families run Codex in a workspace-write sandbox with the build directory as an extra writable
+  root. The runner arm does not work inside that sandbox: it blocks ptrace, and KUnit's UML kernel
+  needs it (the same suite ran 15/15 directly and "0 tests, 1 error" under the sandbox), so
+  `--kunit` through Codex needs `--codex-full-access`, which drops the sandbox and is never the
+  default. The browser families need the Claude-in-Chrome tools, which Codex does not have, so they
+  offer only Claude Code.
 - Codex cannot be held to a turn limit or a tool list, only to its sandbox (read-only here).
 - Codex ran on a ChatGPT login; the dollars are the API list price for the tokens it reported.

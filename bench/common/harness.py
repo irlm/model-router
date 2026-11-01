@@ -13,21 +13,43 @@ never see which harness ran:
   operational_error  None, or why the session is not a verdict
   harness            'claude' | 'codex'
 
-  claude  Claude Code, `claude -p --output-format json`. Tools are an allow-list.
+  claude  Claude Code, `claude -p --output-format json`. Tools are an allow-list;
+          `chrome=True` adds the Claude-in-Chrome tools (the user's own Chrome).
   codex   OpenAI Codex CLI, `codex exec --json` (ChatGPT login or API key). Tools
           are whatever Codex has (a shell, file edits) inside its sandbox:
-          read-only, or workspace-write when `write=True`. A tool list cannot
-          be enforced, so a Codex run in a "no runner" arm can still build and
-          test. Receipts record that under harness_note. No turn limit either;
-          the timeout bounds the session.
+          read-only, or workspace-write when `write=True` (the cwd plus any
+          `writable` roots, e.g. a build directory outside the worktree). A tool
+          list cannot be enforced, so a Codex run in a "no runner" arm can still
+          build and test. Receipts record that under harness_note. No turn limit
+          either; the timeout bounds the session. No browser. `unsandboxed=True`
+          drops the sandbox entirely (`danger-full-access`): the Codex sandbox's
+          seccomp filter blocks ptrace, so a test runner that boots a UML kernel
+          (KUnit) cannot run inside it. The runners only set this behind an
+          explicit flag, because the model then runs as the user on the whole
+          machine, not just in the disposable worktree.
+
+Every adapter takes the same keywords (chrome, write, writable, unsandboxed) and ignores the
+ones it has no use for. CAPABILITIES says what each harness can be asked for, and
+a runner picks its `--harness` choices from it, so a browser family only lists
+harnesses that have a browser.
 """
 import json
 import subprocess
 
 CODEX_EFFORT = {'low': 'low', 'medium': 'medium', 'high': 'high', 'xhigh': 'xhigh', 'max': 'xhigh'}
+# 'browser' = can drive the user's Chrome; 'write' = can edit files in the
+# working tree and run a build there.
+CAPABILITIES = {'claude': {'browser', 'write'}, 'codex': {'write'}}
 
 
-def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=False):
+def harnesses(need=()):
+    """Names of the harnesses that have every capability in `need`."""
+    return sorted(h for h, caps in CAPABILITIES.items() if set(need) <= caps)
+
+
+def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=False, write=False, writable=(),
+                unsandboxed=False):
+    # `write`, `writable` and `unsandboxed` are implied by the allow-list (Edit, Write, Bash(...)); nothing to pass.
     cmd = ['claude', '-p', '--output-format', 'json', '--model', model,
            '--max-turns', str(max_turns), '--effort', effort, '--allowed-tools', tools]
     if chrome:
@@ -46,16 +68,26 @@ def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=Fa
             'operational_error': 'endpoint-error' if data.get('is_error') else None}
 
 
-def call_codex(prompt, model, effort, max_turns, tools, timeout, cwd, write=False):
+def call_codex(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=False, write=False, writable=(),
+               unsandboxed=False):
+    if chrome:
+        return {'harness': 'codex', 'text': '', 'usage': None, 'cost_usd': None,
+                'operational_error': 'harness-has-no-browser'}
+    sandbox = 'danger-full-access' if unsandboxed else ('workspace-write' if write else 'read-only')
     cmd = ['codex', 'exec', '--skip-git-repo-check', '--json', '--ephemeral', '--color', 'never',
            '-C', str(cwd), '-m', model, '-c', f'model_reasoning_effort="{CODEX_EFFORT.get(effort, "low")}"',
-           '-s', 'workspace-write' if write else 'read-only', '-']
+           '-s', sandbox]
+    roots = [str(p) for p in writable] if (write and not unsandboxed) else []
+    if roots:
+        cmd += ['-c', 'sandbox_workspace_write.writable_roots=' + json.dumps(roots)]
+    cmd.append('-')
     try:
         proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, capture_output=True, timeout=timeout)
     except subprocess.TimeoutExpired as e:
         return {'harness': 'codex', 'text': (e.stdout or '')[-2000:] if isinstance(e.stdout, str) else '',
                 'usage': None, 'cost_usd': None, 'operational_error': 'timeout'}
     messages, items, usage, err = [], {}, None, None
+    commands, file_changes = [], []
     for line in proc.stdout.splitlines():
         try:
             ev = json.loads(line)
@@ -67,6 +99,10 @@ def call_codex(prompt, model, effort, max_turns, tools, timeout, cwd, write=Fals
             items[item.get('type', '?')] = items.get(item.get('type', '?'), 0) + 1
             if item.get('type') == 'agent_message':
                 messages.append(item.get('text', ''))
+            elif item.get('type') == 'command_execution':
+                commands.append({'command': (item.get('command') or '')[:200], 'exit_code': item.get('exit_code')})
+            elif item.get('type') == 'file_change':
+                file_changes += [str(c.get('path', '')).replace(str(cwd) + '/', '') for c in (item.get('changes') or [])]
             elif item.get('type') == 'error':
                 err = err or item.get('message')
         elif t == 'turn.completed':
@@ -82,10 +118,13 @@ def call_codex(prompt, model, effort, max_turns, tools, timeout, cwd, write=Fals
                 'output_tokens_details': {'reasoning_output_tokens': usage.get('reasoning_output_tokens', 0)},
                 'codex': usage}
     fatal = err if (err and not messages) or proc.returncode != 0 else None
-    return {'harness': 'codex', 'text': messages[-1] if messages else '', 'usage': norm, 'cost_usd': None,
-            'num_turns': sum(items.values()), 'items': items, 'model_used': model,
+    where = sandbox + (', writable ' + ', '.join(roots) if roots else '')
+    return {'harness': 'codex', 'sandbox': sandbox, 'text': messages[-1] if messages else '', 'usage': norm,
+            'cost_usd': None, 'num_turns': sum(items.values()), 'items': items, 'model_used': model,
+            # What Codex actually did; its final text can claim an edit it never made.
+            'commands': commands, 'file_changes': file_changes,
             'stderr': proc.stderr[-500:] if fatal else '', 'harness_warning': err if (err and not fatal) else None,
-            'harness_note': 'codex: own tools in a sandbox, tool list and turn limit not enforced; tools asked: ' + tools,
+            'harness_note': f'codex: own tools in a sandbox ({where}), tool list and turn limit not enforced; tools asked: {tools}',
             'operational_error': ('endpoint-error: ' + fatal[:120]) if fatal else None}
 
 

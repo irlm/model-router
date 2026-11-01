@@ -28,9 +28,15 @@ apply_agents.py          writes the decision into ~/.claude/agents/*.md (--rever
   `incomplete` or `operational`; `decide.py` leaves those out of the rate.
 - **Harnesses.** `bench/common/harness.py` runs a session on Claude Code (`claude -p`, Anthropic
   models) or on the OpenAI Codex CLI (`codex exec`, OpenAI models) and returns one receipt shape, so
-  the checkers never see which harness answered. Claude Code agent files can only name Anthropic
-  models, so `apply_agents.py` applies the cheapest Anthropic candidate above the bar even when
-  another provider wins a family; `routing.json` says when that happened.
+  the checkers never see which harness answered. Every runner takes `--harness`. The code families
+  run Codex in a workspace-write sandbox with the build directory as an extra writable root. A
+  runner arm (`--kunit`) through Codex also needs `--codex-full-access`: the Codex sandbox blocks
+  ptrace, so KUnit's UML kernel cannot boot inside it, and dropping the sandbox lets the model act
+  as your user on the whole machine, so it is never the default. The browser families offer only
+  harnesses that have a browser (`harness.CAPABILITIES`), which today means Claude Code.
+  `python3 bench/common/test_harness.py` checks the adapters' command lines without calling anything. Claude Code agent files can only name Anthropic models, so `apply_agents.py`
+  applies the cheapest Anthropic candidate above the bar even when another provider wins a family;
+  `routing.json` says when that happened.
 
 ## Layout
 
@@ -59,13 +65,18 @@ apply_agents.py          writes the decision into ~/.claude/agents/*.md (--rever
 ```bash
 python3 bench/find_feature/run_agent.py --model claude-haiku-5-5 --effort low
 python3 bench/find_feature/run_agent.py --model gpt-6-luna --effort low --harness codex
+WT=$KERNEL_WT                    # local/config.json: kernel_worktrees
+python3 bench/fix_bug/run_agent.py --model gpt-6-luna --effort low --harness codex \
+    --worktree $WT/sonnet --tasks bench/fix_bug/tasks-hard.json --bench fix_bug_hard \
+    --kunit --build-dir $WT/build-sonnet --codex-full-access   # any free worktree and build dir
 python3 report.py --out results/<cell>
 python3 decide.py --dry-run        # the table and the plan; drop --dry-run to write routing.json and ROUTING.md
 python3 apply_agents.py            # into the agent files; --revert undoes
 ```
 
 The code families need the kernel worktrees and build directories under
-`$KERNEL_WT/` (one per model); the browser families
+`$KERNEL_WT/` (one per run that is in flight at the
+same time; they are named after the model that first used them); the browser families
 need Chrome with the Claude extension, and the own-app fixture's `setup.sh` for the store.
 
 ## Caveats

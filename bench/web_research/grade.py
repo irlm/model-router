@@ -185,7 +185,10 @@ def main():
         for line in f.read_text().splitlines():
             if not line.strip():
                 continue
-            r = json.loads(line)
+            try:
+                r = json.loads(line)
+            except ValueError:  # a receipt still being written by a runner
+                continue
             key = f"{r['model_requested']} / {r['effort']} / {r['trial']} / {r['id']}"
             if key in grades or r['id'] not in tasks:
                 continue

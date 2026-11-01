@@ -115,6 +115,10 @@ need Chrome with the Claude extension, and the own-app fixture's `setup.sh` for 
   Codex run in a "no runner" arm can still build and test. Receipts say so.
 - Anthropic's bar for a production cutover is about 50 cases and 5 trials per configuration. The
   families here are 10 to 72 tasks with one to three trials; `decide.py --min-trials` raises the bar.
+- Receipts keep Claude Code's per-model usage (`model_usage`) since 2026-11-01. The web tools fetch
+  pages through a second model and bill that content as uncached input the summed `usage` block leaves
+  out, so a web-tool receipt without the breakdown is priced by the CLI's figure (catalog/price.py says
+  when). On every other receipt the catalog and the CLI agree to the cent.
 - The fixed Claude Code prefix (system prompt, tools, the user's agent list) is identical across
   models and is part of every receipt. That is the real workload, so it stays in.
 - The browser runs use the user's real Chrome. Closing it mid-run loses the flow (it is then retried).

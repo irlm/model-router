@@ -1,22 +1,124 @@
 {
-  "schema": 1,
-  "notes": [
-    "API list prices per million tokens. Subscription plans are metered differently; the claude CLI on a claude.ai login reports API-equivalent cost_usd, not a bill.",
-    "Prices are not exposed by the providers' model-list APIs. A new model found by discovery stays 'price unknown' until a human fills it in with a source URL and date.",
-    "cache_read_per_mtok null = not verified yet."
-  ],
-  "providers": {
-    "anthropic": {"models_api": "https://api.anthropic.com/v1/models", "pricing_url": "https://platform.claude.com/docs/en/about-claude/pricing"},
-    "openai": {"models_api": "https://api.openai.com/v1/models", "pricing_url": "https://developers.openai.com/api/docs/pricing"}
+ "schema": 1,
+ "notes": [
+  "API list prices per million tokens. Subscription plans are metered differently; the claude CLI on a claude.ai login reports API-equivalent cost_usd, not a bill.",
+  "Prices are not exposed by the providers' model-list APIs. A new model found by discovery stays 'price unknown' until a human fills it in with a source URL and date.",
+  "cache_read_per_mtok null = not verified yet."
+ ],
+ "providers": {
+  "anthropic": {
+   "models_api": "https://api.anthropic.com/v1/models",
+   "pricing_url": "https://platform.claude.com/docs/en/about-claude/pricing"
   },
-  "models": {
-    "claude-fable-5-1": {"provider": "anthropic", "tier": "frontier", "input_per_mtok": 10.0, "output_per_mtok": 50.0, "cache_read_per_mtok": 0.25, "cache_write_multipliers": {"5m": 1.25, "1h": 2.0}, "context": 1000000, "verified_date": "2026-10-08", "source": "https://platform.claude.com/docs/en/about-claude/pricing"},
-    "claude-opus-5-5":  {"provider": "anthropic", "tier": "large",    "input_per_mtok": 4.0,  "output_per_mtok": 20.0, "cache_read_per_mtok": 0.2,  "cache_write_multipliers": {"5m": 1.25, "1h": 2.0}, "context": 1000000, "verified_date": "2026-10-08", "source": "https://platform.claude.com/docs/en/about-claude/pricing"},
-    "claude-sonnet-5-5": {"provider": "anthropic", "tier": "mid",     "input_per_mtok": 2.0,  "output_per_mtok": 10.0, "cache_read_per_mtok": 0.1,  "cache_write_multipliers": {"5m": 1.25, "1h": 2.0}, "context": 1000000, "verified_date": "2026-10-08", "source": "https://platform.claude.com/docs/en/about-claude/pricing"},
-    "claude-haiku-5-5": {"provider": "anthropic", "tier": "small",    "input_per_mtok": 0.10, "output_per_mtok": 0.50, "cache_read_per_mtok": null, "cache_write_multipliers": {"5m": 1.25, "1h": 2.0}, "context": 1000000, "verified_date": "2026-10-06", "source": "https://platform.claude.com/docs/en/about-claude/pricing", "notes": ["Rates for prompts up to 100K tokens; 0.50 / 2.50 beyond."]},
-    "openai:gpt-6.1-sol":   {"provider": "openai", "tier": "mid",      "input_per_mtok": 2.0,  "output_per_mtok": 10.0, "cache_read_per_mtok": 0.1,  "context_tier": "standard-short", "verified_date": "2026-10-08", "source": "https://developers.openai.com/api/docs/pricing"},
-    "openai:gpt-6-astra":   {"provider": "openai", "tier": "frontier", "input_per_mtok": 10.0, "output_per_mtok": 50.0, "cache_read_per_mtok": 1.0,  "context_tier": "standard-short", "verified_date": "2026-10-08", "source": "https://developers.openai.com/api/docs/pricing"},
-    "openai:gpt-6-luna":    {"provider": "openai", "tier": "small",    "input_per_mtok": 0.1,  "output_per_mtok": 0.5,  "cache_read_per_mtok": 0.01, "context_tier": "standard-short", "verified_date": "2026-10-08", "source": "https://developers.openai.com/api/docs/pricing"},
-    "openai:gpt-5.3-codex": {"provider": "openai", "tier": "mid",      "input_per_mtok": 1.75, "output_per_mtok": 14.0, "cache_read_per_mtok": 0.175, "context_tier": "standard-short", "verified_date": "2026-10-08", "source": "https://developers.openai.com/api/docs/pricing"}
+  "openai": {
+   "models_api": "https://api.openai.com/v1/models",
+   "pricing_url": "https://developers.openai.com/api/docs/pricing"
   }
+ },
+ "models": {
+  "claude-fable-5-1": {
+   "provider": "anthropic",
+   "tier": "frontier",
+   "input_per_mtok": 10.0,
+   "output_per_mtok": 50.0,
+   "cache_read_per_mtok": 0.25,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 1000000,
+   "verified_date": "2026-10-08",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+  },
+  "claude-opus-5-5": {
+   "provider": "anthropic",
+   "tier": "large",
+   "input_per_mtok": 4.0,
+   "output_per_mtok": 20.0,
+   "cache_read_per_mtok": 0.2,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 1000000,
+   "verified_date": "2026-10-08",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+  },
+  "claude-sonnet-5-5": {
+   "provider": "anthropic",
+   "tier": "mid",
+   "input_per_mtok": 2.0,
+   "output_per_mtok": 10.0,
+   "cache_read_per_mtok": 0.1,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 1000000,
+   "verified_date": "2026-10-08",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+  },
+  "claude-haiku-5-5": {
+   "provider": "anthropic",
+   "tier": "small",
+   "input_per_mtok": 0.1,
+   "output_per_mtok": 0.5,
+   "cache_read_per_mtok": null,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 1000000,
+   "verified_date": "2026-10-06",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+   "notes": [
+    "Rates for prompts up to 100K tokens; 0.50 / 2.50 beyond."
+   ]
+  },
+  "openai:gpt-6.1-sol": {
+   "provider": "openai",
+   "tier": "mid",
+   "input_per_mtok": 2.0,
+   "output_per_mtok": 10.0,
+   "cache_read_per_mtok": 0.1,
+   "context_tier": "standard-short",
+   "verified_date": "2026-10-08",
+   "source": "https://developers.openai.com/api/docs/pricing"
+  },
+  "openai:gpt-6-astra": {
+   "provider": "openai",
+   "tier": "frontier",
+   "input_per_mtok": 10.0,
+   "output_per_mtok": 50.0,
+   "cache_read_per_mtok": 1.0,
+   "context_tier": "standard-short",
+   "verified_date": "2026-10-08",
+   "source": "https://developers.openai.com/api/docs/pricing"
+  },
+  "openai:gpt-6-luna": {
+   "provider": "openai",
+   "tier": "small",
+   "input_per_mtok": 0.1,
+   "output_per_mtok": 0.5,
+   "cache_read_per_mtok": 0.01,
+   "context_tier": "standard-short",
+   "verified_date": "2026-10-08",
+   "source": "https://developers.openai.com/api/docs/pricing"
+  },
+  "openai:gpt-5.3-codex": {
+   "provider": "openai",
+   "tier": "mid",
+   "input_per_mtok": 1.75,
+   "output_per_mtok": 14.0,
+   "cache_read_per_mtok": 0.175,
+   "context_tier": "standard-short",
+   "verified_date": "2026-10-08",
+   "source": "https://developers.openai.com/api/docs/pricing"
+  }
+ },
+ "fees": {
+  "web_search_per_request_usd": 0.01,
+  "source": "https://docs.claude.com/en/docs/agents-and-tools/tool-use/web-search-tool ($10 per 1,000 searches, plus tokens)",
+  "verified": "2026-11-01"
+ }
 }

@@ -61,6 +61,8 @@ def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=Fa
         return {'harness': 'claude', 'text': proc.stdout[-2000:], 'stderr': proc.stderr[-500:],
                 'usage': None, 'cost_usd': None, 'operational_error': 'invalid-endpoint-response'}
     return {'harness': 'claude', 'text': data.get('result', ''), 'usage': data.get('usage'),
+            # per-model breakdown: the web tools bill their fetched content as uncached input that `usage` leaves out
+            'model_usage': data.get('modelUsage'),
             'cost_usd': data.get('total_cost_usd'), 'num_turns': data.get('num_turns'),
             'duration_ms': data.get('duration_ms'),
             'model_used': ','.join(sorted((data.get('modelUsage') or {}).keys())),

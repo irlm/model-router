@@ -59,6 +59,40 @@ def price_usage(usage, entry):
             + (w5 or 0) * r['write_5m'] + (w1 or 0) * r['write_1h'])
 
 
+def price_model_usage(model_usage, cat=None):
+    """USD for a Claude Code `modelUsage` block: every model the session used, priced on its own
+    entry, plus the web search fee per request. None when any model has no price."""
+    cat = cat or catalog()
+    fee = (cat.get('fees') or {}).get('web_search_per_request_usd', 0.0)
+    total = 0.0
+    for model, u in (model_usage or {}).items():
+        entry = model_entry(u.get('canonicalModel') or model, cat)
+        r = rates(entry) if entry else None
+        if r is None:
+            return None
+        w5, w1 = u.get('cacheCreationEphemeral5mInputTokens'), u.get('cacheCreationEphemeral1hInputTokens')
+        if w5 is None and w1 is None:
+            w5, w1 = 0, u.get('cacheCreationInputTokens', 0) or 0
+        total += ((u.get('inputTokens', 0) or 0) * r['in'] + (u.get('outputTokens', 0) or 0) * r['out']
+                  + (u.get('cacheReadInputTokens', 0) or 0) * r['cache_read']
+                  + (w5 or 0) * r['write_5m'] + (w1 or 0) * r['write_1h']
+                  + (u.get('webSearchRequests', 0) or 0) * fee)
+    return total
+
+
 def price_record(record, cat=None):
+    """Catalog price of one receipt. Prefers the per-model breakdown (`model_usage`, kept since
+    2026-11-01): the web tools bill the pages they fetch as uncached input tokens that the summed
+    `usage` block leaves out, so on a web-tool receipt without the breakdown the catalog figure is
+    too low (up to 5x on Haiku). Such a receipt is priced by the CLI's own figure instead, and only
+    when the two disagree by more than 2%; everywhere else the two agree to the cent."""
+    if record.get('model_usage'):
+        priced = price_model_usage(record['model_usage'], cat)
+        if priced is not None:
+            return priced
     entry = model_entry(record.get('model_requested') or record.get('model') or '', cat)
-    return price_usage(record.get('usage'), entry) if entry else None
+    priced = price_usage(record.get('usage'), entry) if entry else None
+    cli = record.get('cost_usd')
+    if priced is not None and cli and abs(cli - priced) > 0.02 * cli:
+        return cli
+    return priced

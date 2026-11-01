@@ -73,7 +73,10 @@ def main():
         for line in f.read_text().splitlines():
             if not line.strip():
                 continue
-            r = json.loads(line)
+            try:
+                r = json.loads(line)
+            except ValueError:  # a receipt still being written by a runner
+                continue
             variant = r.get('variant', 'noexec')
             effort = r['effort'] + ('' if variant == 'noexec' else '+' + variant)
             key = f"{r['model_requested']} / {effort} / {r['trial']} / {r['id']}"

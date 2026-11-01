@@ -14,6 +14,7 @@ Usage: python3 report.py [--runs runs] [--out results/<cell>] [--prices FILE] [-
 import argparse
 import importlib.util
 import json
+import math
 import statistics
 import sys
 from collections import defaultdict
@@ -39,7 +40,8 @@ price = _load('price', 'catalog/price.py')
 FF_TASK_FILES = [HERE / 'bench/find_feature/tasks/lexical.json',
                  HERE / 'bench/find_feature/tasks/semantic.json']
 SUCCESS = {'find_feature': {'correct'}, 'fix_bug': {'fixed'}, 'fix_bug_hard': {'fixed'},
-           'write_tests': {'catches-bug'}, 'browser_flow': {'correct'}, 'own_app_flow': {'correct'}}
+           'write_tests': {'catches-bug'}, 'browser_flow': {'correct'}, 'own_app_flow': {'correct'},
+           'repo_fix': {'fixed'}, 'repo_fix_pb': {'fixed'}, 'web_research': {'correct'}}
 # Outcomes the harness caused, not the model's judgement (a lost browser tab, a CLI
 # failure). In use these runs are retried; decide.py leaves them out of the rate.
 NOT_MODEL = {'operational', 'incomplete'}
@@ -85,10 +87,9 @@ def tokens_of(usage):
 def load_cells(runs_dir, cat=None, cli_cost=False):
     """Grade every receipt under runs_dir. Returns {(bench, model, effort, trial): [row]}."""
     tree, ff_tasks = load_ff_tasks()
-    cached = {}
-    for bench in ('fix_bug', 'fix_bug_hard', 'write_tests'):
-        gp = runs_dir / bench / 'grades.json'
-        cached[bench] = json.loads(gp.read_text()) if gp.exists() else {}
+    # benches graded by their own grade.py (a build, a test run, page fetches) cache the verdicts here
+    cached = {d.name: json.loads((d / 'grades.json').read_text())
+              for d in runs_dir.iterdir() if d.is_dir() and (d / 'grades.json').exists()}
     cells = defaultdict(list)
     files = sorted(runs_dir.glob('runs-*.jsonl')) + sorted(runs_dir.glob('*/runs-*.jsonl'))
     for f in files:
@@ -112,7 +113,7 @@ def load_cells(runs_dir, cat=None, cli_cost=False):
                 family = bench
             else:
                 key = f"{r['model_requested']} / {effort} / {r['trial']} / {r['id']}"
-                g = cached[bench].get(key)
+                g = cached.get(bench, {}).get(key)
                 outcome, detail = (g['outcome'], g['detail']) if g else ('ungraded', '')
                 family = bench
             cli = r.get('cost_usd')
@@ -123,6 +124,17 @@ def load_cells(runs_dir, cat=None, cli_cost=False):
                  'turns': r.get('num_turns'), 'wall': r.get('wall_seconds'),
                  'tokens': tokens_of(r.get('usage'))})
     return cells
+
+
+def wilson(success, n, z=1.96):
+    """95% Wilson score interval for a rate; (None, None) when nothing was judged."""
+    if not n:
+        return (None, None)
+    p = success / n
+    d = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / d
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return (max(0.0, centre - half), min(1.0, centre + half))
 
 
 def pct(values, p):
@@ -149,6 +161,7 @@ def summarize(rows, bench):
     total = sum(costs) if costs else None
     tok = {k: statistics.mean(x['tokens'][k] for x in rows) for k in ('input', 'output', 'cache_read', 'cache_write')} if rows else {}
     return {'n': n, 'success': success, 'not_model': not_model, 'outcomes': dict(sorted(outcomes.items())),
+            'ci': wilson(success, n - not_model),
             'cost_total': total,
             'cost_per_success': (total / success) if (total is not None and success) else None,
             'cost_mean': statistics.mean(costs) if costs else None,
@@ -174,14 +187,15 @@ def main():
     lines, out = [], {'cells': {}, 'by_family': {}, 'misses': [], 'price_source': source}
     lines.append(f'Cost column: {source}.\n')
     lines.append('## Per bench x model x effort x trial\n')
-    lines.append('| Bench | Model | Effort | Trial | n | success | outcomes | cost total $ | cost / success $ | cost p90 $ | cost max $ | turns mean | turns max | wall mean s |')
-    lines.append('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
+    lines.append('| Bench | Model | Effort | Trial | n | success | rate 95% CI | outcomes | cost total $ | cost / success $ | cost p90 $ | cost max $ | turns mean | turns max | wall mean s |')
+    lines.append('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
     for key in sorted(cells):
         b, m, e, t = key
         s = summarize(cells[key], b)
         out['cells'][' / '.join(map(str, key))] = s
         oc = ', '.join(f'{k} {v}' for k, v in s['outcomes'].items())
-        lines.append(f"| {b} | {m} | {e} | {t} | {s['n']} | {s['success']} | {oc} | {fmt(s['cost_total'],2)} | {fmt(s['cost_per_success'],4)} | {fmt(s['cost_p90'],4)} | {fmt(s['cost_max'],4)} | {fmt(s['turns_mean'],1)} | {s['turns_max'] if s['turns_max'] is not None else '-'} | {fmt(s['wall_mean'],1)} |")
+        ci = '-' if s['ci'][0] is None else f"{s['ci'][0]:.2f}-{s['ci'][1]:.2f}"
+        lines.append(f"| {b} | {m} | {e} | {t} | {s['n']} | {s['success']} | {ci} | {oc} | {fmt(s['cost_total'],2)} | {fmt(s['cost_per_success'],4)} | {fmt(s['cost_p90'],4)} | {fmt(s['cost_max'],4)} | {fmt(s['turns_mean'],1)} | {s['turns_max'] if s['turns_max'] is not None else '-'} | {fmt(s['wall_mean'],1)} |")
     lines.append('\n## find_feature per family\n')
     lines.append('| Model | Effort | Trial | Family | n | correct | outcomes | cost / correct $ | turns mean | wall mean s |')
     lines.append('|---|---|---|---|---|---|---|---|---|---|')

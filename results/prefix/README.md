@@ -13,6 +13,8 @@ Claude Code 2.1.314.
 | after, call 1 | 2 | 8,699 | 13,961 | 22,662 | $0.0019 |
 | after, call 2 | 2 | 0 | 22,660 | 22,662 | $0.0002 |
 
+Claude Code updated itself to 2.1.316 between the two pairs, so the pairs were repeated on 2.1.316 with the
+179 files restored and then pruned again: 38,809 and 40,735 tokens with 184 files, 24,588 and 22,662 with 5.
 The agent list was about 17k tokens of every request (matches `results/cell1/PREFIX.md`), 40-44% of this
 minimal prefix. It is paid on every turn of every session as a cache read, and again as a cache write
 whenever the cache has expired. Reverse with `python3 tools/prune_agents.py --revert`.

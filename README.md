@@ -6,6 +6,10 @@ re-decided when a new model appears and repriced when a price changes.
 
 Status: routing v1 decided 2026-10-30 from four families, all Haiku at effort low (two of them
 only with a test runner in the loop); see `ROUTING.md`. `results/` holds what has actually run.
+2026-11-01: two families on what this machine actually does (`GAPS.md`): a bug fix in the user's own
+TypeScript repo with an effort sweep of the big models, and web research with a citation checker;
+intervals and pass^k in the decision; a usage ledger and a regression check; the unused agent files out
+of every request's prefix (`results/prefix`).
 
 ## The loop
 
@@ -15,8 +19,11 @@ catalog/models.json      the prices, with a verified date and a source   (a huma
 bench/<family>/run_agent.py   run a family for one model x effort, receipts with token counts
 bench/<family>/grade.py       the mechanical checker (KUnit build, scripted user, string truth)
 report.py                grades every receipt and prices it from the catalog (no judge model)
-decide.py                the rule: cheapest candidate at or above the best rate minus a margin
+decide.py                the rule: cheapest candidate whose Wilson lower bound is at or above the best minus a margin
 apply_agents.py          writes the decision into ~/.claude/agents/*.md (--revert undoes)
+regress.py               after a Claude Code update or monthly: each default on a small sample, binomial check
+tools/ledger.sh          monthly: what this machine actually ran (subagent calls, tokens, cost), from the transcripts
+tools/prune_agents.py    moves the agent files no transcript ever called out of the prefix (reversible)
 ```
 
 - **Receipts hold tokens, not dollars.** A price change is a catalog edit plus `report.py`; nothing
@@ -24,6 +31,9 @@ apply_agents.py          writes the decision into ~/.claude/agents/*.md (--rever
 - **A new model is run only where it can change the decision:** `decide.py` lists, per catalog
   model with no receipts, the families where it is not dearer than the current default (or where the
   default is below the ceiling), cheapest family first, with the expected cost of that run.
+- **Thin evidence cannot win a family.** A candidate is scored by the lower bound of the 95% Wilson
+  interval of its rate (`decide.py --rule lower`, the default): 10/10 scores 0.72, 63/63 scores 0.94.
+  The table also shows pass^k, the chance that every trial of a task succeeds.
 - **Runs the harness lost are retried, not judged.** A lost browser tab or a CLI failure is
   `incomplete` or `operational`; `decide.py` leaves those out of the rate.
 - **Harnesses.** `bench/common/harness.py` runs a session on Claude Code (`claude -p`, Anthropic
@@ -56,7 +66,19 @@ apply_agents.py          writes the decision into ~/.claude/agents/*.md (--rever
 - `bench/own_app_flow/`: the same shape on the author's own Go web store, 10 items, 14 planted
   defects behind an environment variable, a separate Postgres with a small seed. A fixture on one app,
   so it stays local (see `local/README.md`); the receipts and tables of cell 5 are in.
+- `bench/repo_fix/`: fix a bug with a failing test in one of the user's own repositories
+  (`repos/<name>.json`, a local file, `example.json` shows the shape; the author's was TypeScript with vitest): `make_tasks.py` mutates one source
+  line at a time and keeps the mutants the suite catches, the agent gets the failing output and the test
+  command, `grade.py` reruns the suite on the patched tree. A private tree, so no training-data leak;
+  `--prompt-variant b` asks the same thing in other words.
+- `bench/web_research/`: look up one technical fact on the web and cite the page (18 questions, mostly
+  PostgreSQL and DuckDB defaults and limits). `grade.py` checks the answer by pattern, then fetches every
+  cited URL and looks for the evidence in its text: a right answer with a made-up or wrong URL is
+  `right-unsourced`, not `correct`. `--self-test` checks the tasks' own sources.
 - `bench/common/`: worktree and KUnit helpers, the harness adapters.
+- `ledger/`: `usage-<date>.md` from `tools/ledger.sh` and `regress-<tag>.md` from `regress.py`.
+- `tools/`: `usage_scan.py` (the transcript scan behind `GAPS.md` and the ledger), `prune_agents.py`,
+  `ledger.sh`, `install_ledger_timer.sh` (a monthly systemd user timer, installed only by hand).
 - `runs/<bench>/`: one receipt per call (`runs-<model>-<effort>[-kunit]-t<trial>.jsonl`). Committed.
 - `results/<cell>/`: the tables and a short reading of each cell.
 
@@ -69,12 +91,17 @@ WT=$KERNEL_WT                    # local/config.json: kernel_worktrees
 python3 bench/fix_bug/run_agent.py --model gpt-6-luna --effort low --harness codex \
     --worktree $WT/sonnet --tasks bench/fix_bug/tasks-hard.json --bench fix_bug_hard \
     --kunit --build-dir $WT/build-sonnet --codex-full-access   # any free worktree and build dir
+python3 bench/repo_fix/run_agent.py --repo <name> --slot a --model claude-opus-5-5 --effort xhigh
+python3 bench/repo_fix/grade.py --repo <name> --slot grade
+python3 bench/web_research/run_agent.py --model claude-haiku-5-5 --effort low && python3 bench/web_research/grade.py
 python3 report.py --out results/<cell>
 python3 decide.py --dry-run        # the table and the plan; drop --dry-run to write routing.json and ROUTING.md
 python3 apply_agents.py            # into the agent files; --revert undoes
 ```
 
-The code families need the kernel worktrees and build directories under
+`bench/repo_fix/repos/<name>.json` (local; `example.json` shows the shape) says how its clone and worktrees are set up (a clone of the
+user's repo under `~/Projects/Github/model-router-evaluation/`, one worktree per run slot, the agent's
+slot and the grader's slot never shared). The kernel code families need the kernel worktrees and build directories under
 `$KERNEL_WT/` (one per run that is in flight at the
 same time; they are named after the model that first used them); the browser families
 need Chrome with the Claude extension, and the own-app fixture's `setup.sh` for the store.

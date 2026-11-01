@@ -1,6 +1,6 @@
 {
- "version": 1,
- "decided": "2026-10-30",
+ "version": 1.1,
+ "decided": "2026-11-01",
  "basis": [
   "results/cell1",
   "results/cell2",
@@ -8,7 +8,8 @@
   "results/cell4",
   "results/cell5",
   "results/cell6",
-  "results/cell7"
+  "results/cell7",
+  "results/cell8"
  ],
  "prices_verified": "see catalog/models.json",
  "runtime": {
@@ -50,8 +51,8 @@
    },
    "status": "decided",
    "decided": {
-    "bar": 0.98,
-    "rule": "cheapest candidate with rate >= best - 0.02 by cost per success; harness-lost runs excluded from the rate",
+    "bar": 0.954,
+    "rule": "cheapest candidate whose Wilson 95% lower bound >= best - 0.02, by cost per success; harness-lost runs excluded from the rate",
     "evidence": {
      "claude-fable-5-1 low": {
       "n": 72,
@@ -59,6 +60,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.9493,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
       "cost_per_success": 0.5779,
       "cost_total": 41.6087,
       "wall_mean": 8.3482,
@@ -73,6 +80,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.9907,
+      "ci": [
+       0.9669,
+       0.9975
+      ],
+      "k": 3,
+      "pass_k": 0.9722,
       "cost_per_success": 0.0046,
       "cost_total": 0.9843,
       "wall_mean": 6.383,
@@ -87,6 +100,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.9861,
+      "ci": [
+       0.96,
+       0.9953
+      ],
+      "k": 3,
+      "pass_k": 0.9583,
       "cost_per_success": 0.0057,
       "cost_total": 1.2085,
       "wall_mean": 6.7031,
@@ -101,6 +120,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.974,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
       "cost_per_success": 0.1173,
       "cost_total": 16.8869,
       "wall_mean": 6.1289,
@@ -115,6 +140,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.9676,
+      "ci": [
+       0.9346,
+       0.9842
+      ],
+      "k": 3,
+      "pass_k": 0.9583,
       "cost_per_success": 0.0005,
       "cost_total": 0.1123,
       "wall_mean": 4.3725,
@@ -157,8 +188,8 @@
     "the test runner in the loop (KUnit)"
    ],
    "decided": {
-    "bar": 0.98,
-    "rule": "cheapest candidate with rate >= best - 0.02 by cost per success; harness-lost runs excluded from the rate",
+    "bar": 0.9225,
+    "rule": "cheapest candidate whose Wilson 95% lower bound >= best - 0.02, by cost per success; harness-lost runs excluded from the rate",
     "evidence": {
      "claude-fable-5-1 low": {
       "n": 21,
@@ -166,6 +197,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.7619,
+      "ci": [
+       0.5491,
+       0.8937
+      ],
+      "k": 1,
+      "pass_k": 0.7619,
       "cost_per_success": 1.127,
       "cost_total": 18.0324,
       "wall_mean": 31.0062,
@@ -180,6 +217,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.9162,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
       "cost_per_success": 0.8948,
       "cost_total": 37.5833,
       "wall_mean": 45.9633,
@@ -194,6 +237,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.7619,
+      "ci": [
+       0.5491,
+       0.8937
+      ],
+      "k": 1,
+      "pass_k": 0.7619,
       "cost_per_success": 0.0158,
       "cost_total": 0.2527,
       "wall_mean": 26.5824,
@@ -208,6 +257,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.9425,
+       1.0
+      ],
+      "k": 3,
+      "pass_k": 1.0,
       "cost_per_success": 0.0145,
       "cost_total": 0.911,
       "wall_mean": 40.7243,
@@ -222,6 +277,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.6667,
+      "ci": [
+       0.4537,
+       0.8281
+      ],
+      "k": 1,
+      "pass_k": 0.6667,
       "cost_per_success": 0.2564,
       "cost_total": 3.5895,
       "wall_mean": 22.2124,
@@ -236,6 +297,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.9162,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
       "cost_per_success": 0.1902,
       "cost_total": 7.9899,
       "wall_mean": 33.606,
@@ -275,8 +342,8 @@
     "the test runner in the loop (KUnit)"
    ],
    "decided": {
-    "bar": 0.98,
-    "rule": "cheapest candidate with rate >= best - 0.02 by cost per success; harness-lost runs excluded from the rate",
+    "bar": 0.8665,
+    "rule": "cheapest candidate whose Wilson 95% lower bound >= best - 0.02, by cost per success; harness-lost runs excluded from the rate",
     "evidence": {
      "claude-fable-5-1 low": {
       "n": 10,
@@ -284,6 +351,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.4,
+      "ci": [
+       0.1682,
+       0.6873
+      ],
+      "k": 1,
+      "pass_k": 0.4,
       "cost_per_success": 4.5774,
       "cost_total": 18.3096,
       "wall_mean": 167.784,
@@ -298,6 +371,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.8389,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
       "cost_per_success": 1.5736,
       "cost_total": 31.4729,
       "wall_mean": 149.293,
@@ -312,6 +391,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.5,
+      "ci": [
+       0.2366,
+       0.7634
+      ],
+      "k": 1,
+      "pass_k": 0.5,
       "cost_per_success": 0.049,
       "cost_total": 0.2451,
       "wall_mean": 93.467,
@@ -326,6 +411,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.8865,
+       1.0
+      ],
+      "k": 3,
+      "pass_k": 1.0,
       "cost_per_success": 0.0259,
       "cost_total": 0.7759,
       "wall_mean": 98.637,
@@ -340,6 +431,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 0.7,
+      "ci": [
+       0.3968,
+       0.8922
+      ],
+      "k": 1,
+      "pass_k": 0.7,
       "cost_per_success": 0.3705,
       "cost_total": 2.5932,
       "wall_mean": 50.323,
@@ -354,6 +451,12 @@
       "not_model": 0,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.8389,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
       "cost_per_success": 0.2792,
       "cost_total": 5.5847,
       "wall_mean": 66.3955,
@@ -433,8 +536,8 @@
     "browser_disconnects": "4 of 76 runs (haiku 2, sonnet 1, fable 1): the user closed the shared Chrome by mistake during the runs; each flow was rerun afterwards"
    },
    "decided": {
-    "bar": 0.98,
-    "rule": "cheapest candidate with rate >= best - 0.02 by cost per success; harness-lost runs excluded from the rate",
+    "bar": 0.9225,
+    "rule": "cheapest candidate whose Wilson 95% lower bound >= best - 0.02, by cost per success; harness-lost runs excluded from the rate",
     "evidence": {
      "claude-fable-5-1 low": {
       "n": 27,
@@ -442,6 +545,12 @@
       "not_model": 1,
       "pending": 0,
       "rate": 0.9615,
+      "ci": [
+       0.8111,
+       0.9932
+      ],
+      "k": 1,
+      "pass_k": 0.9615,
       "cost_per_success": 2.6294,
       "cost_total": 65.7354,
       "wall_mean": 188.6681,
@@ -457,6 +566,12 @@
       "not_model": 2,
       "pending": 0,
       "rate": 1.0,
+      "ci": [
+       0.9425,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
       "cost_per_success": 0.0367,
       "cost_total": 2.3135,
       "wall_mean": 116.0932,
@@ -472,6 +587,12 @@
       "not_model": 1,
       "pending": 0,
       "rate": 0.9024,
+      "ci": [
+       0.7745,
+       0.9614
+      ],
+      "k": 1,
+      "pass_k": 0.9231,
       "cost_per_success": 0.5278,
       "cost_total": 19.5291,
       "wall_mean": 117.875,
@@ -494,6 +615,384 @@
    },
    "why": "no evidence; a cheap model's miss is silent where there is no checker (cell 1), so no blind downgrade",
    "status": "open"
+  },
+  "repo_fix": {
+   "what": "fix a bug with a failing test in a private repository of the author's (TypeScript, vitest); the transfer check for fix_bug on the user's own code",
+   "default": {
+    "model": "haiku",
+    "effort": "low"
+   },
+   "step_up": null,
+   "escalation_rule": null,
+   "why_no_escalation": "not needed with the runner: every Claude tier fixes 24/24 at every effort",
+   "evidence": {
+    "haiku low+vitest": "72/72 over 3 trials",
+    "sonnet low+vitest": "24/24",
+    "opus low/high/xhigh+vitest": "24/24 each",
+    "fable low/high/xhigh+vitest": "24/24 each",
+    "haiku low no runner": "22/24",
+    "gpt-6-luna low+vitest (codex)": "20/24",
+    "haiku low+vitest paraphrased prompt": "24/24"
+   },
+   "status": "decided",
+   "requires": [
+    "the test runner in the loop (vitest)"
+   ],
+   "decided": {
+    "bar": 0.9293,
+    "rule": "cheapest candidate whose Wilson 95% lower bound >= best - 0.02, by cost per success; harness-lost runs excluded from the rate",
+    "evidence": {
+     "claude-fable-5-1 high+vitest": {
+      "n": 24,
+      "success": 24,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.862,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.556,
+      "cost_total": 13.3435,
+      "wall_mean": 70.2771,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     },
+     "claude-fable-5-1 low+vitest": {
+      "n": 24,
+      "success": 24,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.862,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.4806,
+      "cost_total": 11.5345,
+      "wall_mean": 62.5546,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     },
+     "claude-fable-5-1 xhigh+vitest": {
+      "n": 24,
+      "success": 24,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.862,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.7288,
+      "cost_total": 17.4912,
+      "wall_mean": 93.8487,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low": {
+      "n": 24,
+      "success": 22,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.9167,
+      "ci": [
+       0.7415,
+       0.9768
+      ],
+      "k": 1,
+      "pass_k": 0.9167,
+      "cost_per_success": 0.0077,
+      "cost_total": 0.1697,
+      "wall_mean": 15.8367,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low+vitest": {
+      "n": 72,
+      "success": 72,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.9493,
+       1.0
+      ],
+      "k": 3,
+      "pass_k": 1.0,
+      "cost_per_success": 0.0071,
+      "cost_total": 0.5143,
+      "wall_mean": 41.5379,
+      "trials": {
+       "repo_fix": 3
+      },
+      "covers": true
+     },
+     "claude-opus-5-5 high+vitest": {
+      "n": 24,
+      "success": 24,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.862,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.189,
+      "cost_total": 4.537,
+      "wall_mean": 44.0063,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     },
+     "claude-opus-5-5 low+vitest": {
+      "n": 24,
+      "success": 24,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.862,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.1783,
+      "cost_total": 4.2783,
+      "wall_mean": 50.0179,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     },
+     "claude-opus-5-5 xhigh+vitest": {
+      "n": 24,
+      "success": 24,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.862,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.2306,
+      "cost_total": 5.5346,
+      "wall_mean": 66.5192,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low+vitest": {
+      "n": 24,
+      "success": 24,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.862,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.0966,
+      "cost_total": 2.3187,
+      "wall_mean": 53.3462,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     },
+     "gpt-6-luna low+vitest": {
+      "n": 24,
+      "success": 20,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.8333,
+      "ci": [
+       0.6415,
+       0.9332
+      ],
+      "k": 1,
+      "pass_k": 0.8333,
+      "cost_per_success": 0.0063,
+      "cost_total": 0.1267,
+      "wall_mean": 27.1821,
+      "trials": {
+       "repo_fix": 1
+      },
+      "covers": true
+     }
+    },
+    "n_tasks": 24,
+    "default_rate": 1.0
+   }
+  },
+  "web_research": {
+   "what": "look up a technical fact on the web and cite a page that states it (answer pattern plus a fetch of every cited URL; 8 of 26 questions have a live truth fetched at grading time)",
+   "default": {
+    "model": "haiku",
+    "effort": "low"
+   },
+   "step_up": null,
+   "escalation_rule": null,
+   "why_no_escalation": "none: every tier finds the fact with a real source; the failure to watch is a right answer with no usable source",
+   "evidence": {
+    "haiku low": "76/78 over 3 trials",
+    "sonnet low": "26/26",
+    "opus low": "26/26",
+    "opus xhigh": "26/26",
+    "fable low": "26/26",
+    "fable xhigh": "26/26"
+   },
+   "status": "decided",
+   "decided": {
+    "bar": 0.8912,
+    "rule": "cheapest candidate whose Wilson 95% lower bound >= best - 0.02, by cost per success; harness-lost runs excluded from the rate",
+    "evidence": {
+     "claude-fable-5-1 low": {
+      "n": 26,
+      "success": 26,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.8713,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.3034,
+      "cost_total": 7.8872,
+      "wall_mean": 17.1015,
+      "trials": {
+       "web_research": 1
+      },
+      "covers": true
+     },
+     "claude-fable-5-1 xhigh": {
+      "n": 26,
+      "success": 26,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.8713,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.3791,
+      "cost_total": 9.857,
+      "wall_mean": 27.4385,
+      "trials": {
+       "web_research": 1
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low": {
+      "n": 78,
+      "success": 76,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.9744,
+      "ci": [
+       0.9112,
+       0.9929
+      ],
+      "k": 3,
+      "pass_k": 0.9231,
+      "cost_per_success": 0.0219,
+      "cost_total": 1.6672,
+      "wall_mean": 17.4704,
+      "trials": {
+       "web_research": 3
+      },
+      "covers": true
+     },
+     "claude-opus-5-5 low": {
+      "n": 26,
+      "success": 26,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.8713,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.1205,
+      "cost_total": 3.1327,
+      "wall_mean": 12.9204,
+      "trials": {
+       "web_research": 1
+      },
+      "covers": true
+     },
+     "claude-opus-5-5 xhigh": {
+      "n": 26,
+      "success": 26,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.8713,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.1601,
+      "cost_total": 4.1635,
+      "wall_mean": 24.9835,
+      "trials": {
+       "web_research": 1
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low": {
+      "n": 26,
+      "success": 26,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.8713,
+       1.0
+      ],
+      "k": 1,
+      "pass_k": 1.0,
+      "cost_per_success": 0.062,
+      "cost_total": 1.6131,
+      "wall_mean": 11.5977,
+      "trials": {
+       "web_research": 1
+      },
+      "covers": true
+     }
+    },
+    "n_tasks": 26,
+    "default_rate": 0.9743589743589743
+   }
   }
  },
  "rules": [
@@ -530,6 +1029,13 @@
    "effort": "low",
    "note": "closest agent to the measured family; its screenshot/visual-review and 'minimum 3-5 issues' parts are not measured",
    "instruction": "When you are given a page and a checklist, drive every step in order in the browser, judge each item only by what you actually see on screen, and report pass or fail per item with one sentence of evidence for each fail. Do not report a failure you did not observe. If the browser disconnects or a step cannot be run, mark those items not_run and say where the flow stopped, so the caller can retry."
+  },
+  "web-researcher.md": {
+   "family": "web_research",
+   "model": "haiku",
+   "effort": "low",
+   "note": "a new agent file (2026-11-01): the research calls in the transcripts went to the built-in general-purpose agent, which no file can route; this file is the way to route them",
+   "instruction": "Answer from pages you read in this session, not from memory. Give the answer first, then the URL of every page you actually opened that states it; never cite a page you did not open. If no page states it, say so."
   }
  },
  "recheck_when": [
@@ -539,49 +1045,27 @@
   "a new family is measured"
  ],
  "revised": "2026-10-30 after cells 6 and 7; defaults written by decide.py",
- "decided_by": "decide.py --margin 0.02 --min-trials 1 (catalog prices)",
+ "decided_by": "decide.py --margin 0.02 --min-trials 1 --rule lower (catalog prices)",
  "plan_for_unmeasured_models": [
-  {
-   "model": "claude-opus-5-5",
-   "provider": "anthropic",
-   "list_price_in_plus_out_per_mtok": 24.0,
-   "families": [
-    {
-     "family": "write_tests",
-     "run": false,
-     "n_tasks": 10,
-     "expected_cost_usd": 9.29,
-     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
-    },
-    {
-     "family": "fix_bug",
-     "run": false,
-     "n_tasks": 21,
-     "expected_cost_usd": 10.65,
-     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
-    },
-    {
-     "family": "find_feature",
-     "run": false,
-     "n_tasks": 72,
-     "expected_cost_usd": 11.94,
-     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
-    },
-    {
-     "family": "browser_flow",
-     "run": false,
-     "n_tasks": 26,
-     "expected_cost_usd": 28.89,
-     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
-    }
-   ],
-   "harness": "claude"
-  },
   {
    "model": "openai:gpt-6.1-sol",
    "provider": "openai",
    "list_price_in_plus_out_per_mtok": 12.0,
    "families": [
+    {
+     "family": "web_research",
+     "run": true,
+     "n_tasks": 26,
+     "expected_cost_usd": 1.78,
+     "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
+    },
+    {
+     "family": "repo_fix",
+     "run": false,
+     "n_tasks": 24,
+     "expected_cost_usd": 2.99,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
     {
      "family": "write_tests",
      "run": false,
@@ -619,6 +1103,20 @@
    "list_price_in_plus_out_per_mtok": 60.0,
    "families": [
     {
+     "family": "web_research",
+     "run": true,
+     "n_tasks": 26,
+     "expected_cost_usd": 9.94,
+     "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
+    },
+    {
+     "family": "repo_fix",
+     "run": false,
+     "n_tasks": 24,
+     "expected_cost_usd": 17.14,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
      "family": "write_tests",
      "run": false,
      "n_tasks": 10,
@@ -654,6 +1152,20 @@
    "provider": "openai",
    "list_price_in_plus_out_per_mtok": 15.75,
    "families": [
+    {
+     "family": "web_research",
+     "run": true,
+     "n_tasks": 26,
+     "expected_cost_usd": 1.82,
+     "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
+    },
+    {
+     "family": "repo_fix",
+     "run": false,
+     "n_tasks": 24,
+     "expected_cost_usd": 3.25,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
     {
      "family": "write_tests",
      "run": false,

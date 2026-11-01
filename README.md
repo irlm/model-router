@@ -6,10 +6,12 @@ re-decided when a new model appears and repriced when a price changes.
 
 Status: routing v1 decided 2026-10-30 from four families, all Haiku at effort low (two of them
 only with a test runner in the loop); see `ROUTING.md`. `results/` holds what has actually run.
-2026-11-01: two families on what this machine actually does (`GAPS.md`): a bug fix in the user's own
-TypeScript repo with an effort sweep of the big models, and web research with a citation checker;
-intervals and pass^k in the decision; a usage ledger and a regression check; the unused agent files out
-of every request's prefix (`results/prefix`).
+2026-11-01 (`results/cell8`): two families on what this machine actually does (`GAPS.md`): a bug fix in
+the user's own TypeScript repo with an effort sweep of the big models (every Claude tier fixes 24/24 at
+every effort; xhigh costs 1.3-1.5x low for nothing; Haiku low with the runner 72/72 at 1/70 of Fable),
+and web research with a citation checker (Haiku 76/78 at 1/17 of Fable xhigh); intervals and pass^k in
+the decision; a usage ledger and a regression check; the unused agent files out of every request's
+prefix (40k -> 23k tokens, `results/prefix`).
 
 ## The loop
 

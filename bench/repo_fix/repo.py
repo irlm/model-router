@@ -68,7 +68,9 @@ def run_tests(wt, cfg, timeout=600, files=()):
     """Run the suite with vitest's JSON reporter. complete=False means the run produced no report."""
     tmp = Path(tempfile.mkdtemp(prefix='repo_fix_'))
     out = tmp / 'vitest.json'
-    cmd = [*cfg['test_cmd'], '--reporter=json', f'--outputFile={out}', *files]
+    # long timeouts: the grade must not depend on machine load (the default 5 s test timeout failed
+    # a DOM test and a CLI test while six agent sessions ran vitest at once)
+    cmd = [*cfg['test_cmd'], '--reporter=json', f'--outputFile={out}', '--testTimeout=120000', '--hookTimeout=120000', *files]
     try:
         proc = subprocess.run(cmd, cwd=str(wt), stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:

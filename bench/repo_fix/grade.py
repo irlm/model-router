@@ -49,7 +49,12 @@ def grade_one(wt, cfg, task, record):
         if res['failed'] == 0 and res['passed'] > 0:
             types = typecheck(wt, cfg)
             return 'fixed', '' if types is None else ('types ok' if types else 'tests pass but the type check fails')
-        return 'still-failing', f"{res['failed']} failed | {res['passed']} passed"
+        again = R.run_tests(wt, cfg)  # a failure must repeat: one flaky run under load is not a verdict
+        if again['complete'] and again['failed'] == 0 and again['passed'] > 0:
+            types = typecheck(wt, cfg)
+            return 'fixed', ('flaky first run; ' + ('types ok' if types else 'tests pass but the type check fails')) if types is not None else 'flaky first run'
+        names = sorted({f['name'] for f in res['failures']} & {f['name'] for f in again['failures']}) or sorted({f['name'] for f in res['failures']})
+        return 'still-failing', f"{res['failed']} failed | {res['passed']} passed; {names[0][:90] if names else ''}"
     finally:
         R.reset(wt, cfg['base'])
 

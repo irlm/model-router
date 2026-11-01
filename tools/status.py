@@ -109,13 +109,20 @@ def regress_rows(path):
     return rows
 
 
+REGRESS_NAME = re.compile(r'regress-(\d{4}-\d{2}-\d{2})-claude-(.+?)(?:-r(\d+))?\.md$')
+
+
 def last_regress():
-    files = sorted(HERE.glob('ledger/regress-*.md'))
-    if not files:
+    """The newest ledger/regress-<date>-claude-<version>[-rN].md by date, then run number."""
+    found = []
+    for f in HERE.glob('ledger/regress-*.md'):
+        m = REGRESS_NAME.match(f.name)
+        if m:
+            found.append(((m.group(1), int(m.group(3) or 1)), f, m))
+    if not found:
         return None
-    f = files[-1]
-    m = re.match(r'regress-(\d{4}-\d{2}-\d{2})-claude-(.+)\.md$', f.name)
-    return {'file': f.name, 'date': m.group(1) if m else None, 'claude': m.group(2) if m else None, 'rows': regress_rows(f)}
+    _, f, m = max(found, key=lambda x: x[0])
+    return {'file': f.name, 'date': m.group(1), 'claude': m.group(2), 'run': int(m.group(3) or 1), 'rows': regress_rows(f)}
 
 
 def last_usage():

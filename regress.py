@@ -97,6 +97,11 @@ def main():
     args = ap.parse_args()
     version = claude_version()
     tag = args.tag or f"{datetime.date.today().isoformat()}-claude-{version}"
+    if not args.tag:   # a second run on the same day and version gets its own tag, so receipts never mix
+        n = 2
+        while (HERE / 'runs/regress' / tag).exists() or (HERE / 'ledger' / f'regress-{tag}.md').exists():
+            tag = f"{datetime.date.today().isoformat()}-claude-{version}-r{n}"
+            n += 1
     out_root = HERE / 'runs/regress' / tag
     routing = json.loads((HERE / 'routing.json').read_text())
     lines = [f'# Regression check {tag}', '', f'Claude Code {version}, sample {args.sample} tasks per family, seed {args.seed}, alpha {args.alpha}.', '']

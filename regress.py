@@ -27,6 +27,7 @@ import math
 import random
 import subprocess
 import sys
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -35,6 +36,7 @@ import report
 
 HERE = Path(__file__).resolve().parent
 PY = sys.executable
+CLAUDE = shutil.which('claude') or 'claude'   # PATH lookup: on Windows the CLI is claude.cmd
 ID_FOR = {alias: mid for mid, alias in decide.ALIAS.items()}
 TASK_FILES = {'find_feature': None, 'fix_bug_hard': 'bench/fix_bug/tasks-hard.json', 'write_tests': 'bench/write_tests/tasks.json',
               'repo_fix': 'bench/repo_fix/tasks.json', 'web_research': 'bench/web_research/tasks.json',
@@ -43,7 +45,7 @@ TASK_FILES = {'find_feature': None, 'fix_bug_hard': 'bench/fix_bug/tasks-hard.js
 
 def claude_version():
     try:
-        return subprocess.run(['claude', '--version'], capture_output=True, text=True, timeout=30).stdout.split()[0]
+        return subprocess.run([CLAUDE, '--version'], capture_output=True, text=True, timeout=30).stdout.split()[0]
     except (OSError, IndexError, subprocess.TimeoutExpired):
         return 'unknown'
 
@@ -54,7 +56,7 @@ def prefix_tokens(n=2):
     rows = []
     for _ in range(n):
         try:
-            p = subprocess.run(['claude', '-p', '--output-format', 'json', '--model', 'claude-haiku-5-5', '--effort', 'low',
+            p = subprocess.run([CLAUDE, '-p', '--output-format', 'json', '--model', 'claude-haiku-5-5', '--effort', 'low',
                                 '--max-turns', '1', '--allowed-tools', 'Read'], input='Reply with the single word OK.',
                                capture_output=True, text=True, timeout=180, cwd=cwd)
             u = json.loads(p.stdout)['usage']

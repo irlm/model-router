@@ -39,7 +39,7 @@ def call(name, stdout, **kw):
 class Claude(unittest.TestCase):
     def test_plain(self):
         cmd, r = call('claude', CLAUDE)
-        self.assertEqual(cmd[:2], ['claude', '-p'])
+        self.assertEqual((cmd[0], cmd[1]), (harness.CLAUDE, '-p'))   # argv[0] is the PATH lookup (claude.cmd on Windows)
         self.assertNotIn('--chrome', cmd)
         self.assertEqual(cmd[cmd.index('--allowed-tools') + 1], 'Read Edit')
         self.assertEqual((r['harness'], r['text'], r['num_turns'], r['model_used']), ('claude', 'ok', 2, 'claude-x'))

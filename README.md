@@ -24,9 +24,28 @@ report.py                grades every receipt and prices it from the catalog (no
 decide.py                the rule: cheapest candidate whose Wilson lower bound is at or above the best minus a margin
 apply_agents.py          writes the decision into ~/.claude/agents/*.md (--revert undoes)
 regress.py               after a Claude Code update or monthly: each default on a small sample, binomial check
-tools/ledger.sh          monthly: what this machine actually ran (subagent calls, tokens, cost), from the transcripts
+tools/ledger.py          monthly: what this machine actually ran (subagent calls, tokens, cost), from the transcripts
 tools/prune_agents.py    moves the agent files no transcript ever called out of the prefix (reversible)
+tools/status.py          where the routing stands on this machine, and what is worth doing (text or --json)
+tools/update.py          re-check: regress.py on every family whose fixtures exist here, then commit and push
+mod/                     the Claude Code widget: status line + /router pane over the two scripts above
 ```
+
+## The widget
+
+`mod/` is a Claude Code mod (hooks module) that runs on Linux, macOS and Windows alike, since it
+runs inside Claude Code: a status line under the prompt (`router ok · v1.1 · 3 families checkable
+here · Claude Code 2.1.316 · 12:01`, or `router: 2 to check · /router`), and `/router` opens a pane
+with the families table, the agent files, price freshness, the ledger dates and buttons that run
+`tools/update.py`, `tools/ledger.py --commit`, `apply_agents.py` and `git pull`. Install on a machine
+that has this repository cloned, Python 3 and the `claude` CLI, at the prompt of a terminal session:
+
+```
+/plugin install model-router --marketplace irlm/model-router
+```
+
+The checkout path is an option in `/config` (default `~/Projects/Github/model-router`).
+`mod/README.md` has the rest; `claude plugin validate mod` and `claude plugin test mod` check it.
 
 - **Receipts hold tokens, not dollars.** A price change is a catalog edit plus `report.py`; nothing
   is re-run. `report.py --prices other.json` prices everything under a what-if catalog.
@@ -78,9 +97,10 @@ tools/prune_agents.py    moves the agent files no transcript ever called out of 
   cited URL and looks for the evidence in its text: a right answer with a made-up or wrong URL is
   `right-unsourced`, not `correct`. `--self-test` checks the tasks' own sources.
 - `bench/common/`: worktree and KUnit helpers, the harness adapters.
-- `ledger/`: `usage-<date>.md` from `tools/ledger.sh` and `regress-<tag>.md` from `regress.py`.
+- `ledger/`: `usage-<date>.md` from `tools/ledger.py` and `regress-<tag>.md` from `regress.py`.
+- `mod/`: the Claude Code widget (see The widget); `.claude-plugin/marketplace.json` at the root makes this repository its marketplace.
 - `tools/`: `usage_scan.py` (the transcript scan behind `GAPS.md` and the ledger), `prune_agents.py`,
-  `ledger.sh`, `install_ledger_timer.sh` (a monthly systemd user timer, `model-router-ledger.timer`, 1st of the month 09:00; installed 2026-11-01, `--remove` undoes it).
+  `status.py`, `update.py`, `ledger.py` (`ledger.sh` wraps it for the timer), `install_ledger_timer.sh` (a monthly systemd user timer, `model-router-ledger.timer`, 1st of the month 09:00; installed 2026-11-01, `--remove` undoes it).
 - `runs/<bench>/`: one receipt per call (`runs-<model>-<effort>[-kunit]-t<trial>.jsonl`). Committed.
 - `results/<cell>/`: the tables and a short reading of each cell.
 

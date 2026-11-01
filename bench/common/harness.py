@@ -34,12 +34,14 @@ a runner picks its `--harness` choices from it, so a browser family only lists
 harnesses that have a browser.
 """
 import json
+import shutil
 import subprocess
 
 CODEX_EFFORT = {'low': 'low', 'medium': 'medium', 'high': 'high', 'xhigh': 'xhigh', 'max': 'xhigh'}
 # 'browser' = can drive the user's Chrome; 'write' = can edit files in the
 # working tree and run a build there.
 CAPABILITIES = {'claude': {'browser', 'write'}, 'codex': {'write'}}
+CLAUDE = shutil.which('claude') or 'claude'   # PATH lookup: on Windows the CLI is claude.cmd
 
 
 def harnesses(need=()):
@@ -50,7 +52,7 @@ def harnesses(need=()):
 def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=False, write=False, writable=(),
                 unsandboxed=False):
     # `write`, `writable` and `unsandboxed` are implied by the allow-list (Edit, Write, Bash(...)); nothing to pass.
-    cmd = ['claude', '-p', '--output-format', 'json', '--model', model,
+    cmd = [CLAUDE, '-p', '--output-format', 'json', '--model', model,
            '--max-turns', str(max_turns), '--effort', effort, '--allowed-tools', tools]
     if chrome:
         cmd.insert(2, '--chrome')

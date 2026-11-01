@@ -1,0 +1,29 @@
+{
+  "name": "model-router",
+  "version": "0.1.0",
+  "description": "Model router widget: which model and effort each kind of agent work runs on, whether that is still true on this machine, and one key to re-check it.",
+  "author": {
+    "name": "irlm"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "repo": {
+      "type": "string",
+      "title": "model-router checkout",
+      "description": "Where the model-router repository is cloned on this machine. ~ is your home folder.",
+      "default": "~/Projects/Github/model-router"
+    },
+    "python": {
+      "type": "string",
+      "title": "Python command",
+      "description": "Empty tries python3, then python, then py. Set it when Python lives elsewhere.",
+      "default": ""
+    },
+    "refreshMinutes": {
+      "type": "number",
+      "title": "Refresh every (minutes)",
+      "description": "How often the status line re-reads the repo while the session is open. 0 reads once at start.",
+      "default": 30
+    }
+  }
+}

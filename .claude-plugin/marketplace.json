@@ -1,0 +1,11 @@
+{
+  "name": "model-router",
+  "owner": { "name": "irlm" },
+  "plugins": [
+    {
+      "name": "model-router",
+      "source": "./mod",
+      "description": "Model router widget: the routing's status on this machine, one key to re-check it."
+    }
+  ]
+}

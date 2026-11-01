@@ -44,6 +44,7 @@ class Claude(unittest.TestCase):
         self.assertEqual(cmd[cmd.index('--allowed-tools') + 1], 'Read Edit')
         self.assertEqual((r['harness'], r['text'], r['num_turns'], r['model_used']), ('claude', 'ok', 2, 'claude-x'))
         self.assertIsNone(r['operational_error'])
+        self.assertEqual(r['model_usage'], {'claude-x': {}})
 
     def test_chrome_and_ignored_keywords(self):
         cmd, _ = call('claude', CLAUDE, chrome=True, write=True, writable=['/b'], unsandboxed=True)

@@ -80,7 +80,7 @@ tools/prune_agents.py    moves the agent files no transcript ever called out of 
 - `bench/common/`: worktree and KUnit helpers, the harness adapters.
 - `ledger/`: `usage-<date>.md` from `tools/ledger.sh` and `regress-<tag>.md` from `regress.py`.
 - `tools/`: `usage_scan.py` (the transcript scan behind `GAPS.md` and the ledger), `prune_agents.py`,
-  `ledger.sh`, `install_ledger_timer.sh` (a monthly systemd user timer, installed only by hand).
+  `ledger.sh`, `install_ledger_timer.sh` (a monthly systemd user timer, `model-router-ledger.timer`, 1st of the month 09:00; installed 2026-11-01, `--remove` undoes it).
 - `runs/<bench>/`: one receipt per call (`runs-<model>-<effort>[-kunit]-t<trial>.jsonl`). Committed.
 - `results/<cell>/`: the tables and a short reading of each cell.
 

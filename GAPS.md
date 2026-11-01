@@ -3,8 +3,8 @@
 **Status 2026-11-01:** items 1-9 below are done or have a first measurement; see `results/cell8`.
 1 pruned (prefix 40k -> 23k tokens, `results/prefix`); 2 done on a private TypeScript repo with the effort sweep
 (Opus and Fable fix 24/24 at low, high and xhigh; xhigh costs 1.3-1.5x low; Haiku low with the runner
-72/72 at 1/70 of Fable); 3 `tools/ledger.sh` with the first entry (the monthly timer is
-`tools/install_ledger_timer.sh`, not installed by the benchmark); 4 `bench/web_research` with a
+72/72 at 1/70 of Fable); 3 `tools/ledger.sh` with the first entry (the monthly systemd user timer from
+`tools/install_ledger_timer.sh` is installed since 2026-11-01 on the user's request; first run verified under systemd); 4 `bench/web_research` with a
 citation checker and live-version questions (Haiku 76/78 at 1/17 of Fable xhigh); the rubric part
 is still open; 5 Wilson intervals and pass^k in `report.py`/`decide.py`, `--rule lower` default;
 6 `regress.py` is the regression suite, the new families are the capability tier (both still at the

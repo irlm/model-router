@@ -189,7 +189,8 @@ def main():
                 r = json.loads(line)
             except ValueError:  # a receipt still being written by a runner
                 continue
-            key = f"{r['model_requested']} / {r['effort']} / {r['trial']} / {r['id']}"
+            pv = r.get('prompt_variant', 'a')
+            key = f"{r['model_requested']} / {r['effort']} / {r['trial']} / {r['id']}" + ('' if pv == 'a' else f' / p{pv}')
             if key in grades or r['id'] not in tasks:
                 continue
             outcome, detail = grade_one(tasks[r['id']], r, cache)

@@ -46,6 +46,7 @@ FAMILIES = {
     'browser_flow': {'benches': ['browser_flow', 'own_app_flow'], 'what': 'drive a web page through a checklist in a real browser'},
     'repo_fix': {'benches': ['repo_fix'], 'what': "fix a bug with a failing test in a repository of the user's own (TypeScript with vitest when measured)"},
     'web_research': {'benches': ['web_research'], 'what': 'look up a technical fact on the web and cite a page that states it'},
+    'research_synthesis': {'benches': ['research_synthesis'], 'what': 'write a short research note answering three looked-up questions, each claim with the page that states it'},
 }
 ALIAS = {'claude-haiku-5-5': 'haiku', 'claude-sonnet-5-5': 'sonnet', 'claude-opus-5-5': 'opus', 'claude-fable-5-1': 'fable'}
 HARNESS_FOR = {'anthropic': 'claude', 'openai': 'codex'}  # provider -> adapter in bench/common/harness.py

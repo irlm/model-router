@@ -1,0 +1,11 @@
+{
+ "what": "write a short research note (250-700 words) for a colleague that answers three technical questions looked up on the web, each claim with the page that states it. The questions and their truth are the fixed-answer tasks of bench/web_research (the same verified patterns); the note is graded in code: every answer must match its pattern and a cited page must state it, and the prose must be a note, not a list. Prose quality beyond that is not judged.",
+ "tasks": [
+  {"id": "rs-01", "brief": "sizing a PostgreSQL schema and its connection pool for a new service", "facts": ["wr-01", "wr-12", "wr-11"]},
+  {"id": "rs-02", "brief": "tuning the memory and WAL settings of a fresh PostgreSQL install", "facts": ["wr-14", "wr-15", "wr-16"]},
+  {"id": "rs-03", "brief": "choosing an analytics side-store next to PostgreSQL (DuckDB or SQLite) and checking whether MERGE is available on PostgreSQL 15", "facts": ["wr-02", "wr-03", "wr-06"]},
+  {"id": "rs-04", "brief": "writing an internal guideline on TLS versions, host naming and HTTP status codes", "facts": ["wr-04", "wr-13", "wr-10"]},
+  {"id": "rs-05", "brief": "writing a deploy runbook for a service that runs on AWS Lambda, on Kubernetes and in local Docker", "facts": ["wr-07", "wr-08", "wr-09"]},
+  {"id": "rs-06", "brief": "setting the test and tooling defaults of a repository (vitest timeouts, the Linux kernel version the team follows for Rust, PostgreSQL statement timeouts)", "facts": ["wr-05", "wr-17", "wr-18"]}
+ ]
+}

@@ -15,3 +15,7 @@ runs/own_app_flow/
 runs/repo_fix_pb/
 runs/regress/*/repo_fix/
 runs/smoke/repo_fix/
+
+# find_feature on a private tree (the contamination control): tasks, receipts and grades name private files
+bench/find_feature/private-tasks.json
+runs/find_feature_private/

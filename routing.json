@@ -993,6 +993,15 @@
     "n_tasks": 26,
     "default_rate": 0.9743589743589743
    }
+  },
+  "research_synthesis": {
+   "what": "write a short research note (250-700 words) that answers three looked-up questions, each claim with the page that states it; graded in code (answer patterns, every cited page fetched), prose quality beyond that not judged",
+   "default": null,
+   "step_up": null,
+   "escalation_rule": null,
+   "why_no_escalation": null,
+   "evidence": {},
+   "status": "measuring"
   }
  },
  "rules": [

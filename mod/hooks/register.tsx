@@ -389,7 +389,7 @@ const matchFamily = (agent: string, prompt: string): Match | null => {
   if (agent === 'Web Researcher') return { family: 'web_research', why: 'the lookup agent' }
   if (agent === 'Evidence Collector') return { family: 'browser_flow', why: 'the browser agent' }
   if (p.length < 900 && LOOKUP.some(k => p.includes(k))) return { family: 'web_research', why: 'a short fact lookup' }
-  if (SYNTHESIS.some(k => p.includes(k))) return null
+  if (SYNTHESIS.some(k => p.includes(k))) return { family: 'research_synthesis', why: 'a research note' }   // acts only once the family is decided
   if (BROWSER.filter(k => p.includes(k)).length >= 2) return { family: 'browser_flow', why: 'a browser flow' }
   if (CODE.some(k => p.includes(k)) && RUNNER.some(k => p.includes(k))) return { family: 'repo_fix', why: 'a fix with the test runner in the loop' }
   return null

@@ -45,7 +45,8 @@ FIND_FEATURE_COST = 0.0046    # Haiku low per code search, 214/216 found (routin
 BROWSER_FLOW_COST = 0.0367    # Haiku low per browser flow, 63/63 on the toy app (routing.json evidence)
 SUGGESTION_FLOOR = 0.5        # a known saving below this many dollars per window is not worth a line
 # Which measured family stands behind each class of Agent call the consumption scan sees.
-CLASS_FAMILY = {'code-explore': 'find_feature', 'fact-lookup': 'web_research', 'browser-flow': 'browser_flow', 'code-change': 'repo_fix'}
+CLASS_FAMILY = {'code-explore': 'find_feature', 'fact-lookup': 'web_research', 'browser-flow': 'browser_flow', 'code-change': 'repo_fix',
+                'research-synthesis': 'research_synthesis'}
 AGENTS_DIR = Path.home() / '.claude/agents'
 UNUSED_DIR = Path.home() / '.claude/agents.unused'
 
@@ -114,7 +115,7 @@ def can_run(bench):
         if not shutil.which('npx'):
             return False, 'needs node (npx) for vitest'
         return True, ''
-    if bench == 'web_research':
+    if bench in ('web_research', 'research_synthesis'):
         return (True, '') if shutil.which('claude') else (False, 'needs the claude CLI')
     if bench == 'browser_flow':
         return False, 'needs Chrome open (regress.py --browser): by hand'

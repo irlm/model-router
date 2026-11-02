@@ -17,13 +17,22 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / 'common'))
 import harness  # noqa: E402
 
-PROMPT = """Answer this question by looking it up on the web, not from memory:
+PROMPT = {
+ 'a': """Answer this question by looking it up on the web, not from memory:
 
 {question}
 
 Use web search and read the page(s) that state the answer; prefer the official documentation or the primary source. Then reply with ONLY a JSON object:
 {{"answer": "<the value, short>", "sources": ["<url>", ...]}}
-where every url is a page you actually read in this session that states the answer. Do not list a page you did not read."""
+where every url is a page you actually read in this session that states the answer. Do not list a page you did not read.""",
+ 'b': """I need this settled from a source, not from memory:
+
+{question}
+
+Search the web, open the official documentation or the primary source, and read where it states the answer. Your whole reply is one JSON object and nothing else:
+{{"answer": "<short value>", "sources": ["<url>", ...]}}
+with only the pages you really opened in this session that state the answer.""",
+}
 TOOLS = 'WebSearch WebFetch'
 
 
@@ -33,6 +42,7 @@ def main():
     ap.add_argument('--effort', required=True, choices=['low', 'medium', 'high', 'xhigh', 'max'])
     ap.add_argument('--ids', nargs='*', default=None)
     ap.add_argument('--trial', type=int, default=1)
+    ap.add_argument('--prompt-variant', default='a', choices=['a', 'b'])
     ap.add_argument('--max-turns', type=int, default=12)
     ap.add_argument('--timeout', type=int, default=600)
     ap.add_argument('--harness', default='claude', choices=['claude'])
@@ -54,7 +64,7 @@ def main():
         for task in tasks:
             if task['id'] in done:
                 continue
-            prompt = PROMPT.format(question=task['question'])
+            prompt = PROMPT[args.prompt_variant].format(question=task['question'])
             start = time.perf_counter()
             try:
                 reply = harness.run(args.harness, prompt, args.model, args.effort, args.max_turns, TOOLS, args.timeout, cwd)
@@ -62,7 +72,8 @@ def main():
                 reply = {'text': '', 'usage': None, 'cost_usd': None, 'operational_error': type(error).__name__}
             if not reply.get('operational_error') and not (reply.get('text') or '').strip():
                 reply['operational_error'] = 'empty-response'
-            record = {'id': task['id'], 'family': 'web_research', 'bench': 'web_research', 'arm': 'T', 'variant': 'noexec',
+            record = {'id': task['id'], 'family': 'web_research', 'bench': 'web_research' + ('' if args.prompt_variant == 'a' else '_p' + args.prompt_variant),
+                      'arm': 'T', 'variant': 'noexec', 'prompt_variant': args.prompt_variant,
                       'model_requested': args.model, 'effort': args.effort, 'harness': args.harness, 'trial': args.trial,
                       'tools': TOOLS, 'max_turns': args.max_turns, 'prompt_chars': len(prompt),
                       'wall_seconds': round(time.perf_counter() - start, 2), **reply}

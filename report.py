@@ -44,7 +44,7 @@ FF_TASK_FILES = [HERE / 'bench/find_feature/tasks/lexical.json',
                  HERE / 'bench/find_feature/tasks/semantic.json']
 SUCCESS = {'find_feature': {'correct'}, 'fix_bug': {'fixed'}, 'fix_bug_hard': {'fixed'},
            'write_tests': {'catches-bug'}, 'browser_flow': {'correct'}, 'own_app_flow': {'correct'},
-           'repo_fix': {'fixed'}, 'repo_fix_pb': {'fixed'}, 'web_research': {'correct'}}
+           'repo_fix': {'fixed'}, 'repo_fix_pb': {'fixed'}, 'web_research': {'correct'}, 'web_research_pb': {'correct'}, 'research_synthesis': {'correct'}, 'research_synthesis_pb': {'correct'}}
 # Outcomes the harness caused, not the model's judgement (a lost browser tab, a CLI
 # failure). In use these runs are retried; decide.py leaves them out of the rate.
 NOT_MODEL = {'operational', 'incomplete'}
@@ -115,8 +115,9 @@ def load_cells(runs_dir, cat=None, cli_cost=False):
                 outcome, detail = ds_grade.grade_one(DS_TASKS[r['id']], r)
                 family = bench
             else:
-                key = f"{r['model_requested']} / {effort} / {r['trial']} / {r['id']}"
-                g = cached.get(bench, {}).get(key)
+                pv = r.get('prompt_variant', 'a')
+                key = f"{r['model_requested']} / {effort} / {r['trial']} / {r['id']}" + ('' if pv == 'a' else f' / p{pv}')
+                g = cached.get(f.parent.name, {}).get(key)   # the grades.json of the directory the receipt is in
                 outcome, detail = (g['outcome'], g['detail']) if g else ('ungraded', '')
                 family = bench
             cli = r.get('cost_usd')

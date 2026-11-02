@@ -41,6 +41,7 @@ CLAUDE = shutil.which('claude') or 'claude'   # PATH lookup: on Windows the CLI 
 ID_FOR = {alias: mid for mid, alias in decide.ALIAS.items()}
 TASK_FILES = {'find_feature': None, 'fix_bug_hard': 'bench/fix_bug/tasks-hard.json', 'write_tests': 'bench/write_tests/tasks.json',
               'repo_fix': 'bench/repo_fix/tasks.json', 'web_research': 'bench/web_research/tasks.json',
+              'research_synthesis': 'bench/research_synthesis/tasks.json',
               'browser_flow': 'bench/browser_flow/tasks.json'}
 
 
@@ -115,6 +116,7 @@ def main():
     ap.add_argument('--grade-slot', default='grade')
     ap.add_argument('--alpha', type=float, default=0.05)
     ap.add_argument('--no-prefix', action='store_true')
+    ap.add_argument('--prompt-variant', default='a', choices=['a', 'b'], help='b: the paraphrased prompt, where a family has one (web_research, research_synthesis, repo_fix); the spread between a and b is the prompt-robustness check')
     ap.add_argument('--tag', default=None)
     args = ap.parse_args()
     version = claude_version()
@@ -151,6 +153,8 @@ def main():
         ids = sorted(random.Random(args.seed).sample(task_ids(bench), min(args.sample, len(task_ids(bench)))))
         out = out_root / bench
         common = ['--model', model, '--effort', effort, '--ids', *ids, '--out', str(out), '--trial', '1']
+        if bench in ('web_research', 'research_synthesis', 'repo_fix'):
+            common += ['--prompt-variant', args.prompt_variant]
         if bench == 'find_feature':
             run = [PY, 'bench/find_feature/run_agent.py', *common]
             grade = None
@@ -171,6 +175,9 @@ def main():
         elif bench == 'web_research':
             run = [PY, 'bench/web_research/run_agent.py', *common]
             grade = [PY, 'bench/web_research/grade.py', '--runs', str(out)]
+        elif bench == 'research_synthesis':
+            run = [PY, 'bench/research_synthesis/run_agent.py', *common]
+            grade = [PY, 'bench/research_synthesis/grade.py', '--runs', str(out)]
         elif bench == 'browser_flow':
             run = [PY, 'bench/browser_flow/run_agent.py', *common]
             grade = None
@@ -182,7 +189,7 @@ def main():
         if grade:
             subprocess.run(grade, cwd=str(HERE), check=False)
         cells = report.load_cells(out_root)
-        rows = [x for (b, m, e, t), rs in cells.items() if b == bench for x in rs]
+        rows = [x for (b, m, e, t), rs in cells.items() if b in (bench, bench + '_p' + args.prompt_variant) for x in rs]
         judged = [x for x in rows if x['outcome'] not in report.NOT_MODEL]
         n, s = len(judged), sum(1 for x in judged if x['outcome'] in report.SUCCESS[bench])
         cost = sum(x['cost'] or 0 for x in rows)
@@ -194,7 +201,8 @@ def main():
             tail = binom_tail(n, s, p0_lo)
             verdict = 'REGRESSED' if tail < args.alpha else 'ok'
             dec = f"{ev['success']}/{ev['n'] - ev['not_model']} ({p0_lo:.2f}-{p0_hi:.2f})"
-        lines.append(f"| {fam} | {d['model']} {effort}{' +' + variant if variant else ''} | {n} | {s} | {dec} | {'-' if tail is None else f'{tail:.2f}'} | {verdict} | {cost:.3f} |")
+        pv = '' if args.prompt_variant == 'a' else f' (prompt {args.prompt_variant})'
+        lines.append(f"| {fam} | {d['model']} {effort}{' +' + variant if variant else ''}{pv} | {n} | {s} | {dec} | {'-' if tail is None else f'{tail:.2f}'} | {verdict} | {cost:.3f} |")
         print(lines[-1], flush=True)
     text = '\n'.join(lines) + '\n'
     (HERE / 'ledger').mkdir(exist_ok=True)

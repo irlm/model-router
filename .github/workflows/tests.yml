@@ -1,0 +1,25 @@
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  python:
+    # The data side of the widget and the runners' command lines, on the two platforms the widget runs on.
+    # The mod itself (claude plugin test mod) needs the engine's types, which only a Claude Code session writes.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.13']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Every script compiles
+        run: python -m compileall -q tools bench catalog apply_agents.py regress.py report.py decide.py
+      - name: Data side (classifier, suggestions, per-change savings)
+        run: python tools/test_status.py
+      - name: Runner command lines
+        run: python bench/common/test_harness.py

@@ -27,6 +27,8 @@ const JOBS: Record<string, { title: string; argv: (python: string, clone: boolea
 // Python reads and writes UTF-8 everywhere (transcripts, ledger, git output), also on Windows,
 // where its default is the console code page.
 const PY_ENV = { PYTHONUTF8: '1' }
+/** The scripts' environment; in the install's clone, MODEL_ROUTER_CLONE tells status.py its local results are uncommitted on purpose. */
+const pyEnv = () => ({ ...PY_ENV, ...(where ? { MODEL_ROUTER_CLONE: '1' } : {}) })
 
 const clock = (ms: number) => {
   const d = new Date(ms)
@@ -117,7 +119,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     lines.push(line(`since ${when(r.since)} (${r.kind}: ${r.what})${r.days ? `, ${r.days} days` : ''}: ${saidSaved(r.saved)}${r.projected != null ? ` · projected ${money(r.projected)} per ${u?.days ?? 30}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
       { color: savedColor(r.saved), bold: true }))
   } else if (full) {
-    lines.push(line('no change recorded yet: Apply agents, /router routing auto and /router mark <note> start the before/after count', { dim: true }))
+    lines.push(line('no change recorded yet: Apply agents (when it changes a file), /router routing auto and /router mark <note> start the before/after count', { dim: true }))
   }
   lines.push(BLANK, line(`${'family'.padEnd(13)}${'default'.padEnd(19)}${'ok'.padEnd(11)}${'evidence'.padEnd(9)}${'$/ok'.padEnd(8)}${'here'.padEnd(5)}last check`, { bold: true }))
   for (const f of s.families) {
@@ -149,9 +151,12 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     for (const r of u.main_rows.slice(0, 6)) {
       lines.push(line(`  ${r.model.padEnd(30)}${r.effort.padEnd(8)}${bar(top > 0 ? r.cost / top : 0, 20)} ${money(r.cost).padStart(5)}  ${String(r.msgs).padStart(5)} msgs`))
     }
+    if (u.main_rows.some(r => r.effort === '?')) lines.push(line('  effort ? = not recorded in the transcript: the default effort of the session at the time', { dim: true }))
     for (const [cls, b] of Object.entries(u.by_class).sort((a, b) => b[1].cost - a[1].cost)) {
-      const types = Object.entries(b.types).map(([t, n]) => `${t} x${n}`).join(', ')
-      lines.push(line(`  ${('agents ' + cls).padEnd(30)}${''.padEnd(8)}${bar(top > 0 ? b.cost / top : 0, 20)} ${money(b.cost).padStart(5)}  ${String(b.n).padStart(5)} calls  ${types}`))
+      const types = Object.entries(b.types).sort((a, b) => b[1] - a[1])
+      const shown = types.slice(0, 3).map(([t, n]) => `${t} x${n}`).join(', ') + (types.length > 3 ? ` +${types.length - 3} more` : '')
+      lines.push(line(`  ${('agents ' + cls).padEnd(30)}${''.padEnd(8)}${bar(top > 0 ? b.cost / top : 0, 20)} ${money(b.cost).padStart(5)}  ${String(b.n).padStart(5)} calls${b.last ? `  last ${b.last.slice(0, 10)}` : ''}`))
+      lines.push(line(`${''.padEnd(40)}${shown}`, { dim: true }))
     }
   }
   if (r && full) {
@@ -252,7 +257,7 @@ async function refresh($: Dollar, fetch = false) {
     }
     const py = await findPython($)
     const argv = [py, 'tools/status.py', '--json', ...(fetch ? ['--fetch'] : [])]
-    const r = await $.process.run(argv, { cwd: repo, env: PY_ENV, timeoutMs: 180000 })
+    const r = await $.process.run(argv, { cwd: repo, env: pyEnv(), timeoutMs: 180000 })
     if (r.exitCode !== 0) throw new Error(`status.py exit ${r.exitCode}: ${r.stderr.trim().split('\n').pop() ?? ''}`)
     const json = JSON.parse(r.stdout) as StatusJson
     const rateLimits = await readLimits($)
@@ -271,7 +276,7 @@ async function recordChange($: Dollar, kind: string, detail: string, projected?:
   try {
     const py = await findPython($)
     const argv = [py, 'tools/changes.py', 'add', kind, detail, ...(projected ? ['--projected', projected.toFixed(2)] : [])]
-    const r = await $.process.run(argv, { cwd: repo, env: PY_ENV, timeoutMs: 20000 })
+    const r = await $.process.run(argv, { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
     if (r.exitCode !== 0) throw new Error(r.stderr.trim().split('\n').pop() ?? `exit ${r.exitCode}`)
   } catch (err) {
     $.ui.toast(`router: could not record the change: ${err instanceof Error ? err.message : String(err)}`)
@@ -303,7 +308,7 @@ async function runJob($: Dollar, name: string) {
     const append = (text: string) =>
       update($, job, j => (j ? { ...j, lines: [...j.lines, ...text.split('\n')].slice(-400) } : j))
     try {
-      const child = $.process.spawn({ argv, cwd: repo, env: PY_ENV })
+      const child = $.process.spawn({ argv, cwd: repo, env: pyEnv() })
       for await (const piece of child) {
         rest += piece.text
         const cut = rest.lastIndexOf('\n')

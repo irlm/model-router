@@ -42,8 +42,10 @@ EFFORT_RATIO = {'xhigh': {'claude-opus-5-5': 1.30, 'claude-fable-5-1': 1.52}, 'h
 OPUS_OVER_FABLE = (0.37, 0.40)
 WEB_RESEARCHER_COST = 0.022   # Haiku low per fact lookup, 76/78 correct (results/cell8)
 FIND_FEATURE_COST = 0.0046    # Haiku low per code search, 214/216 found (routing.json evidence)
+BROWSER_FLOW_COST = 0.0367    # Haiku low per browser flow, 63/63 on the toy app (routing.json evidence)
+SUGGESTION_FLOOR = 0.5        # a known saving below this many dollars per window is not worth a line
 # Which measured family stands behind each class of Agent call the consumption scan sees.
-CLASS_FAMILY = {'code-explore': 'find_feature', 'fact-lookup': 'web_research', 'code-change': 'repo_fix'}
+CLASS_FAMILY = {'code-explore': 'find_feature', 'fact-lookup': 'web_research', 'browser-flow': 'browser_flow', 'code-change': 'repo_fix'}
 AGENTS_DIR = Path.home() / '.claude/agents'
 UNUSED_DIR = Path.home() / '.claude/agents.unused'
 
@@ -233,10 +235,11 @@ def suggest(usage, agents):
     bc = usage['subagents']['by_class']
     fl = bc.get('fact-lookup')
     if fl and any(t != 'Web Researcher' for t in fl['types']):
-        n = sum(v for t, v in fl['types'].items() if t != 'Web Researcher')
+        others = {t: v for t, v in fl['types'].items() if t != 'Web Researcher'}
+        n = sum(others.values())
         cost = fl['cost']
         out.append({'id': 'lookups', 'kind': 'measured', 'stake': cost, 'saving': [round(max(0.0, cost - n * WEB_RESEARCHER_COST), 2)] * 2,
-                    'title': f"{n} fact lookups ran on general-purpose agents (${cost:.2f})",
+                    'title': f"{n} fact lookups ran on {', '.join(f'{t} x{v}' for t, v in sorted(others.items(), key=lambda kv: -kv[1]))} (${cost:.2f}, last {fl['last'][:10]})",
                     'basis': f'web_research family: Haiku low 76/78 correct with sources at ${WEB_RESEARCHER_COST} each (results/cell8)',
                     'action': 'ask for the Web Researcher agent for lookups (model haiku, effort low in ~/.claude/agents/web-researcher.md)'})
     # 3. code searches that ran above haiku: the find_feature family covers them, the widget routes them
@@ -245,9 +248,18 @@ def suggest(usage, agents):
     if dear:
         n = sum(v['n'] for v in dear.values()); cost = round(sum(v['cost'] for v in dear.values()), 2)
         out.append({'id': 'explore', 'kind': 'measured', 'stake': cost, 'saving': [round(max(0.0, cost - n * FIND_FEATURE_COST), 2)] * 2,
-                    'title': f"{n} code searches above haiku (${cost:.2f} on {', '.join(m.removeprefix('claude-') for m in sorted(dear))})",
+                    'title': f"{n} code searches above haiku (${cost:.2f} on {', '.join(m.removeprefix('claude-') for m in sorted(dear))}, last {ce['last'][:10]})",
                     'basis': f'find_feature family: Haiku low found 214/216 at ${FIND_FEATURE_COST} per search; the widget routes Explore calls when routing is ask or auto',
                     'action': '/router routing auto, so these calls run on haiku low without asking (or pick the measured option when the router asks)'})
+    # 3b. browser flows that ran above haiku: the browser_flow family covers them, the widget routes them
+    bf = bc.get('browser-flow')
+    dear = {m: v for m, v in (bf or {}).get('models', {}).items() if m != '?' and not m.startswith('claude-haiku')}
+    if dear:
+        n = sum(v['n'] for v in dear.values()); cost = round(sum(v['cost'] for v in dear.values()), 2)
+        out.append({'id': 'browser', 'kind': 'measured', 'stake': cost, 'saving': [round(max(0.0, cost - n * BROWSER_FLOW_COST), 2)] * 2,
+                    'title': f"{n} browser flows above haiku (${cost:.2f} on {', '.join(m.removeprefix('claude-') for m in sorted(dear))}, last {bf['last'][:10]})",
+                    'basis': f'browser_flow family: Haiku low drove 63/63 checklist flows at ${BROWSER_FLOW_COST} each, and 28/30 on a real store; the widget routes browser flows when routing is ask or auto',
+                    'action': '/router routing auto, so browser flows run on haiku low without asking; or set model haiku, effort low in the agent file that drives them'})
     # 4. research synthesis: the stake is known, no cheaper model is
     rs = bc.get('research-synthesis')
     if rs and rs['n']:
@@ -265,7 +277,7 @@ def suggest(usage, agents):
                     'basis': 'on the measured families Opus 5.5 matched Fable (24/24 and 26/26) at 37-40% of the cost (results/cell8); '
                              'main-session work is not measured, so the saving is what it would be if that held',
                     'action': 'try `claude --model opus` for routine sessions and compare the next ledger; keep Fable where you see the difference'})
-    return out
+    return [g for g in out if g['saving'] is None or g['saving'][1] >= SUGGESTION_FLOOR]
 
 
 def realized_savings(usage, events, families):
@@ -360,7 +372,7 @@ def collect(fetch=False):
         advice.append(f"prices verified {age} days ago ({oldest}): check the sources in catalog/models.json, then decide.py")
     if git.get('behind'):
         advice.append(f"repo is {git['behind']} commit(s) behind origin: /router pull")
-    if git.get('dirty'):
+    if git.get('dirty') and not os.environ.get('MODEL_ROUTER_CLONE'):   # the install's clone keeps local results uncommitted on purpose
         advice.append(f"{git['dirty']} uncommitted change(s) in the repo")
     for a in agents['routed']:
         if a['state'] == 'missing':
@@ -388,7 +400,7 @@ def collect(fetch=False):
             'usage': {'days': usage['days'], 'since': usage['since'], 'main_total': usage['main']['total'], 'main_out_cost': usage['main']['out_cost'],
                       'main_rows': [{k: r[k] for k in ('model', 'effort', 'msgs', 'cost', 'out_cost')} for r in usage['main']['rows'] if r['cost'] >= 0.5 or r['model'].endswith('(no price)')],
                       'subagents_total': usage['subagents']['total'], 'subagent_calls': len(usage['subagents']['calls']),
-                      'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types'], 'models': v.get('models', {})} for k, v in usage['subagents']['by_class'].items()},
+                      'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types'], 'models': v.get('models', {}), 'last': v.get('last', '')} for k, v in usage['subagents']['by_class'].items()},
                       'daily': usage.get('daily', []),
                       'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
             'suggestions': suggestions, 'changes': {'events': events[-5:], 'realized': realized},

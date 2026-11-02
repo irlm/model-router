@@ -57,8 +57,10 @@ def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=Fa
     if chrome:
         cmd.insert(2, '--chrome')
     proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, encoding='utf-8', errors='replace', capture_output=True, timeout=timeout)
+    # The JSON starts at the first brace: a tool manager (mise) may print its own notice line before it.
+    start = proc.stdout.find('{')
     try:
-        data = json.loads(proc.stdout)
+        data = json.loads(proc.stdout[start:] if start >= 0 else proc.stdout)
     except ValueError:
         return {'harness': 'claude', 'text': proc.stdout[-2000:], 'stderr': proc.stderr[-500:],
                 'usage': None, 'cost_usd': None, 'operational_error': 'invalid-endpoint-response'}

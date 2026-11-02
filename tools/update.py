@@ -52,7 +52,14 @@ def main():
         sys.exit(f'regress.py exit {r.returncode}, new entries: {[p.name for p in new]}')
     entry = new[-1]
     print()
-    print(entry.read_text(encoding='utf-8'))
+    text = entry.read_text(encoding='utf-8')
+    print(text)
+    judged = [l for l in text.splitlines() if l.startswith('| ') and not l.startswith('| Family') and 'nothing judged' not in l]
+    if not judged:
+        # Every task failed to run (a broken CLI, no network, a tool manager's notice in the JSON): not evidence of anything.
+        for p in (entry, HERE / 'runs/regress' / entry.stem[len('regress-'):]):
+            shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
+        sys.exit('the check judged nothing (every run failed): entry discarded, nothing committed; run one task by hand to see why')
     if args.no_commit:
         return
     git = shutil.which('git') or 'git'

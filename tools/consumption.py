@@ -36,14 +36,24 @@ LOOKUP = ('what is the', 'which version', 'latest version', 'look up', 'find out
 SYNTHESIS = ('research', 'compare', 'comparison', 'report', 'compile', 'deep dive', 'survey', 'landscape', 'fact-dense',
              'summarize the', 'write up', 'notes that let')
 CODE = ('fix', 'implement', 'refactor', 'write tests', 'bug', 'add a', 'change the', 'migrate', 'failing test')
+BROWSER = ('in the browser', 'chrome', 'web page', 'the page at', 'fill the form', 'fill in the form', 'click', 'sign in', 'log in',
+           'navigate to', 'open http', 'checklist', 'pass/fail')   # the same list the widget's router uses
 
 
 def classify(subagent_type, prompt):
+    """The kind of work an Agent call is, by agent type first, then by its prompt. code-explore, fact-lookup
+    and browser-flow are measured families (tools/status.py CLASS_FAMILY); the rest are not, and no suggestion
+    downgrades them."""
     p = (prompt or '').lower()
-    if subagent_type in ('Explore', 'Plan', 'Codebase Onboarding Engineer'):
-        return 'code-explore'
+    t = (subagent_type or '').lower()
     if subagent_type == 'Web Researcher':
         return 'fact-lookup'
+    if subagent_type in ('Explore', 'Plan', 'Codebase Onboarding Engineer'):
+        return 'code-explore'
+    if 'browser' in t or subagent_type == 'Evidence Collector' or sum(k in p for k in BROWSER) >= 2:
+        return 'browser-flow'
+    if 'review' in t:
+        return 'code-review'
     if len(p) < 900 and any(k in p for k in LOOKUP):
         return 'fact-lookup'
     if any(k in p for k in SYNTHESIS):
@@ -140,13 +150,14 @@ def collect(days=30, now=None, split=None):
                 out.append({'model': model, 'effort': eff, 'msgs': n, **{k: tok[(w, where, model, eff)][k] for k in TOKENS},
                             'cost': round(cost[(w, where, model, eff)], 2), 'out_cost': round(out_cost[(w, where, model, eff)], 2)})
         return out
-    by_class = collections.defaultdict(lambda: {'n': 0, 'cost': 0.0, 'types': collections.Counter(), 'unpriced': 0,
+    by_class = collections.defaultdict(lambda: {'n': 0, 'cost': 0.0, 'types': collections.Counter(), 'unpriced': 0, 'last': '',
                                                 'models': collections.defaultdict(lambda: {'n': 0, 'cost': 0.0})})
     for c in calls.values():
         if c['window'] != 'cur':
             continue
         b = by_class[c['class']]; b['n'] += 1; b['types'][c['type']] += 1
         bm = b['models'][c['model'] or '?']; bm['n'] += 1; bm['cost'] += c['cost'] or 0.0
+        b['last'] = max(b['last'], c['ts'])
         if c['cost'] is None:
             b['unpriced'] += 1
         else:

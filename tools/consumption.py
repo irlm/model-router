@@ -63,9 +63,10 @@ def classify(subagent_type, prompt):
     return 'other'
 
 
-def collect(days=30, now=None, split=None):
-    """The window's consumption; with `split` (an ISO UTC time), the current window is also cut into the
-    phases before and after it, so a change made then can be measured (tools/status.py)."""
+def collect(days=30, now=None, splits=None):
+    """The window's consumption; with `splits` (sorted ISO UTC times, the recorded changes), the current
+    window is also cut into segments between them, so each change can be measured in its own window
+    (tools/status.py realized_savings): segment i is the stretch before change i, segment i+1 the one after."""
     now = now or datetime.datetime.now(datetime.timezone.utc)
     since_cur = (now - datetime.timedelta(days=days)).isoformat()
     since_prev = (now - datetime.timedelta(days=2 * days)).isoformat()
@@ -75,7 +76,7 @@ def collect(days=30, now=None, split=None):
     agent_of = {}                                            # tool_use_id -> agentId
     agent_cost = collections.Counter(); agent_model = {}
     daily = collections.Counter()                            # day -> catalog $ (main and subagents)
-    pmsgs = collections.Counter(); pcost = collections.Counter()   # (phase, where, model, effort) when split is set
+    pmsgs = collections.Counter(); pcost = collections.Counter()   # (segment, where, model, effort) when splits are set
     seen = set()
     files = 0
     for f in ROOT.glob('**/*.jsonl'):
@@ -116,8 +117,8 @@ def collect(days=30, now=None, split=None):
                         msgs[key] += 1; cost[key] += c; out_cost[key] += oc
                         if window == 'cur':
                             daily[ts[:10]] += c
-                            if split:
-                                pk = ('after' if ts >= split else 'before', 'sub' if is_sub else 'main', model, effort or '?')
+                            if splits:
+                                pk = (sum(1 for sp in splits if ts >= sp), 'sub' if is_sub else 'main', model, effort or '?')
                                 pmsgs[pk] += 1; pcost[pk] += c
                     if is_sub and r.get('agentId'):
                         agent_cost[r['agentId']] += c; agent_model[r['agentId']] = model
@@ -166,15 +167,15 @@ def collect(days=30, now=None, split=None):
         b['cost'] = round(b['cost'], 2); b['types'] = dict(b['types'])
         b['models'] = {m: {'n': v['n'], 'cost': round(v['cost'], 4)} for m, v in b['models'].items()}
     day_list = [(now - datetime.timedelta(days=i)).date().isoformat() for i in range(days - 1, -1, -1)]
-    def phase(ph):
+    def segment(i):
         prow = [{'model': m, 'effort': e, 'msgs': n, 'cost': round(pcost[(p, w, m, e)], 2)}
-                for (p, w, m, e), n in sorted(pmsgs.items(), key=lambda kv: -pcost[kv[0]]) if p == ph and w == 'main']
-        return {'main_rows': prow, 'main_total': round(sum(v for k, v in pcost.items() if k[0] == ph and k[1] == 'main'), 2),
-                'main_msgs': sum(v for k, v in pmsgs.items() if k[0] == ph and k[1] == 'main')}
+                for (p, w, m, e), n in sorted(pmsgs.items(), key=lambda kv: -pcost[kv[0]]) if p == i and w == 'main']
+        return {'main_rows': prow, 'main_total': round(sum(v for k, v in pcost.items() if k[0] == i and k[1] == 'main'), 2),
+                'main_msgs': sum(v for k, v in pmsgs.items() if k[0] == i and k[1] == 'main')}
     sub_total = {w: round(sum(v for k, v in cost.items() if k[0] == w and k[1] == 'sub'), 2) for w in ('cur', 'prev')}
     main_total = {w: round(sum(v for k, v in cost.items() if k[0] == w and k[1] == 'main'), 2) for w in ('cur', 'prev')}
     return {'days': days, 'since': since_cur[:10], 'files': files, 'daily': [{'date': d, 'cost': round(daily[d], 2)} for d in day_list],
-            'split': split, 'phases': {'before': phase('before'), 'after': phase('after')} if split else None,
+            'splits': splits, 'segments': [segment(i) for i in range(len(splits) + 1)] if splits else None,
             'main': {'rows': rows('cur'), 'total': main_total['cur'], 'out_cost': round(sum(v for k, v in out_cost.items() if k[0] == 'cur' and k[1] == 'main'), 2)},
             'subagents': {'calls': sorted((c for c in calls.values() if c['window'] == 'cur'), key=lambda c: c['ts']),
                           'by_class': dict(by_class), 'total': sub_total['cur']},

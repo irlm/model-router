@@ -24,7 +24,11 @@ const STATUS = {
   suggestions: [{ id: 'effort', kind: 'extrapolated', title: 'main sessions at high/xhigh effort: $225 in 30 days', stake: 225,
     saving: [72, 72], basis: 'results/cell8 sweep', action: 'claude --effort low' }],
   changes: { events: [{ at: '2026-10-30T10:00Z', kind: 'apply', detail: 'agents: web-researcher.md', projected: 25 }],
-    realized: { since: '2026-10-30T10:00Z', kind: 'apply', what: 'agents: web-researcher.md', projected: 25, days: 2,
+    history: [{ since: '2026-10-30T10:00Z', until: null, span: '2.0 days', kind: 'apply', what: 'agents: web-researcher.md', projected: 25, days: 2, classes: [],
+      main: { before: { msgs: 1, cost: 1, per_msg: 1 }, after: { msgs: 1, cost: 1, per_msg: 1 }, saved: 0, rows: [] }, saved: 12.59 },
+      { since: '2026-10-28T09:00Z', until: '2026-10-30T10:00Z', span: '2.0 days', kind: 'mark', what: 'effort low', projected: null, days: 4, classes: [],
+      main: { before: { msgs: 100, cost: 12, per_msg: 0.12 }, after: { msgs: 100, cost: 13.2, per_msg: 0.132 }, saved: -1.2, rows: [] }, saved: -1.2 }],
+    realized: { since: '2026-10-30T10:00Z', until: null, span: '2.0 days', kind: 'apply', what: 'agents: web-researcher.md', projected: 25, days: 2,
       classes: [{ class: 'code-explore', family: 'find_feature', saved: 7.69, check: { sample: '6', successes: '6', verdict: 'ok' },
         before: { n: 16, cost: 24.71, per_call: 1.544, models: { 'claude-opus-5-5': 16 } }, after: { n: 5, cost: 0.03, per_call: 0.006, models: { 'claude-haiku-5-5': 5 } } }],
       main: { before: { msgs: 2000, cost: 234, per_msg: 0.117 }, after: { msgs: 140, cost: 11.48, per_msg: 0.082 }, saved: 4.9, rows: [] }, saved: 12.59 } },
@@ -60,7 +64,8 @@ test('/router check prints the table and the status line counts the advice', asy
   expect(text).toContain('find_feature haiku low          ██████████ 214/216  0.0046  yes  ok 6/6')
   expect(text).toContain('spend 30d ▂▃▅▆█ $592 (main $517, agents $75) · prev $500')
   expect(text).toContain('agents: 6 files, 179 unused; routed 1/1 applied, 1 not on this machine')
-  expect(text).toContain('(apply: agents: web-researcher.md), 2 days: saved $13 · projected $25 per 30d · regress find_feature ok')
+  expect(text).toContain('(apply: agents: web-researcher.md), 2.0 days so far: saved $13 · projected $25 per 30d · regress find_feature ok')
+  expect(text).toContain('(mark: effort low) · 2.0 days: cost up $1.20')
   expect(text).toContain('code-explore       before 16 calls $1.54/call (opus-5-5 x16) · after 5 calls $0.0060/call (haiku-5-5 x5) · saved $7.69 · find_feature regress ok 6/6')
   expect(text).toContain('main sessions      before 2000 msgs $0.1170/msg · after 140 msgs $0.0820/msg · saved $4.90')
   expect((await $.command.run({ ...RUN, command: 'router', args: 'mark effort low from today' })).text).toContain('change recorded: effort low from today')

@@ -120,8 +120,9 @@ Details shows the per-class and main-session lines.
 A change is recorded in `~/.claude/model-router/changes.jsonl` (never in the repository) by Apply
 agents when it writes a file, by `/router routing auto` or "Always route this session", and by
 `/router mark <note>` for changes the widget does not make itself, such as `claude --effort low`
-or `claude --model opus` from today. The count starts at the latest change; `python3
-tools/changes.py list` prints them.
+or `claude --model opus` from today. Each change is measured in its own window: from it to the next change (or to now), against the
+stretch before it back to the previous change. The pane line shows the latest; Details lists the
+earlier ones with their own numbers. `python3 tools/changes.py list` prints the log.
 
 ### Windows
 

@@ -124,7 +124,8 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   const r = s.changes?.realized
   if (r) {
     const checks = r.classes.filter(c => c.family && c.check).map(c => `${c.family} ${c.check!.verdict}`)
-    lines.push(line(`since ${when(r.since)} (${r.kind}: ${r.what})${r.days ? `, ${r.days} days` : ''}: ${saidSaved(r.saved)}${r.projected != null ? ` · projected ${money(r.projected)} per ${u?.days ?? 30}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
+    const span = r.span ? `, ${r.span}${r.until ? ' until the next change' : ' so far'}` : r.days ? `, ${r.days} days` : ''
+    lines.push(line(`since ${when(r.since)} (${r.kind}: ${r.what})${span}: ${saidSaved(r.saved)}${r.projected != null ? ` · projected ${money(r.projected)} per ${u?.days ?? 30}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
       { color: savedColor(r.saved), bold: true }))
   } else if (full) {
     lines.push(line('no change recorded yet: Apply agents (when it changes a file), /router routing auto and /router mark <note> start the before/after count', { dim: true }))
@@ -178,6 +179,13 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     lines.push(line(`  ${'main sessions'.padEnd(19)}before ${ms(r.main.before)} · after ${ms(r.main.after)} · ${saidSaved(r.main.saved)} (same unit, a message; the mix of work may differ)`, { color: savedColor(r.main.saved) }))
     for (const row of r.main.rows.slice(0, 4)) {
       lines.push(line(`    ${row.model.replace(/^claude-/, '')} ${row.effort}: ${row.before ? ms(row.before) : '-'} -> ${row.after ? ms(row.after) : '-'}`, { dim: true }))
+    }
+    const earlier = (s.changes?.history ?? []).slice(1, 6)
+    if (earlier.length) {
+      lines.push(line('  earlier changes, each measured in its own window (from the change to the next one):', { dim: true }))
+      for (const h of earlier) {
+        lines.push(line(`    ${when(h.since)} (${h.kind}: ${h.what})${h.span ? ` · ${h.span}` : ''}: ${saidSaved(h.saved)}${h.projected != null ? ` · projected ${money(h.projected)}` : ''}`, { color: savedColor(h.saved) }))
+      }
     }
   }
   // Suggestions: largest saving first, unknown last; each with its share of the window's spend.

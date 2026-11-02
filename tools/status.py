@@ -281,49 +281,63 @@ def suggest(usage, agents):
 
 
 def realized_savings(usage, events, families):
-    """What the transcripts show since the last recorded change (tools/changes.py): the cost per unit of the
-    same work before and after it, times the units after it. The unit is one Agent call of a class, and
-    one main-session message. Positive is saved, negative is dearer. Next to each class, the family's last
-    regression verdict: the check that the cheaper model still does the work here."""
-    if not events or not usage.get('phases'):
+    """What the transcripts show for each recorded change (tools/changes.py), in its own window: from the
+    change to the next one (or now), against the stretch before it (back to the previous change, or the
+    window's start). The cost per unit of the same work on each side, times the units after: one Agent
+    call of a class, one main-session message. Positive is saved, negative is dearer. Beside each class,
+    the family's last regression verdict: the check that the cheaper model still does the work here."""
+    segs = usage.get('segments')
+    if not events or not segs:
         return None
-    ev = events[-1]
-    split = ev['at'][:16]
     checks = {f['name']: f.get('last_check') for f in families}
     calls = usage['subagents']['calls']
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     def side(cs):
         priced = [c for c in cs if c['cost'] is not None]
         return {'n': len(cs), 'cost': round(sum(c['cost'] or 0 for c in cs), 2),
                 'per_call': round(sum(c['cost'] for c in priced) / len(priced), 4) if priced else None,
                 'models': dict(collections.Counter(c['model'] or '?' for c in cs))}
-    classes = []
-    for cls in sorted({c['class'] for c in calls}):
-        before = side([c for c in calls if c['class'] == cls and c['ts'] < split])
-        after = side([c for c in calls if c['class'] == cls and c['ts'] >= split])
-        if not after['n']:
-            continue
-        saved = round((before['per_call'] - after['per_call']) * after['n'], 2) if before['per_call'] is not None and after['per_call'] is not None else None
-        fam = CLASS_FAMILY.get(cls)
-        classes.append({'class': cls, 'family': fam, 'before': before, 'after': after, 'saved': saved, 'check': checks.get(fam) if fam else None})
-    ph = usage['phases']
 
     def per_msg(p):
         return round(p['main_total'] / p['main_msgs'], 4) if p['main_msgs'] else None
-    pb, pa = per_msg(ph['before']), per_msg(ph['after'])
-    rb = {(r['model'], r['effort']): r for r in ph['before']['main_rows']}
-    ra = {(r['model'], r['effort']): r for r in ph['after']['main_rows']}
-    rows = [{'model': k[0], 'effort': k[1],
-             'before': {'msgs': rb[k]['msgs'], 'per_msg': round(rb[k]['cost'] / rb[k]['msgs'], 4)} if k in rb else None,
-             'after': {'msgs': ra[k]['msgs'], 'per_msg': round(ra[k]['cost'] / ra[k]['msgs'], 4)} if k in ra else None}
-            for k in sorted(set(rb) | set(ra), key=lambda k: -((ra.get(k) or rb.get(k))['cost']))]
-    main = {'before': {'msgs': ph['before']['main_msgs'], 'cost': ph['before']['main_total'], 'per_msg': pb},
-            'after': {'msgs': ph['after']['main_msgs'], 'cost': ph['after']['main_total'], 'per_msg': pa},
-            'saved': round((pb - pa) * ph['after']['main_msgs'], 2) if pb is not None and pa is not None else None, 'rows': rows}
-    saved = round(sum(c['saved'] or 0 for c in classes) + (main['saved'] or 0), 2)
-    return {'since': ev['at'], 'kind': ev['kind'], 'what': ev['detail'], 'projected': ev.get('projected'),
-            'days': days_since(ev['at'][:10], datetime.date.today()), 'classes': classes, 'main': main, 'saved': saved}
 
+    def span(a, b):
+        start = datetime.datetime.strptime(a[:16], '%Y-%m-%dT%H:%M').replace(tzinfo=datetime.timezone.utc)
+        end = datetime.datetime.strptime(b[:16], '%Y-%m-%dT%H:%M').replace(tzinfo=datetime.timezone.utc) if b else now
+        m = max(0, int((end - start).total_seconds() // 60))
+        return f'{m} min' if m < 120 else f'{m / 60:.1f} h' if m < 48 * 60 else f'{m / 1440:.1f} days'
+
+    windows = []
+    for i, ev in enumerate(events):
+        at, prev = ev['at'][:16], events[i - 1]['at'][:16] if i else ''
+        nxt = events[i + 1]['at'] if i + 1 < len(events) else None
+        classes = []
+        for cls in sorted({c['class'] for c in calls}):
+            before = side([c for c in calls if c['class'] == cls and prev <= c['ts'] < at])
+            after = side([c for c in calls if c['class'] == cls and c['ts'] >= at and (nxt is None or c['ts'] < nxt[:16])])
+            if not after['n']:
+                continue
+            saved = round((before['per_call'] - after['per_call']) * after['n'], 2) if before['per_call'] is not None and after['per_call'] is not None else None
+            fam = CLASS_FAMILY.get(cls)
+            classes.append({'class': cls, 'family': fam, 'before': before, 'after': after, 'saved': saved, 'check': checks.get(fam) if fam else None})
+        b, a = segs[i], segs[i + 1]
+        pb, pa = per_msg(b), per_msg(a)
+        rb = {(r['model'], r['effort']): r for r in b['main_rows']}
+        ra = {(r['model'], r['effort']): r for r in a['main_rows']}
+        rows = [{'model': k[0], 'effort': k[1],
+                 'before': {'msgs': rb[k]['msgs'], 'per_msg': round(rb[k]['cost'] / rb[k]['msgs'], 4)} if k in rb else None,
+                 'after': {'msgs': ra[k]['msgs'], 'per_msg': round(ra[k]['cost'] / ra[k]['msgs'], 4)} if k in ra else None}
+                for k in sorted(set(rb) | set(ra), key=lambda k: -((ra.get(k) or rb.get(k))['cost']))]
+        main = {'before': {'msgs': b['main_msgs'], 'cost': b['main_total'], 'per_msg': pb},
+                'after': {'msgs': a['main_msgs'], 'cost': a['main_total'], 'per_msg': pa},
+                'saved': round((pb - pa) * a['main_msgs'], 2) if pb is not None and pa is not None else None, 'rows': rows}
+        saved = round(sum(c['saved'] or 0 for c in classes) + (main['saved'] or 0), 2)
+        windows.append({'since': ev['at'], 'until': nxt, 'span': span(ev['at'], nxt), 'kind': ev['kind'], 'what': ev['detail'],
+                        'projected': ev.get('projected'), 'days': days_since(ev['at'][:10], datetime.date.today()),
+                        'classes': classes, 'main': main, 'saved': saved})
+    windows.reverse()
+    return {'latest': windows[0], 'history': windows}
 
 def collect(fetch=False):
     today = datetime.date.today()
@@ -351,8 +365,9 @@ def collect(fetch=False):
     timer = timer_state()
     for f in families:
         f['last_check'] = (reg or {}).get('rows', {}).get(f['name'])
-    events = changes.read()
-    usage = consumption.collect(USAGE_DAYS, split=events[-1]['at'] if events else None)
+    cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=USAGE_DAYS)).strftime('%Y-%m-%dT%H:%M')
+    events = [e for e in changes.read() if e.get('at', '') >= cutoff]   # a change older than the window has no before side here
+    usage = consumption.collect(USAGE_DAYS, splits=[e['at'] for e in events] or None)
     suggestions = suggest(usage, agents)
     realized = realized_savings(usage, events, families)
 
@@ -403,7 +418,8 @@ def collect(fetch=False):
                       'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types'], 'models': v.get('models', {}), 'last': v.get('last', '')} for k, v in usage['subagents']['by_class'].items()},
                       'daily': usage.get('daily', []),
                       'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
-            'suggestions': suggestions, 'changes': {'events': events[-5:], 'realized': realized},
+            'suggestions': suggestions,
+            'changes': {'events': events[-5:], 'realized': realized['latest'] if realized else None, 'history': realized['history'] if realized else []},
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}
 
 

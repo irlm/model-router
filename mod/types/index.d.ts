@@ -26,7 +26,7 @@ export type StatusJson = {
   advice: string[]
   usage?: Usage
   suggestions?: Suggestion[]
-  changes?: { events: Change[]; realized: Realized | null }
+  changes?: { events: Change[]; realized: Realized | null; history?: Realized[] }
 }
 
 /** The last 30 days of interactive work, catalog-priced: headroom on a subscription. */
@@ -64,6 +64,10 @@ export type RealizedMainSide = { msgs: number; cost: number; per_msg: number | n
 /** What the transcripts saved since the last change: cost per unit of the same work before vs after, times the units after. */
 export type Realized = {
   since: string
+  /** the next change, which closes this window; null while it runs to now */
+  until?: string | null
+  /** how long the window is, as text */
+  span?: string
   kind: string
   what: string
   projected?: number | null

@@ -145,6 +145,10 @@ shows what your own transcripts saved since it, per unit of the same work:
 - main sessions: cost per message before and after (same unit; the mix of work can differ, so
   read it as a trend, not a receipt), and the top model/effort rows.
 
+A number that cannot mean anything yet says so on its line: too few messages and calls after the
+change, or, for a change marked by hand, main sessions still on the same model and effort as
+before (the mark records the date; the effort or model changes when you start a session with
+`--effort low` or `--model opus`). The status line leaves such a number out.
 Next to each class stands the family's last regression verdict: the cheaper model still does the
 work here. Projected, realized, regress: three checks on one line of the pane, for example
 `since 2026-11-02 10:40 (apply: agents: web-researcher.md), 3 days: saved $7.70 · projected $25 per 30d · regress find_feature ok`.

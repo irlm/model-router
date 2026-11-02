@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Hook, Register } from 'claude-code'
 
-import type { Job, RateLimit, RealizedMainSide, RealizedSide, Routed, Status, StatusJson } from '../types'
+import type { Job, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, Status, StatusJson } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
 type RoutingMode = 'ask' | 'auto' | 'off'
@@ -50,7 +50,7 @@ const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: Statu
   const parts = [limitsText(limits)]
   if (routedN > 0) parts.push(`routed ${routedN}`)
   const r = s.changes?.realized
-  if (mode === 'full' && r && r.saved !== 0) parts.push(`${r.saved > 0 ? 'saved' : 'cost up'} ${money(Math.abs(r.saved))} since ${r.since.slice(5, 10)}`)
+  if (mode === 'full' && r && r.saved !== 0 && !caveats(r)) parts.push(`${r.saved > 0 ? 'saved' : 'cost up'} ${money(Math.abs(r.saved))} since ${r.since.slice(5, 10)}`)
   const upTo = savingsUpTo(s)
   if (mode === 'full' && upTo >= 1) parts.push(`${money(upTo)} to save`)
   if (s.advice.length > 0) parts.push(`${s.advice.length} to check`)
@@ -82,6 +82,16 @@ const when = (iso: string) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${clock(d.getTime())}`
 }
 const saidSaved = (n: number | null) => (n === null ? 'no basis' : `${n >= 0 ? 'saved' : 'cost up'} ${money(Math.abs(n))}`)
+/** What keeps a change's number from meaning anything yet: too few units, or a main-session change not in effect. */
+const caveats = (r: Realized) => {
+  const calls = r.classes.reduce((n, c) => n + c.after.n, 0)
+  const out: string[] = []
+  if (r.main.after.msgs < 50 && calls < 5) out.push(`too little yet: ${r.main.after.msgs} msgs, ${calls} agent calls`)
+  const top = (side: 'before' | 'after') => r.main.rows.filter(x => x[side]).sort((a, b) => (b[side]!.msgs - a[side]!.msgs))[0]
+  const tb = top('before'), ta = top('after')
+  if (r.kind === 'mark' && tb && ta && tb === ta) out.push('main sessions run on the same model and effort as before, so the change is not in effect')
+  return out.length ? ` (${out.join('; ')})` : ''
+}
 const savedColor = (n: number | null) => (n === null ? undefined : n > 0 ? 'green' : n < 0 ? 'yellow' : undefined)
 /** What the measured suggestions project per window: recorded with a routing change, to compare with what came. */
 const measuredProjected = (s: StatusJson | null | undefined) => (s?.suggestions ?? []).filter(g => g.kind === 'measured').reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
@@ -125,8 +135,8 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   if (r) {
     const checks = r.classes.filter(c => c.family && c.check).map(c => `${c.family} ${c.check!.verdict}`)
     const span = r.span ? `, ${r.span}${r.until ? ' until the next change' : ' so far'}` : r.days ? `, ${r.days} days` : ''
-    lines.push(line(`since ${when(r.since)} (${r.kind}: ${r.what})${span}: ${saidSaved(r.saved)}${r.projected != null ? ` · projected ${money(r.projected)} per ${u?.days ?? 30}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
-      { color: savedColor(r.saved), bold: true }))
+    lines.push(line(`since ${when(r.since)} (${r.kind}: ${r.what})${span}: ${saidSaved(r.saved)}${caveats(r)}${r.projected != null ? ` · projected ${money(r.projected)} per ${u?.days ?? 30}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
+      { color: caveats(r) ? undefined : savedColor(r.saved), bold: true, wrap: true }))
   } else if (full) {
     lines.push(line('no change recorded yet: Apply agents (when it changes a file), /router routing auto and /router mark <note> start the before/after count', { dim: true }))
   }
@@ -190,7 +200,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     if (earlier.length) {
       lines.push(line('  earlier changes, each measured in its own window (from the change to the next one):', { dim: true }))
       for (const h of earlier) {
-        lines.push(line(`    ${when(h.since)} (${h.kind}: ${h.what})${h.span ? ` · ${h.span}` : ''}: ${saidSaved(h.saved)}${h.projected != null ? ` · projected ${money(h.projected)}` : ''}`, { color: savedColor(h.saved) }))
+        lines.push(line(`    ${when(h.since)} (${h.kind}: ${h.what})${h.span ? ` · ${h.span}` : ''}: ${saidSaved(h.saved)}${caveats(h)}${h.projected != null ? ` · projected ${money(h.projected)}` : ''}`, { color: caveats(h) ? undefined : savedColor(h.saved), wrap: true }))
       }
     }
   }

@@ -75,6 +75,68 @@
     "Rates for prompts up to 100K tokens; 0.50 / 2.50 beyond."
    ]
   },
+  "claude-fable-5": {
+   "provider": "anthropic",
+   "tier": "frontier",
+   "input_per_mtok": 10.0,
+   "output_per_mtok": 50.0,
+   "cache_read_per_mtok": 1.0,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 1000000,
+   "verified_date": "2026-11-02",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+   "notes": [
+    "Cache hits $1 / MTok on the page (5.1: $0.25)."
+   ]
+  },
+  "claude-opus-5": {
+   "provider": "anthropic",
+   "tier": "large",
+   "input_per_mtok": 5.0,
+   "output_per_mtok": 25.0,
+   "cache_read_per_mtok": 0.5,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 1000000,
+   "verified_date": "2026-11-02",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+  },
+  "claude-opus-4-8": {
+   "provider": "anthropic",
+   "tier": "large",
+   "input_per_mtok": 5.0,
+   "output_per_mtok": 25.0,
+   "cache_read_per_mtok": 0.5,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 1000000,
+   "verified_date": "2026-11-02",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+  },
+  "claude-haiku-4-5-20251001": {
+   "provider": "anthropic",
+   "tier": "small",
+   "input_per_mtok": 1.0,
+   "output_per_mtok": 5.0,
+   "cache_read_per_mtok": 0.1,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 200000,
+   "verified_date": "2026-11-02",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+   "notes": [
+    "The dated id the transcripts carry; one rate for every prompt length."
+   ]
+  },
   "openai:gpt-6.1-sol": {
    "provider": "openai",
    "tier": "mid",

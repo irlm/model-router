@@ -12,6 +12,8 @@ const status = atom({ plugin: 'model-router', key: 'status' } as const, null, { 
 const job = atom({ plugin: 'model-router', key: 'job' } as const, null, { shape: 'job-1' })
 // routed-1: the Agent calls the router saw this session, newest last
 const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Routed[], { shape: 'routed-1' })
+// details-1: whether the pane shows the long sections (agents, dates, consumption, each suggestion's basis)
+const details = atom({ plugin: 'model-router', key: 'details' } as const, false, { shape: 'details-1' })
 
 // What the buttons and /router <verb> run, from the checkout's root. In the clone the plugin install
 // made (`clone`), nothing is committed: the ledger prints its entry, the re-check keeps its results local.
@@ -46,8 +48,9 @@ const statusLine = (s: StatusJson, limits: RateLimit[], at: number, routedN = 0)
   return `router: ${parts.filter(Boolean).join(' · ')} · /router · ${clock(at)}`
 }
 
-/** The pane's body and /router check's text: the same lines. */
-const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''): string[] => {
+/** The pane's body and /router check's text. `full` (the text, or the pane with Details on) adds the long
+ * sections; the pane's default is a glance: checkout, families, to check, one line per suggestion. */
+const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = '', full = true): string[] => {
   const g = s.repo
   const sync = !g.is_repo
     ? 'not a git checkout'
@@ -70,17 +73,19 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     lines.push(`${f.name.padEnd(13)}${d.padEnd(19)}${(f.rate ?? '-').padEnd(9)}${cost.padEnd(8)}${(f.can_run ? 'yes' : 'no').padEnd(5)}${last}`)
   }
   const applied = s.agents.routed.filter(r => r.state === 'applied').length
-  lines.push(
-    '',
-    `agents: ${s.agents.files} files, ${s.agents.unused} unused; routed ${applied}/${s.agents.routed.length} applied`,
-    `prices verified ${s.catalog.verified_oldest ?? '?'} (${s.catalog.age_days ?? '?'} days) · ledger: usage ${s.ledger.usage_last ?? 'none'}, regress ${reg?.date ?? 'none'} on ${reg?.claude ?? '-'}`,
-    `timer: ${s.timer.next ? 'next ' + s.timer.next : s.timer.note ?? 'none'}`,
-    '',
-  )
+  if (full) {
+    lines.push(
+      '',
+      `agents: ${s.agents.files} files, ${s.agents.unused} unused; routed ${applied}/${s.agents.routed.length} applied`,
+      `prices verified ${s.catalog.verified_oldest ?? '?'} (${s.catalog.age_days ?? '?'} days) · ledger: usage ${s.ledger.usage_last ?? 'none'}, regress ${reg?.date ?? 'none'} on ${reg?.claude ?? '-'}`,
+      `timer: ${s.timer.next ? 'next ' + s.timer.next : s.timer.note ?? 'none'}`,
+    )
+  }
+  lines.push('')
   if (s.advice.length === 0) lines.push('nothing to do')
   else lines.push('to check:', ...s.advice.map(a => `  - ${a}`))
   const u = s.usage
-  if (u) {
+  if (u && full) {
     lines.push(
       '',
       `consumption, last ${u.days} days since ${u.since} (catalog $ = headroom on a subscription):`,
@@ -95,14 +100,16 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     }
   }
   const sug = s.suggestions ?? []
-  lines.push('', sug.length === 0 ? 'suggestions: none from the last window' : 'suggestions (catalog $ per window; the kind says how far the evidence reaches):')
+  lines.push('', sug.length === 0 ? 'suggestions: none from the last window'
+    : full ? 'suggestions (catalog $ per window; the kind says how far the evidence reaches):' : 'suggestions (catalog $ per 30 days; Details for the basis):')
   for (const g of sug) {
     const sv = g.saving === null ? 'saving unknown' : g.saving[0] === g.saving[1] ? `saves $${g.saving[0].toFixed(0)}` : `saves $${g.saving[0].toFixed(0)}-${g.saving[1].toFixed(0)}`
-    lines.push(`* [${g.kind}] ${g.title}: ${sv}`, `    basis: ${g.basis}`, `    do: ${g.action}`)
+    lines.push(`* [${g.kind}] ${g.title}: ${sv}`)
+    if (full) lines.push(`    basis: ${g.basis}`, `    do: ${g.action}`)
   }
   if (seen.length > 0) {
     lines.push('', `routed this session (${seen.length}; mode ${routingMode}, /router routing <ask|auto|off>):`)
-    for (const r of seen.slice(-8)) lines.push(`  ${clock(r.at)}  ${r.agent}: ${r.from} -> ${r.to}  [${r.family}] ${r.decision}  ${r.description}`)
+    for (const r of seen.slice(full ? -8 : -3)) lines.push(`  ${clock(r.at)}  ${r.agent}: ${r.from} -> ${r.to}  [${r.family}] ${r.decision}  ${r.description}`)
   }
   return lines
 }
@@ -370,10 +377,11 @@ export const register: Register = (on, options) => {
     const s = await read($, status)
     const j = await read($, job)
     const busy = j?.isRunning === true
+    const full = await read($, details)
     const limits = s?.rateLimits ?? []
     const body = [
       ...(limits.length ? [`rate limits: ${limits.map(l => `${windowName(l.kind)} ${l.percentUsed}% used${l.resetsAt ? ', resets ' + clock(Date.parse(l.resetsAt)) : ''}`).join(' · ')}`] : []),
-      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where) : [s?.error ?? 'reading the checkout…']),
+      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full) : [s?.error ?? 'reading the checkout…']),
     ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     const logRoom = Math.max(3, rows - body.length - 3)
@@ -384,6 +392,9 @@ export const register: Register = (on, options) => {
           <Button key="refresh" hotkey="r" onPress={() => { void refresh($) }}>Refresh</Button>
           <Button key="fetch" hotkey="f" onPress={() => { void refresh($, true) }}>Fetch origin</Button>
           <Button key="update" hotkey="u" variant="primary" dimColor={busy} onPress={() => { void runJob($, 'update') }}>Re-check routing</Button>
+          <Button key="details" hotkey="d" onPress={() => { void update($, details, v => !v) }}>{full ? 'Less' : 'Details'}</Button>
+        </Box>
+        <Box flexDirection="row" gap={1} flexWrap="wrap">
           <Button key="ledger" hotkey="l" dimColor={busy} onPress={() => { void runJob($, 'ledger') }}>Ledger now</Button>
           <Button key="apply" hotkey="a" dimColor={busy} onPress={() => { void runJob($, 'apply') }}>Apply agents</Button>
           <Button key="pull" hotkey="p" dimColor={busy} onPress={() => { void runJob($, 'pull') }}>Pull</Button>

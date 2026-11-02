@@ -25,6 +25,7 @@ import datetime
 import json
 import math
 import random
+import re
 import subprocess
 import sys
 import shutil
@@ -51,9 +52,12 @@ def repo_fix_repo():
 
 def claude_version():
     try:
-        return subprocess.run([CLAUDE, '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30).stdout.split()[0]
-    except (OSError, IndexError, subprocess.TimeoutExpired):
+        r = subprocess.run([CLAUDE, '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
         return 'unknown'
+    # The first version-shaped word: a tool manager (mise) may print its own notice first.
+    m = re.search(r'\d+\.\d+\.\d+\S*', r.stdout) or re.search(r'\d+\.\d+\.\d+\S*', r.stderr)
+    return m.group(0) if m else 'unknown'
 
 
 def prefix_tokens(n=2):

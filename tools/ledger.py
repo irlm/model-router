@@ -10,6 +10,7 @@ Usage: python3 tools/ledger.py [--commit]
 import argparse
 import datetime
 import shutil
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -22,9 +23,12 @@ def claude_version():
     if not exe:
         return 'not found'
     try:
-        return subprocess.run([exe, '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30).stdout.strip().splitlines()[0]
-    except (OSError, IndexError, subprocess.TimeoutExpired):
+        r = subprocess.run([exe, '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
         return 'unknown'
+    # The first version-shaped word: a tool manager (mise) may print its own notice first.
+    m = re.search(r'\d+\.\d+\.\d+\S*', r.stdout) or re.search(r'\d+\.\d+\.\d+\S*', r.stderr)
+    return m.group(0) if m else 'unknown'
 
 
 def main():

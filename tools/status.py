@@ -55,8 +55,10 @@ def claude_version():
     exe = shutil.which('claude')
     if not exe:
         return None
-    _, out, _ = sh([exe, '--version'])
-    return out.split()[0] if out else None
+    _, out, err = sh([exe, '--version'])
+    # The first version-shaped word: a tool manager (mise) may print its own notice first.
+    m = re.search(r'\d+\.\d+\.\d+\S*', out) or re.search(r'\d+\.\d+\.\d+\S*', err)
+    return m.group(0) if m else None
 
 
 def git_state(fetch):

@@ -9,11 +9,13 @@ What you see:
 - A status line under the prompt: `router: 5h 37% · 7d 62% · 2 suggestions · /router · 12:01`.
   The percentages are the subscription's rate-limit windows as the last API response reported
   them. Then the count of things to check and of suggestions, or `router ok`.
-- `/router` opens a pane with, top to bottom: the rate-limit windows; the families table (default
-  model and effort, evidence, cost per success, whether the family's regression sample can run on
-  this machine, the last check); the agent files (applied or drifted), price freshness, ledger
-  dates, the timer; the things to check; what the last 30 days consumed (main sessions by model
-  and effort, subagent calls by kind); and the suggestions.
+- `/router` opens a pane with, top to bottom: the rate-limit windows; one line on the checkout;
+  the families table (default model and effort, evidence, cost per success, whether the family's
+  regression sample can run on this machine, the last check); the things to check; one line per
+  suggestion; the Agent calls routed this session. `Details` (`d`) adds the long sections: the
+  agent files (applied or drifted), price freshness, ledger dates, the timer, what the last 30 days
+  consumed (main sessions by model and effort, subagent calls by kind), and each suggestion's
+  basis and action. `/router check` prints everything as text.
 
 Suggestions say where the same work could consume less of the subscription. Catalog prices are
 API-equivalent dollars, which on a subscription measure rate-limit headroom. Each suggestion
@@ -60,6 +62,7 @@ Buttons and verbs (`/router <verb>`):
 | Button | Verb | Runs |
 |---|---|---|
 | | `routing ask\|auto\|off` | sets how Agent calls are routed for this session |
+| Details / Less | | shows or hides the pane's long sections |
 | Refresh | `check` | `tools/status.py` (also prints the table as text) |
 | Fetch origin | `fetch` | the same after `git fetch`, so behind/ahead are current |
 | Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |

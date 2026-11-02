@@ -64,6 +64,17 @@ test('/router check prints the table and the status line counts the advice', asy
     expect(await ui.find({ type: 'Button', text: /Re-check routing/ })).toBeTruthy()
     await ui.unmount()
   }
+
+  // The pane is a glance by default; Details adds the long sections.
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^\* \[extrapolated\]/ }))?.text).toBe('* [extrapolated] main sessions at high/xhigh effort: $225 in 30 days: saves $72')
+  expect(await ui.find({ type: 'Text', text: /basis:/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /consumption, last 30 days/ })).toBeUndefined()
+  await ui.press({ key: 'details' })
+  expect((await ui.find({ type: 'Text', text: /basis:/ }))?.text).toContain('results/cell8 sweep')
+  expect(await ui.find({ type: 'Text', text: /consumption, last 30 days/ })).toBeTruthy()
+  expect(await ui.find({ type: 'Button', text: /Less/ })).toBeTruthy()
+  await ui.unmount()
 })
 
 test('a missing checkout is said in the pane, not thrown', async ($, on) => {

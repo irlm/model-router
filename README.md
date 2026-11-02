@@ -47,7 +47,9 @@ with Python 3, git and the `claude` CLI, at the prompt of a terminal session:
 
 That is the whole setup: the install clones this repository (the marketplace) and the widget reads
 from that clone. A checkout of your own, for the benchmark or the code, is an option in `/config`
-(default `~/Projects/Github/model-router`; on Windows `~` is `C:\Users\<you>`).
+(default `~/Projects/Github/model-router`; on Windows `~` is `C:\Users\<you>`). To update:
+`claude plugin marketplace update model-router`, then `claude plugin update model-router@model-router`,
+then restart Claude Code (`mod/README.md`, "Updating", says what changes before and after the restart).
 `mod/README.md` has the Windows steps (Git for Windows, Python 3, then the same install line) and the
 rest; `claude plugin validate mod` and `claude plugin test mod` check it.
 

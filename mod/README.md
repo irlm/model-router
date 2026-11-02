@@ -98,6 +98,36 @@ clone nothing is committed: "Ledger now" prints the entry into the pane instead 
 A checkout of your own is for the benchmark, the ledger timer and changing the code: clone the
 repository to the default path, or anywhere and set the path in `/config`.
 
+### Updating
+
+The widget has two parts that update separately: the mod (the pane, the status line, the router
+hook: the code Claude Code loads at start) and the repository it reads (the scripts, the routing,
+the prices, the results). From a terminal on any machine:
+
+```
+claude plugin marketplace update model-router
+claude plugin update model-router@model-router
+```
+
+The first pulls the repository (the marketplace clone); the second installs the mod's new version
+from it. Then exit Claude Code and open it again: "Restart to apply changes" is literal, a running
+session keeps the mod it started with. Inside a session, `/plugin` has the same two steps as menus.
+
+What you see before the restart: the scripts and data are already new, and Refresh runs them
+fresh, so new classes, suggestions and advice appear at once; the pane layout, the status line and
+the router hook stay old until the restart. That mix is normal.
+
+The pane's first line says which version of the repository it reads (`repo <commit>`), and `behind`
+when origin has newer commits after a Fetch. In the marketplace clone, Pull is the same `git pull`
+the marketplace update runs; in a checkout of your own, Pull updates it and the mod version you
+run comes from the plugin update, not from the checkout. On Windows the commands are the same, in
+PowerShell or CMD.
+
+To see which version of the mod is loaded: `/plugin` lists installed plugins with their versions;
+the marketplace's `mod/.claude-plugin/plugin.json` has the newest one. If the install ever looks
+stuck, `claude plugin uninstall model-router@model-router` and the install line again is a clean
+reset; the change log, the agent files and `/config` options are not in the plugin and survive it.
+
 Agent calls are classed by agent type first, then by the prompt: code searches (Explore, Plan,
 Codebase Onboarding Engineer), fact lookups (Web Researcher, or a short prompt asking for one
 thing), browser flows (an agent whose name says browser, Evidence Collector, or a prompt that

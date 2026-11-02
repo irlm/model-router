@@ -53,13 +53,14 @@ def main():
     args = ap.parse_args()
     agents = json.loads(args.routing.read_text(encoding='utf-8'))['agents']
     done = []
+    absent = []
     for name, route in agents.items():
         path = args.agents_dir / name
         install = False
         if path.exists():
             before = path.read_text(encoding='utf-8')
         elif args.revert or not (TEMPLATES / name).exists():
-            print(f"{'absent':12} {name}: not on this machine, skipped ({route['family']})")
+            absent.append(name)
             continue
         else:
             before = (TEMPLATES / name).read_text(encoding='utf-8')
@@ -74,6 +75,8 @@ def main():
             path.write_text(after, encoding='utf-8')
             done.append(name)
         print(f"{state:13} {name}: {'removed' if args.revert else route['model'] + ' / ' + route['effort']} ({route['family']})")
+    if absent:
+        print(f"skipped {len(absent)} agent file(s) not on this machine: {', '.join(absent)}")
     if done:
         # The change log: from now on the widget counts what the transcripts save (tools/changes.py).
         e = changes.add('revert' if args.revert else 'apply', 'agents: ' + ', '.join(done))

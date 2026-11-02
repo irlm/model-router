@@ -483,7 +483,8 @@ export const register: Register = (on, options) => {
     ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     const logRoom = Math.max(3, rows - body.length - 3)
-    const log = j ? j.lines.slice(-logRoom) : []
+    // A job that ended well keeps one line; its whole output stays under Details, and a failure shows it all.
+    const log = j ? (busy || j.exitCode !== 0 || full ? j.lines.slice(-logRoom) : j.lines.slice(-1)) : []
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1} flexWrap="wrap">

@@ -49,7 +49,7 @@ class Claude(unittest.TestCase):
     def test_chrome_and_ignored_keywords(self):
         cmd, _ = call('claude', CLAUDE, chrome=True, write=True, writable=['/b'], unsandboxed=True)
         self.assertEqual(cmd[2], '--chrome')
-        self.assertFalse(any('/b' in c or 'danger' in c for c in cmd))
+        self.assertFalse(any('/b' in c or 'danger' in c for c in cmd[1:]))   # argv[0] is a path and may hold /bin
 
     def test_bad_output(self):
         _, r = call('claude', 'not json')

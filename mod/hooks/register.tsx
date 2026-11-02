@@ -326,6 +326,7 @@ async function runJob($: Dollar, name: string) {
   }
   const startedAt = await $.clock.now()
   await update($, job, () => ({ name: spec.title, lines: [`$ ${argv.join(' ')}`], isRunning: true, exitCode: null, startedAt }))
+  if (statusMode !== 'off') $.ui.status(`running ${spec.title}… · /router`)
   // The child outlives this dispatch: its loop runs on and ends with the child.
   void (async () => {
     let code: number | null = null
@@ -509,10 +510,13 @@ export const register: Register = (on, options) => {
     const busy = j?.isRunning === true
     const full = await read($, details)
     const limits = s?.rateLimits ?? []
-    const body: Line[] = [
-      ...limitLines(limits),
-      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]),
-    ]
+    // While a job runs the pane is the job: its output, nothing else; the summary returns when it ends.
+    const body: Line[] = busy && j
+      ? [line(`running ${j.name} since ${clock(j.startedAt)} · the summary returns when it ends`, { bold: true })]
+      : [
+          ...limitLines(limits),
+          ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]),
+        ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     // One line stays one line: cut to the pane's width instead of wrapping (/router check keeps the full text).
     const width = Math.max(40, (e.viewport?.columns ?? 100) - 1)

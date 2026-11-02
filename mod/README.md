@@ -19,7 +19,8 @@ What you see:
   on this machine, the last check); the things to check; the suggestions, largest saving first, each
   with its share of the window's spend as a bar; the Agent calls routed this session. The glance
   shows three items per section and one line per item, cut to the pane's width; Details shows all
-  of it, and `/router check` prints the full text. `Details` (`d`) adds the long sections: the
+  of it, and `/router check` prints the full text. While a job runs (Re-check, Ledger, Apply, Pull)
+  the pane shows only that job's output, and the summary returns when it ends. `Details` (`d`) adds the long sections: the
   agent files (applied or drifted), price freshness, ledger dates, the timer, what the last 30 days
   consumed (main sessions by model and effort, subagent calls by kind), and each suggestion's
   basis and action. `/router check` prints everything as text.

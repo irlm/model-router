@@ -7,16 +7,17 @@ type Dollar = Parameters<Hook<'session.start'>>[0]
 type RoutingMode = 'ask' | 'auto' | 'off'
 
 const PANE = 'model-router'
-// status-2: the rate-limit windows and the consumption block joined the value
-const status = atom({ plugin: 'model-router', key: 'status' } as const, null, { shape: 'status-2' })
+// status-3: `where` joined the value (which checkout served: the configured one, or the install's clone)
+const status = atom({ plugin: 'model-router', key: 'status' } as const, null, { shape: 'status-3' })
 const job = atom({ plugin: 'model-router', key: 'job' } as const, null, { shape: 'job-1' })
 // routed-1: the Agent calls the router saw this session, newest last
 const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Routed[], { shape: 'routed-1' })
 
-// What the buttons and /router <verb> run, from the checkout's root.
-const JOBS: Record<string, { title: string; argv: (python: string) => string[] }> = {
-  update: { title: 'regression check', argv: py => [py, 'tools/update.py', '--sample', '6'] },
-  ledger: { title: 'usage ledger', argv: py => [py, 'tools/ledger.py', '--commit'] },
+// What the buttons and /router <verb> run, from the checkout's root. In the clone the plugin install
+// made (`clone`), nothing is committed: the ledger prints its entry, the re-check keeps its results local.
+const JOBS: Record<string, { title: string; argv: (python: string, clone: boolean) => string[] }> = {
+  update: { title: 'regression check', argv: (py, clone) => [py, 'tools/update.py', '--sample', '6', ...(clone ? ['--no-commit'] : [])] },
+  ledger: { title: 'usage ledger', argv: (py, clone) => [py, 'tools/ledger.py', clone ? '--stdout' : '--commit'] },
   apply: { title: 'apply agents', argv: py => [py, 'apply_agents.py'] },
   pull: { title: 'git pull', argv: () => ['git', 'pull', '--ff-only'] },
 }
@@ -46,7 +47,7 @@ const statusLine = (s: StatusJson, limits: RateLimit[], at: number, routedN = 0)
 }
 
 /** The pane's body and /router check's text: the same lines. */
-const summaryLines = (s: StatusJson, at: number, seen: Routed[] = []): string[] => {
+const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''): string[] => {
   const g = s.repo
   const sync = !g.is_repo
     ? 'not a git checkout'
@@ -56,7 +57,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = []): string[] 
         .filter(Boolean).join(', ')
   const reg = s.ledger.regress_last
   const lines = [
-    `read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · repo ${g.head ?? '-'} (${sync})`,
+    `read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · repo ${g.head ?? '-'} (${sync}${where ? ', ' + where : ''})`,
     `routing v${s.routing.version}, decided ${s.routing.decided}`,
     '',
     `${'family'.padEnd(13)}${'default'.padEnd(19)}${'evidence'.padEnd(9)}${'$/ok'.padEnd(8)}${'here'.padEnd(5)}last check`,
@@ -111,12 +112,30 @@ let repoOption = '~/Projects/Github/model-router'
 let pythonOption = ''
 let refreshMinutes = 30
 let repo = repoOption
+// '' when the configured checkout serves; 'marketplace clone' when the clone the plugin install made does.
+let where = ''
 let python = ''
 let routingMode: RoutingMode = 'ask'
 
+/** The checkout the scripts run from: the configured path when the repository is there, else the full
+ * clone the plugin install made (the marketplace; known_marketplaces.json says where it is), so the
+ * install alone is enough. Read on every refresh, so a clone made later is picked up. */
 async function resolveRepo($: Dollar) {
   const home = (await $.env.get('HOME')) || (await $.env.get('USERPROFILE')) || ''
   repo = repoOption.replace(/^~(?=$|[\\/])/, home)
+  where = ''
+  if (await $.fs.exists(`${repo}/routing.json`)) return
+  const configDir = (await $.env.get('CLAUDE_CONFIG_DIR')) || `${home}/.claude`
+  try {
+    const known = JSON.parse(await $.fs.read(`${configDir}/plugins/known_marketplaces.json`)) as Record<string, { installLocation?: string }>
+    const clone = known['model-router']?.installLocation
+    if (clone && (await $.fs.exists(`${clone}/routing.json`))) {
+      repo = clone
+      where = 'marketplace clone'
+    }
+  } catch {
+    // no marketplace file, or not readable: the configured path stands, and refresh says it is missing
+  }
 }
 
 async function findPython($: Dollar) {
@@ -148,8 +167,9 @@ async function readLimits($: Dollar): Promise<RateLimit[]> {
 async function refresh($: Dollar, fetch = false) {
   const at = await $.clock.now()
   try {
+    await resolveRepo($)
     if (!(await $.fs.exists(`${repo}/routing.json`))) {
-      throw new Error(`no model-router checkout at ${repo}: clone it there or set the path in /config`)
+      throw new Error(`no model-router checkout at ${repo} and no clone from the plugin install: clone it there, or set the path in /config`)
     }
     const py = await findPython($)
     const argv = [py, 'tools/status.py', '--json', ...(fetch ? ['--fetch'] : [])]
@@ -157,12 +177,12 @@ async function refresh($: Dollar, fetch = false) {
     if (r.exitCode !== 0) throw new Error(`status.py exit ${r.exitCode}: ${r.stderr.trim().split('\n').pop() ?? ''}`)
     const json = JSON.parse(r.stdout) as StatusJson
     const rateLimits = await readLimits($)
-    await update($, status, () => ({ at, json, error: null, rateLimits }))
+    await update($, status, () => ({ at, json, error: null, rateLimits, where }))
     $.ui.status(statusLine(json, rateLimits, at, (await read($, routed)).length))
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
     const rateLimits = await readLimits($)
-    await update($, status, () => ({ at, json: null, error, rateLimits }))
+    await update($, status, () => ({ at, json: null, error, rateLimits, where }))
     $.ui.status(`router: ${error}`)
   }
 }
@@ -177,7 +197,7 @@ async function runJob($: Dollar, name: string) {
   }
   let argv: string[]
   try {
-    argv = spec.argv(await findPython($))
+    argv = spec.argv(await findPython($), where !== '')
   } catch (err) {
     $.ui.toast(err instanceof Error ? err.message : String(err))
     return false
@@ -284,7 +304,6 @@ export const register: Register = (on, options) => {
       description: 'Model router: where the routing stands, re-check it, ledger, apply, pull',
       argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off',
     })
-    await resolveRepo($)
     void refresh($)
     if (refreshMinutes > 0) {
       $.clock.every(Math.max(1, refreshMinutes) * 60000, () => {
@@ -304,7 +323,7 @@ export const register: Register = (on, options) => {
     if (verb === 'check' || verb === 'fetch') {
       await refresh($, verb === 'fetch')
       const s = await read($, status)
-      return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed)).join('\n') : (s?.error ?? 'no status') }
+      return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where).join('\n') : (s?.error ?? 'no status') }
     }
     if (verb === 'routing') {
       if (arg === 'ask' || arg === 'auto' || arg === 'off') routingMode = arg
@@ -353,7 +372,7 @@ export const register: Register = (on, options) => {
     const limits = s?.rateLimits ?? []
     const body = [
       ...(limits.length ? [`rate limits: ${limits.map(l => `${windowName(l.kind)} ${l.percentUsed}% used${l.resetsAt ? ', resets ' + clock(Date.parse(l.resetsAt)) : ''}`).join(' · ')}`] : []),
-      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed)) : [s?.error ?? 'reading the checkout…']),
+      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where) : [s?.error ?? 'reading the checkout…']),
     ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     const logRoom = Math.max(3, rows - body.length - 3)

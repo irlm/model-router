@@ -68,6 +68,7 @@ test('a missing checkout is said in the pane, not thrown', async ($, on) => {
   mock.clock(on, { now: 1_762_000_000_000 })
   mock.env(on, { HOME: '/home/me' })
   on('fs.exists', () => ({ value: false }))
+  on('fs.read', () => ({ value: '{}' }))
   on('ui.status', () => ({ value: undefined }))
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
@@ -77,6 +78,29 @@ test('a missing checkout is said in the pane, not thrown', async ($, on) => {
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /no model-router checkout/ }))?.text).toContain('set the path in /config')
   await ui.unmount()
+})
+
+test('no checkout at the configured path: the clone the plugin install made serves', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  const CLONE = '/home/me/.claude/plugins/marketplaces/model-router'
+  on('fs.exists', (_, e) => ({ value: e.path.startsWith(CLONE) }))
+  on('fs.read', (_, e) => ({
+    value: e.path === '/home/me/.claude/plugins/known_marketplaces.json' ? JSON.stringify({ 'model-router': { installLocation: CLONE } }) : '{}',
+  }))
+  const runs: { argv: readonly string[]; cwd?: string }[] = []
+  on('process.run', (_, e) => {
+    runs.push({ argv: e.argv, cwd: e.init?.cwd })
+    return { value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(STATUS) } }
+  })
+  on('ui.status', () => ({ value: undefined }))
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('repo abc1234 (clean, up to date at last fetch, marketplace clone)')
+  expect(runs.find(r => r.argv[1] === 'tools/status.py')?.cwd).toBe(CLONE)
 })
 
 type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]

@@ -30,17 +30,22 @@ def claude_version():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--commit', action='store_true', help='git add, commit and push the entry')
+    ap.add_argument('--stdout', action='store_true', help='print the entry instead of writing it (a checkout you do not own, such as the plugin install\'s clone)')
     args = ap.parse_args()
     today = datetime.date.today().isoformat()
-    (HERE / 'ledger').mkdir(exist_ok=True)
     out = HERE / f'ledger/usage-{today}.md'
     scan = subprocess.run([sys.executable, str(HERE / 'tools/usage_scan.py')], capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=HERE)
     if scan.returncode != 0:
         sys.exit(f'usage_scan failed:\n{scan.stderr}')
     window = subprocess.run([sys.executable, str(HERE / 'tools/consumption.py')], capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=HERE)
-    out.write_text(f"# Usage ledger, {today}\n\nClaude Code {claude_version()}. Catalog-equivalent prices (catalog/models.json); "
-                   "on a subscription they measure rate-limit headroom, not a bill.\n\n```\n" + scan.stdout + "```\n\n"
-                   "## Last 30 days by model and effort\n\n```\n" + (window.stdout if window.returncode == 0 else window.stderr) + "```\n", encoding='utf-8')
+    body = (f"# Usage ledger, {today}\n\nClaude Code {claude_version()}. Catalog-equivalent prices (catalog/models.json); "
+            "on a subscription they measure rate-limit headroom, not a bill.\n\n```\n" + scan.stdout + "```\n\n"
+            "## Last 30 days by model and effort\n\n```\n" + (window.stdout if window.returncode == 0 else window.stderr) + "```\n")
+    if args.stdout:
+        sys.stdout.write(body)
+        return
+    (HERE / 'ledger').mkdir(exist_ok=True)
+    out.write_text(body, encoding='utf-8')
     print(f'wrote {out.relative_to(HERE)}')
     if args.commit:
         git = shutil.which('git') or 'git'

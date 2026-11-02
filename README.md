@@ -39,16 +39,17 @@ runs inside Claude Code: a status line under the prompt (`router ok · v1.1 · 3
 here · Claude Code 2.1.316 · 12:01`, or `router: 2 to check · /router`), and `/router` opens a pane
 with the families table, the agent files, price freshness, the ledger dates and buttons that run
 `tools/update.py`, `tools/ledger.py --commit`, `apply_agents.py` and `git pull`. Install on a machine
-that has this repository cloned, Python 3 and the `claude` CLI, at the prompt of a terminal session:
+with Python 3, git and the `claude` CLI, at the prompt of a terminal session:
 
 ```
 /plugin install model-router --marketplace irlm/model-router
 ```
 
-The checkout path is an option in `/config` (default `~/Projects/Github/model-router`).
-On Windows `~` is `C:\Users\<you>`, so clone there or set the option to the folder you chose;
-`mod/README.md` has the Windows steps (Git for Windows, Python 3, the GitHub CLI, then the same install line).
-`mod/README.md` has the rest; `claude plugin validate mod` and `claude plugin test mod` check it.
+That is the whole setup: the install clones this repository (the marketplace) and the widget reads
+from that clone. A checkout of your own, for the benchmark or the code, is an option in `/config`
+(default `~/Projects/Github/model-router`; on Windows `~` is `C:\Users\<you>`).
+`mod/README.md` has the Windows steps (Git for Windows, Python 3, then the same install line) and the
+rest; `claude plugin validate mod` and `claude plugin test mod` check it.
 
 The widget also routes each Agent call: when a measured family covers the task and the call asks
 for a dearer model than the decision, it asks you, rewrites the call (auto) or stays out (off), per

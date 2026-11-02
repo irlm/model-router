@@ -16,7 +16,7 @@ export type StatusJson = {
   at: string
   platform: string
   claude: string | null
-  repo: { is_repo: boolean; head?: string; dirty?: number; ahead?: number | null; behind?: number | null; fetched?: boolean }
+  repo: { path?: string; is_repo: boolean; head?: string; dirty?: number; ahead?: number | null; behind?: number | null; fetched?: boolean }
   routing: { version: number; decided: string }
   families: Family[]
   agents: { files: number; unused: number; routed: RoutedAgent[] }
@@ -55,7 +55,14 @@ export type Suggestion = {
 export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
 
 /** The last status read: the JSON when the script ran, else why not. */
-export type Status = { at: number; json: StatusJson | null; error: string | null; rateLimits: RateLimit[] }
+export type Status = {
+  at: number
+  json: StatusJson | null
+  error: string | null
+  rateLimits: RateLimit[]
+  /** '' when the configured checkout served the read; 'marketplace clone' when the clone the plugin install made did */
+  where: string
+}
 
 /** One Agent call the router saw: what was asked, which measured family covered it, what ran. */
 export type Routed = {

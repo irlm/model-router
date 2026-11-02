@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Model router widget: routes each Agent call to the model and effort the benchmark measured for that kind of task (auto, ask or off), rate-limit headroom, what the last 30 days consumed, and one key to re-check the routing.",
   "author": {
     "name": "irlm"
@@ -21,7 +21,7 @@
     "repo": {
       "type": "string",
       "title": "model-router checkout",
-      "description": "Where the model-router repository is cloned on this machine. ~ is your home folder.",
+      "description": "A checkout of the model-router repository, if you have one: to run the benchmark or change the code. ~ is your home folder. When nothing is there, the widget reads the clone the plugin install made, so the install alone is enough.",
       "default": "~/Projects/Github/model-router"
     },
     "python": {

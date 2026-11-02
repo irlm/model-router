@@ -62,25 +62,29 @@ Buttons and verbs (`/router <verb>`):
 | | `routing ask\|auto\|off` | sets how Agent calls are routed for this session |
 | Refresh | `check` | `tools/status.py` (also prints the table as text) |
 | Fetch origin | `fetch` | the same after `git fetch`, so behind/ahead are current |
-| Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry |
-| Ledger now | `ledger` | `tools/ledger.py --commit` |
+| Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
+| Ledger now | `ledger` | `tools/ledger.py --commit` (`--stdout` in the marketplace clone: the entry goes to the pane) |
 | Apply agents | `apply` | `apply_agents.py`: write routing.json's model and effort into `~/.claude/agents` |
 | Pull | `pull` | `git pull --ff-only` |
 
-Setup on a machine:
-
-1. Clone the model-router repository to `~/Projects/Github/model-router`, or set the
-   path in `/config` under model-router after installing. The repository is public: cloning
-   and installing need git and no GitHub account.
-2. Python 3 on PATH (`python3`, `python` or `py`), git, and the `claude` CLI.
-3. Install the mod from the repository's marketplace, at the prompt of a terminal session:
+Setup on a machine: Python 3 on PATH (`python3`, `python` or `py`), git, and the `claude` CLI; then,
+at the prompt of a terminal session:
 
 ```
 /plugin install model-router --marketplace irlm/model-router
 ```
 
-Answer `y` to add the marketplace, then pick the user scope. No credential is needed: the
-marketplace is a public repository and git clones it anonymously.
+Answer `y` to add the marketplace, then pick the user scope. That is the whole setup. No credential
+is needed: the marketplace is a public repository and git clones it anonymously. The clone the
+install makes is a full checkout of this repository, and the widget reads from it whenever no
+checkout of your own is at the path in `/config` ("model-router checkout", default
+`~/Projects/Github/model-router`); the pane's first line then says `marketplace clone`. In that
+clone nothing is committed: "Ledger now" prints the entry into the pane instead of writing it,
+"Re-check routing" keeps its results local, and "Pull" is the same `git pull` that
+`/plugin marketplace update model-router` does.
+
+A checkout of your own is for the benchmark, the ledger timer and changing the code: clone the
+repository to the default path, or anywhere and set the path in `/config`.
 
 ### Windows
 
@@ -91,17 +95,19 @@ Native Windows, from PowerShell or CMD. Inside WSL it is Linux: follow the steps
    with "Add python.exe to PATH" ticked, or `winget install Python.Python.3.13`); Claude Code
    (PowerShell: `irm https://claude.ai/install.ps1 | iex`). No GitHub account or GitHub CLI is
    needed: the repository is public.
-2. Clone where the default path points. `~` is your profile folder on Windows, so the default
-   `~/Projects/Github/model-router` means `C:\Users\<you>\Projects\Github\model-router`:
+2. At the prompt of a Claude Code session, as above:
+   `/plugin install model-router --marketplace irlm/model-router`. The widget then reads the
+   install's own clone; nothing else to set up.
+3. Only for the benchmark or to change the code: clone where the default path points. `~` is your
+   profile folder on Windows, so the default `~/Projects/Github/model-router` means
+   `C:\Users\<you>\Projects\Github\model-router`:
 
    ```powershell
    git clone https://github.com/irlm/model-router "$env:USERPROFILE\Projects\Github\model-router"
    ```
 
-   Any other folder works too: install the mod, then set "model-router checkout" in `/config` to
-   that folder, written as Windows writes it (`D:\src\model-router`).
-3. At the prompt of a Claude Code session, as above:
-   `/plugin install model-router --marketplace irlm/model-router`.
+   Any other folder works too: set "model-router checkout" in `/config` to that folder, written as
+   Windows writes it (`D:\src\model-router`).
 
 What differs on Windows. `python3` and `python` may be the Microsoft Store placeholders that
 print "Python was not found" and fail; the mod skips a name that does not answer `Python 3` and

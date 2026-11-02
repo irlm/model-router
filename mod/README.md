@@ -17,7 +17,9 @@ What you see:
   checkout; the window's spend as a daily sparkline; the families table (default model and effort,
   a success bar with the evidence, cost per success, whether the family's regression sample can run
   on this machine, the last check); the things to check; the suggestions, largest saving first, each
-  with its share of the window's spend as a bar; the Agent calls routed this session. `Details` (`d`) adds the long sections: the
+  with its share of the window's spend as a bar; the Agent calls routed this session. The glance
+  shows three items per section and one line per item, cut to the pane's width; Details shows all
+  of it, and `/router check` prints the full text. `Details` (`d`) adds the long sections: the
   agent files (applied or drifted), price freshness, ledger dates, the timer, what the last 30 days
   consumed (main sessions by model and effort, subagent calls by kind), and each suggestion's
   basis and action. `/router check` prints everything as text.

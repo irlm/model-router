@@ -83,7 +83,7 @@ test('/router check prints the table and the status line counts the advice', asy
 
   for (const surface of ['terminal', 'desktop', 'vscode', 'mobile'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect((await ui.find({ type: 'Text', text: /routing v1.1/ }))?.text).toContain('routing v1.1, decided 2026-11-01')
+    expect((await ui.find({ type: 'Text', text: /routing v1.1/ }))?.text).toContain('routing v1.1')
     expect(await ui.find({ type: 'Button', text: /Re-check routing/ })).toBeTruthy()
     await ui.unmount()
   }
@@ -91,6 +91,7 @@ test('/router check prints the table and the status line counts the advice', asy
   // The pane is a glance by default; Details adds the long sections.
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /\[extrapolated\]/ }))?.text).toContain('saves $72')
+  expect(await ui.find({ type: 'Text', text: /^routed this session/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /basis:/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /consumption, last 30 days/ })).toBeUndefined()
   await ui.press({ key: 'details' })

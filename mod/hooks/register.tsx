@@ -59,7 +59,7 @@ const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: Statu
 }
 
 /** One line of the pane or of /router check's text, with how the pane paints it. */
-type Line = { text: string; color?: string; bold?: boolean; dim?: boolean }
+type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?: boolean }
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 
@@ -111,10 +111,10 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   const reg = s.ledger.regress_last
   const u = s.usage
   const total = u ? u.main_total + u.subagents_total : 0
-  const lines: Line[] = [
-    line(`read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · routing v${s.routing.version}, decided ${s.routing.decided}`, { dim: true }),
-    line(`repo ${g.head ?? '-'} · ${sync}${where ? ' · ' + where : ''}`, { dim: true }),
-  ]
+  const lines: Line[] = full
+    ? [line(`read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · routing v${s.routing.version}, decided ${s.routing.decided}`, { dim: true }),
+       line(`repo ${g.head ?? '-'} · ${sync}${where ? ' · ' + where : ''}`, { dim: true })]
+    : [line(`read ${clock(at)} · Claude Code ${s.claude ?? 'not found'} · routing v${s.routing.version} · repo ${g.head ?? '-'} ${sync}${where ? ' · ' + where : ''}`, { dim: true })]
   if (u) {
     const prev = u.previous.main_total + u.previous.subagents_total
     const daily = u.daily ?? []
@@ -152,8 +152,14 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     )
   }
   lines.push(BLANK)
+  const GLANCE = 3   // items a section shows before Details
+  const more = (n: number) => line(`  … ${n} more (Details)`, { dim: true })
   if (s.advice.length === 0) lines.push(line('nothing to check', { color: 'green', bold: true }))
-  else lines.push(line('to check:', { bold: true }), ...s.advice.map(a => line(`  - ${a}`, { color: 'yellow' })))
+  else {
+    const shown = full ? s.advice : s.advice.slice(0, GLANCE)
+    lines.push(line('to check:', { bold: true }), ...shown.map(a => line(`  - ${a}`, { color: 'yellow', wrap: true })))
+    if (shown.length < s.advice.length) lines.push(more(s.advice.length - shown.length))
+  }
   if (u && full) {
     lines.push(BLANK, line(`consumption, last ${u.days} days since ${u.since} (catalog $ = headroom on a subscription): main ${money(u.main_total)} (output ${money(u.main_out_cost)}) · subagents ${money(u.subagents_total)} in ${u.subagent_calls} calls`, { bold: true }))
     const top = Math.max(0, ...u.main_rows.map(r => r.cost), ...Object.values(u.by_class).map(b => b.cost))
@@ -192,17 +198,19 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   const sug = [...(s.suggestions ?? [])].sort((a, b) => (b.saving?.[1] ?? -1) - (a.saving?.[1] ?? -1))
   const upTo = savingsUpTo(s)
   lines.push(BLANK, line(sug.length === 0 ? 'suggestions: none from the last window'
-    : `suggestions: up to ${money(upTo)} of ${money(total)} in ${u?.days ?? 30} days${total > 0 ? ` (${Math.round((upTo / total) * 100)}%)` : ''}${full ? '; the kind says how far the evidence reaches' : '; Details for the basis'}`, { bold: true }))
-  for (const g of sug) {
+    : `suggestions: up to ${money(upTo)} of ${money(total)} in ${u?.days ?? 30} days${total > 0 ? ` (${Math.round((upTo / total) * 100)}%)` : ''}${full ? '; the kind says how far the evidence reaches' : ''}`, { bold: true }))
+  const shownSug = full ? sug : sug.slice(0, GLANCE)
+  for (const g of shownSug) {
     const sv = g.saving === null ? 'unknown' : g.saving[0] === g.saving[1] ? `saves ${money(g.saving[0])}` : `saves ${money(g.saving[0])}-${money(g.saving[1])}`
     const share = g.saving && total > 0 ? g.saving[1] / total : 0
     lines.push(line(`${sv.padEnd(16)}${bar(share)} ${String(Math.round(share * 100)).padStart(2)}%  [${g.kind}] ${g.title}`, { color: KIND_COLOR[g.kind] }))
     if (full) lines.push(line(`    basis: ${g.basis}`, { dim: true }), line(`    do: ${g.action}`, { dim: true }))
   }
+  if (shownSug.length < sug.length) lines.push(more(sug.length - shownSug.length))
   if (seen.length > 0) {
     const kept = seen.filter(r => r.decision === 'kept').length
-    lines.push(BLANK, line(`routed this session: ${seen.length - kept} routed, ${kept} kept (mode ${routingMode}; /router routing ask|auto|off)`, { bold: true }))
-    for (const r of seen.slice(full ? -8 : -3)) lines.push(line(`  ${clock(r.at)}  ${r.agent}: ${r.from} -> ${r.to}  [${r.family}] ${r.decision}  ${r.description}`, { dim: r.decision === 'kept' }))
+    lines.push(BLANK, line(`routed this session: ${seen.length - kept} routed, ${kept} kept (mode ${routingMode}; /router routing ask|auto|off${full ? '' : '; Details lists them'})`, { bold: true }))
+    if (full) for (const r of seen.slice(-8)) lines.push(line(`  ${clock(r.at)}  ${r.agent}: ${r.from} -> ${r.to}  [${r.family}] ${r.decision}  ${r.description}`, { dim: r.decision === 'kept' }))
   }
   return lines
 }
@@ -503,9 +511,12 @@ export const register: Register = (on, options) => {
     const limits = s?.rateLimits ?? []
     const body: Line[] = [
       ...limitLines(limits),
-      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined })]),
+      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]),
     ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
+    // One line stays one line: cut to the pane's width instead of wrapping (/router check keeps the full text).
+    const width = Math.max(40, (e.viewport?.columns ?? 100) - 1)
+    const cut = (t: string) => (t.length > width ? t.slice(0, width - 1) + '…' : t)
     const logRoom = Math.max(3, rows - body.length - 3)
     // A job that ended well keeps one line; its whole output stays under Details, and a failure shows it all.
     const log = j ? (busy || j.exitCode !== 0 || full ? j.lines.slice(-logRoom) : j.lines.slice(-1)) : []
@@ -524,7 +535,7 @@ export const register: Register = (on, options) => {
         </Box>
         {body.map(l => (
           <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>
-            {l.text === '' ? ' ' : l.text}
+            {l.text === '' ? ' ' : l.wrap ? l.text : cut(l.text)}
           </Text>
         ))}
         {j && (
@@ -534,7 +545,7 @@ export const register: Register = (on, options) => {
           </Text>
         )}
         {log.map(line => (
-          <Text dimColor>{line === '' ? ' ' : line}</Text>
+          <Text dimColor>{line === '' ? ' ' : cut(line)}</Text>
         ))}
       </Box>
     )

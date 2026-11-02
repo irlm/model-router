@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Model router widget: routes each Agent call to the model and effort the benchmark measured for that kind of task (auto, ask or off), rate-limit headroom, what the last 30 days consumed, and one key to re-check the routing.",
   "author": {
     "name": "irlm"
@@ -15,6 +15,17 @@
       "options": [
         "ask",
         "auto",
+        "off"
+      ]
+    },
+    "statusLine": {
+      "type": "string",
+      "title": "Status line",
+      "description": "The line under the prompt. full: rate-limit windows, routed calls, what a change saved, what the suggestions add up to, what to check. minimal: windows, routed calls, to check. off: none (the pane still has everything).",
+      "default": "full",
+      "options": [
+        "full",
+        "minimal",
         "off"
       ]
     },

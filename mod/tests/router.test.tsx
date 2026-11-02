@@ -70,7 +70,7 @@ test('/router check prints the table and the status line counts the advice', asy
   expect((await $.command.run({ ...RUN, command: 'router', args: '  ' })).text).toBe('Model router pane opened.')
   expect(text).toContain('fix_bug      haiku low +kunit   ████████░░ 16/21    0.0158  no   -')
   expect(text).toContain('  - prices verified 40 days ago')
-  expect(pinned.at(-1)).toContain('1 to check · 1 suggestion')
+  expect(pinned.at(-1)).toBe('saved $13 since 10-30 · $72 to save · 1 to check · /router')
   expect(text).toContain('suggestions: up to $72 of $592 in 30 days (12%)')
   expect(text).toContain('saves $72       █░░░░░░░░░ 12%  [extrapolated] main sessions at high/xhigh effort: $225 in 30 days')
   expect(text).toContain('agents research-synthesis')

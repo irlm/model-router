@@ -40,14 +40,22 @@ const windowName = (kind: string) => (kind === 'five_hour' ? '5h' : kind === 'se
 const limitsText = (limits: RateLimit[]) => limits.map(l => `${windowName(l.kind)} ${Math.round(l.percentUsed)}%`).join(' · ')
 
 /** The status line under the prompt: the rate-limit windows, then what is worth doing. */
-const statusLine = (s: StatusJson, limits: RateLimit[], at: number, routedN = 0) => {
+type StatusMode = 'full' | 'minimal' | 'off'
+const savingsUpTo = (s: StatusJson) => (s.suggestions ?? []).reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
+
+/** The status line under the prompt (the host prefixes the plugin's name): the rate-limit windows, what the
+ * router did this session, what a change saved, what the suggestions add up to, what to check. Only what
+ * changes a decision; `minimal` keeps the windows, the routed count and the to-check count. */
+const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: StatusMode = 'full') => {
   const parts = [limitsText(limits)]
-  const n = s.suggestions?.length ?? 0
+  if (routedN > 0) parts.push(`routed ${routedN}`)
+  const r = s.changes?.realized
+  if (mode === 'full' && r && r.saved !== 0) parts.push(`${r.saved > 0 ? 'saved' : 'cost up'} ${money(Math.abs(r.saved))} since ${r.since.slice(5, 10)}`)
+  const upTo = savingsUpTo(s)
+  if (mode === 'full' && upTo >= 1) parts.push(`${money(upTo)} to save`)
   if (s.advice.length > 0) parts.push(`${s.advice.length} to check`)
-  if (n > 0) parts.push(`${n} suggestion${n > 1 ? 's' : ''}`)
-  if (routedN > 0) parts.push(`${routedN} routed`)
-  if (s.advice.length === 0 && n === 0) parts.push(`router ok · v${s.routing.version}`)
-  return `router: ${parts.filter(Boolean).join(' · ')} · /router · ${clock(at)}`
+  if (parts.filter(Boolean).length === 0) parts.push('ok')
+  return `${parts.filter(Boolean).join(' · ')} · /router`
 }
 
 /** One line of the pane or of /router check's text, with how the pane paints it. */
@@ -174,7 +182,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   }
   // Suggestions: largest saving first, unknown last; each with its share of the window's spend.
   const sug = [...(s.suggestions ?? [])].sort((a, b) => (b.saving?.[1] ?? -1) - (a.saving?.[1] ?? -1))
-  const upTo = sug.reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
+  const upTo = savingsUpTo(s)
   lines.push(BLANK, line(sug.length === 0 ? 'suggestions: none from the last window'
     : `suggestions: up to ${money(upTo)} of ${money(total)} in ${u?.days ?? 30} days${total > 0 ? ` (${Math.round((upTo / total) * 100)}%)` : ''}${full ? '; the kind says how far the evidence reaches' : '; Details for the basis'}`, { bold: true }))
   for (const g of sug) {
@@ -200,6 +208,7 @@ let repo = repoOption
 let where = ''
 let python = ''
 let routingMode: RoutingMode = 'ask'
+let statusMode: StatusMode = 'full'
 
 /** The checkout the scripts run from: the configured path when the repository is there, else the full
  * clone the plugin install made (the marketplace; known_marketplaces.json says where it is), so the
@@ -262,12 +271,12 @@ async function refresh($: Dollar, fetch = false) {
     const json = JSON.parse(r.stdout) as StatusJson
     const rateLimits = await readLimits($)
     await update($, status, () => ({ at, json, error: null, rateLimits, where }))
-    $.ui.status(statusLine(json, rateLimits, at, (await read($, routed)).length))
+    $.ui.status(statusMode === 'off' ? undefined : statusLine(json, rateLimits, (await read($, routed)).length, statusMode))
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
     const rateLimits = await readLimits($)
     await update($, status, () => ({ at, json: null, error, rateLimits, where }))
-    $.ui.status(`router: ${error}`)
+    $.ui.status(statusMode === 'off' ? undefined : error)
   }
 }
 
@@ -392,6 +401,8 @@ export const register: Register = (on, options) => {
   refreshMinutes = Number(options.refreshMinutes ?? 30)
   const mode = String(options.routing ?? 'ask')
   routingMode = mode === 'auto' || mode === 'off' ? mode : 'ask'
+  const sm = String(options.statusLine ?? 'full')
+  statusMode = sm === 'minimal' || sm === 'off' ? sm : 'full'
   repo = repoOption
   python = ''
 

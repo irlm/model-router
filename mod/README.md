@@ -6,9 +6,13 @@ that routing is still applied and still true here, and lets you re-check it with
 
 What you see:
 
-- A status line under the prompt: `router: 5h 37% · 7d 62% · 2 suggestions · /router · 12:01`.
+- A status line under the prompt (the host prefixes the plugin's name):
+  `5h 37% · 7d 62% · routed 2 · saved $7 since 11-02 · $25 to save · 1 to check · /router`.
   The percentages are the subscription's rate-limit windows as the last API response reported
-  them. Then the count of things to check and of suggestions, or `router ok`.
+  them; `routed` is what the router rewrote this session; `saved` is what the transcripts show
+  since the last recorded change; `to save` is what the suggestions add up to per window; `to
+  check` counts the advice. Each part appears only when it has something to say. The "Status
+  line" option in `/config` makes it `minimal` (windows, routed, to check) or `off`.
 - `/router` opens a pane with, top to bottom: the rate-limit windows as bars; one line on the
   checkout; the window's spend as a daily sparkline; the families table (default model and effort,
   a success bar with the evidence, cost per success, whether the family's regression sample can run

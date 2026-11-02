@@ -44,10 +44,14 @@ test('/router check prints the table and the status line counts the advice', asy
   }))
   const pinned: (string | undefined)[] = []
   on('ui.status', (_, e) => { pinned.push(e.text); return { value: undefined } })
+  on('ui.open', () => ({ value: { isPlaced: true } }))
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('find_feature haiku low          214/216  0.0046  yes  ok 6/6')
+
+  expect((await $.command.run({ ...RUN, command: 'router', args: '' })).text).toBe('Model router pane opened.')
+  expect((await $.command.run({ ...RUN, command: 'router', args: '  ' })).text).toBe('Model router pane opened.')
   expect(text).toContain('fix_bug      haiku low +kunit   16/21    0.0158  no   -')
   expect(text).toContain('  - prices verified 40 days ago')
   expect(pinned.at(-1)).toContain('1 to check · 1 suggestion')

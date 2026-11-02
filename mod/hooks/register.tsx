@@ -314,7 +314,8 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'router' }, async ($, e) => {
-    const [verb = 'open', arg = ''] = e.args.trim().split(/\s+/)
+    // No argument is 'open': an empty string splits to [''], which would miss the default.
+    const [verb = 'open', arg = ''] = e.args.trim().split(/\s+/).filter(Boolean)
     if (verb === 'open') {
       const opened = await $.ui.open({ id: PANE, title: 'Model router' })
       void refresh($)

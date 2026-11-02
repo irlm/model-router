@@ -69,8 +69,9 @@ Buttons and verbs (`/router <verb>`):
 
 Setup on a machine:
 
-1. Clone the model-router repository (private) to `~/Projects/Github/model-router`, or set the
-   path in `/config` under model-router after installing.
+1. Clone the model-router repository to `~/Projects/Github/model-router`, or set the
+   path in `/config` under model-router after installing. The repository is public: cloning
+   and installing need git and no GitHub account.
 2. Python 3 on PATH (`python3`, `python` or `py`), git, and the `claude` CLI.
 3. Install the mod from the repository's marketplace, at the prompt of a terminal session:
 
@@ -78,9 +79,8 @@ Setup on a machine:
 /plugin install model-router --marketplace irlm/model-router
 ```
 
-Answer `y` to add the marketplace, then pick the user scope. A private repository installs
-only for GitHub accounts that can read it and whose machine already has a git credential
-for github.com (`gh auth login` then `gh auth setup-git`, or an SSH key).
+Answer `y` to add the marketplace, then pick the user scope. No credential is needed: the
+marketplace is a public repository and git clones it anonymously.
 
 ### Windows
 
@@ -88,9 +88,9 @@ Native Windows, from PowerShell or CMD. Inside WSL it is Linux: follow the steps
 
 1. Tools, once: [Git for Windows](https://git-scm.com/downloads/win) (git, which the install and
    the buttons use, and Git Bash for Claude Code's Bash tool); Python 3 (the python.org installer
-   with "Add python.exe to PATH" ticked, or `winget install Python.Python.3.13`); the GitHub CLI
-   (`winget install GitHub.cli`, then `gh auth login` and `gh auth setup-git`, so git can read the
-   private repository); Claude Code (PowerShell: `irm https://claude.ai/install.ps1 | iex`).
+   with "Add python.exe to PATH" ticked, or `winget install Python.Python.3.13`); Claude Code
+   (PowerShell: `irm https://claude.ai/install.ps1 | iex`). No GitHub account or GitHub CLI is
+   needed: the repository is public.
 2. Clone where the default path points. `~` is your profile folder on Windows, so the default
    `~/Projects/Github/model-router` means `C:\Users\<you>\Projects\Github\model-router`:
 

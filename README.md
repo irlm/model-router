@@ -51,7 +51,8 @@ from that clone. A checkout of your own, for the benchmark or the code, is an op
 `claude plugin marketplace update model-router`, then `claude plugin update model-router@model-router`,
 then restart Claude Code (`mod/README.md`, "Updating", says what changes before and after the restart).
 `mod/README.md` has the Windows steps (Git for Windows, Python 3, then the same install line) and the
-rest; `claude plugin validate mod` and `claude plugin test mod` check it.
+rest; `claude plugin validate mod` and `claude plugin test mod` check the mod, `python3 tools/test_status.py`
+the data side (classifier, suggestions, per-change savings), `python3 bench/common/test_harness.py` the runners.
 
 The widget also routes each Agent call: when a measured family covers the task and the call asks
 for a dearer model than the decision, it asks you, rewrites the call (auto) or stays out (off), per

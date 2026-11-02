@@ -3,6 +3,7 @@
 # (this machine has no cron). Not installed by the benchmark itself; run this by hand.
 # `--remove` disables and deletes the units.
 set -e
+ROOT=$(cd "$(dirname "$0")/.." && pwd)   # this checkout, wherever it is
 U=$HOME/.config/systemd/user; mkdir -p $U
 if [ "$1" = "--remove" ]; then
   systemctl --user disable --now model-router-ledger.timer 2>/dev/null || true
@@ -13,8 +14,8 @@ cat > $U/model-router-ledger.service <<UNIT
 Description=model-router usage ledger (tools/ledger.sh --commit)
 [Service]
 Type=oneshot
-WorkingDirectory=$HOME/Projects/Github/model-router
-ExecStart=$HOME/Projects/Github/model-router/tools/ledger.sh --commit
+WorkingDirectory=$ROOT
+ExecStart=$ROOT/tools/ledger.sh --commit
 UNIT
 cat > $U/model-router-ledger.timer <<UNIT
 [Unit]

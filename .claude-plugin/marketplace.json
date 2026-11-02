@@ -5,7 +5,7 @@
     {
       "name": "model-router",
       "source": "./mod",
-      "description": "Model router widget: the routing's status on this machine, one key to re-check it."
+      "description": "Model router widget: routes each Agent call to the model and effort the benchmark measured, shows rate-limit headroom, the 30-day consumption, suggestions with their evidence, and what each change really saved."
     }
   ]
 }

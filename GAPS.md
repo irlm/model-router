@@ -12,6 +12,18 @@ ceiling for every Claude tier, so they admit, they do not rank); 7 one paraphras
 effect); 8 repo_fix is on a private tree; 9 `regress.py` records the Claude Code version and the
 prefix, and the binary did update from 2.1.314 to 2.1.316 during the day.
 
+**Status 2026-11-02:** the repository is generic and public, with the author's own fixtures kept local
+(`local/README.md`); the widget (`mod/`, 0.7.x) installs with one line, reads the install's own clone, routes
+each Agent call per family (ask, auto, off), and shows the rate-limit windows, the 30-day consumption, the
+suggestions with their evidence, and what each recorded change really saved (per unit of the same work,
+in its own window, with the family's regression verdict beside it). Item 11 is closed by that, item 12 is
+now measurable instead of asserted. Still open, in the order worth doing: (1) a synthesis rubric family,
+the largest unmeasured subagent spend on every machine seen so far; (4) a capability tier with tasks in
+the 30 to 70% band, so a new model can be ranked; (5) contamination control on a private tree for
+find_feature; (6) paraphrases per family; (7) harness ablation; (8) the price of a wrong answer, measured;
+(9) browser work as the agent file describes it; (10) the Codex runner arm, only with the user's say.
+Also open: a macOS install check (Linux and Windows are verified), and a license file for the public repo.
+
 What this benchmark does not cover, what the public ones do not cover, and what to do first.
 Grounded in two things: a scan of this machine's own Claude Code transcripts
 (`tools/usage_scan.py`, September to October 2026) and the public work listed at the end.

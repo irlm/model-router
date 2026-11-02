@@ -395,9 +395,10 @@ def collect(fetch=False):
         elif a['state'] == 'drifted':
             advice.append(f"agent {a['file']} is drifted (want {a['want']}, have {a['have']}): /router apply")
     usage_last = last_usage()
-    if usage_last is None or (days_since(usage_last, today) or 0) > ADVICE_LEDGER_DAYS:
+    clone = bool(os.environ.get('MODEL_ROUTER_CLONE'))   # the install's clone: the ledger prints to the pane, nothing is committed
+    if not clone and (usage_last is None or (days_since(usage_last, today) or 0) > ADVICE_LEDGER_DAYS):
         advice.append(f"no usage ledger since {usage_last}: /router ledger")
-    if timer.get('kind') == 'systemd' and not timer.get('installed'):
+    if not clone and timer.get('kind') == 'systemd' and not timer.get('installed'):
         advice.append('ledger timer not installed: bash tools/install_ledger_timer.sh')
     if not version:
         advice.append('claude CLI not found on PATH: nothing can run here')
@@ -456,6 +457,11 @@ def text(s):
     out.append('')
     if not s['suggestions']:
         out.append('suggestions: none from the last window')
+    r = (s.get('changes') or {}).get('realized')
+    if r:
+        out.append(f"since {r['since']} ({r['kind']}: {r['what']}), {r.get('span', '')}: {'saved' if r['saved'] >= 0 else 'cost up'} ${abs(r['saved']):.2f}"
+                   + (f" (projected ${r['projected']})" if r.get('projected') is not None else ''))
+        out.append('')
     for g in s['suggestions']:
         sv = (f"saves ${g['saving'][0]:.0f}-{g['saving'][1]:.0f}" if g['saving'] and g['saving'][0] != g['saving'][1]
               else f"saves ${g['saving'][0]:.0f}" if g['saving'] else 'saving unknown')

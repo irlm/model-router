@@ -68,7 +68,11 @@ def main():
     if c.returncode != 0:
         print('nothing new to commit' if 'nothing to commit' in c.stdout + c.stderr else c.stderr.strip())
         return
-    subprocess.run([git, 'push', '-q'], cwd=HERE, check=True)
+    p = subprocess.run([git, 'push', '-q'], cwd=HERE, capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if p.returncode != 0:
+        # Committed here; a checkout without write access to origin (someone else's clone) stays local.
+        print(f"committed locally; push failed: {(p.stderr.strip().splitlines() or ['?'])[-1]}")
+        return
     print(f'committed and pushed {entry.name}')
 
 

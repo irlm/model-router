@@ -208,7 +208,7 @@ def days_since(iso, today):
         return None
 
 
-def suggest(usage, agents):
+def suggest(usage, agents, routing=None):
     """Where the last USAGE_DAYS days could have consumed less for the same work, each with its evidence.
 
     kind: measured (a decided family covers it), extrapolated (measured on the benchmark's tasks,
@@ -261,9 +261,22 @@ def suggest(usage, agents):
                     'title': f"{n} browser flows above haiku (${cost:.2f} on {', '.join(m.removeprefix('claude-') for m in sorted(dear))}, last {bf['last'][:10]})",
                     'basis': f'browser_flow family: Haiku low drove 63/63 checklist flows at ${BROWSER_FLOW_COST} each, and 28/30 on a real store; the widget routes browser flows when routing is ask or auto',
                     'action': '/router routing auto, so browser flows run on haiku low without asking; or set model haiku, effort low in the agent file that drives them'})
-    # 4. research synthesis: the stake is known, no cheaper model is
+    # 4. research notes: measured once the research_synthesis family is decided (routing.json), unmeasured before
     rs = bc.get('research-synthesis')
-    if rs and rs['n']:
+    fam = ((routing or {}).get('families') or {}).get('research_synthesis') or {}
+    d = fam.get('default') or {}
+    ev = ((fam.get('decided') or {}).get('evidence') or {})
+    model_id = next((mid for mid, alias in decide.ALIAS.items() if alias == d.get('model')), d.get('model'))
+    per = (ev.get(f"{model_id} {d.get('effort')}") or {}).get('cost_per_success') if d.get('model') else None
+    dear = {m: v for m, v in (rs or {}).get('models', {}).items() if m != '?' and not m.startswith(str(model_id))} if per is not None else {}
+    if dear:
+        n = sum(v['n'] for v in dear.values()); cost = round(sum(v['cost'] for v in dear.values()), 2)
+        out.append({'id': 'synthesis', 'kind': 'measured', 'stake': cost, 'saving': [round(max(0.0, cost - n * per), 2)] * 2,
+                    'title': f"{n} research notes above {d['model']} (${cost:.2f} on {', '.join(m.removeprefix('claude-') for m in sorted(dear))}, last {rs['last'][:10]})",
+                    'basis': f"research_synthesis family: {d['model']} {d['effort']} {(fam.get('evidence') or {}).get(d['model'] + ' ' + d['effort'], '')} on fact-dense notes "
+                             f"with sources at ${per} per note (results/cell9); the prose beyond the facts is not judged",
+                    'action': '/router routing auto, so research notes run on the decided model; keep the session model where you see the difference'})
+    elif rs and rs['n'] and per is None:
         out.append({'id': 'synthesis', 'kind': 'unmeasured', 'stake': rs['cost'], 'saving': None,
                     'title': f"{rs['n']} research reports on general-purpose agents at the session model (${rs['cost']:.2f})",
                     'basis': 'no family grades report writing yet; the fact-lookup result (Haiku 76/78) does not transfer to synthesis',
@@ -369,7 +382,7 @@ def collect(fetch=False):
     cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=USAGE_DAYS)).strftime('%Y-%m-%dT%H:%M')
     events = [e for e in changes.read() if e.get('at', '') >= cutoff]   # a change older than the window has no before side here
     usage = consumption.collect(USAGE_DAYS, splits=[e['at'] for e in events] or None)
-    suggestions = suggest(usage, agents)
+    suggestions = suggest(usage, agents, routing)
     realized = realized_savings(usage, events, families)
 
     advice = []

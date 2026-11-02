@@ -41,6 +41,17 @@ class Suggest(unittest.TestCase):
         self.assertAlmostEqual(out['browser']['saving'][1], 30.0 - 45 * status.BROWSER_FLOW_COST, 2)
         self.assertNotIn('lookups', out)   # a saving of $0.00 is under the floor
 
+    def test_research_notes_measured_once_decided(self):
+        bc = {'research-synthesis': {'n': 20, 'cost': 60.0, 'types': {'general-purpose': 20}, 'last': '2026-11-02T10:00',
+                                     'models': {'claude-fable-5-1': {'n': 15, 'cost': 55.0}, 'claude-haiku-5-5': {'n': 5, 'cost': 0.5}}}}
+        self.assertEqual(status.suggest(usage(bc), {})[0]['kind'], 'unmeasured')
+        routing = {'families': {'research_synthesis': {'default': {'model': 'haiku', 'effort': 'low'}, 'evidence': {'haiku low': '18/18'},
+                                                       'decided': {'evidence': {'claude-haiku-5-5 low': {'cost_per_success': 0.02}}}}}}
+        g = status.suggest(usage(bc), {}, routing)[0]
+        self.assertEqual((g['id'], g['kind']), ('synthesis', 'measured'))
+        self.assertAlmostEqual(g['saving'][1], 55.0 - 15 * 0.02, 2)
+        self.assertIn('15 research notes above haiku', g['title'])
+
     def test_haiku_calls_make_no_suggestion(self):
         bc = {'code-explore': {'n': 3, 'cost': 0.01, 'types': {'Explore': 3}, 'models': {'claude-haiku-5-5': {'n': 3, 'cost': 0.01}}, 'last': ''}}
         self.assertEqual(status.suggest(usage(bc), {}), [])

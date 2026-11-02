@@ -44,7 +44,7 @@ FF_TASK_FILES = [HERE / 'bench/find_feature/tasks/lexical.json',
                  HERE / 'bench/find_feature/tasks/semantic.json']
 SUCCESS = {'find_feature': {'correct'}, 'fix_bug': {'fixed'}, 'fix_bug_hard': {'fixed'},
            'write_tests': {'catches-bug'}, 'browser_flow': {'correct'}, 'own_app_flow': {'correct'},
-           'repo_fix': {'fixed'}, 'repo_fix_pb': {'fixed'}, 'web_research': {'correct'}, 'web_research_pb': {'correct'}, 'research_synthesis': {'correct'}, 'research_synthesis_pb': {'correct'}}
+           'repo_fix': {'fixed'}, 'repo_fix_pb': {'fixed'}, 'web_research': {'correct'}, 'web_research_pb': {'correct'}, 'research_synthesis': {'correct'}, 'research_synthesis_pb': {'correct'}, 'find_feature_private': {'correct'}}
 # Outcomes the harness caused, not the model's judgement (a lost browser tab, a CLI
 # failure). In use these runs are retried; decide.py leaves them out of the rate.
 NOT_MODEL = {'operational', 'incomplete'}
@@ -93,6 +93,8 @@ def load_cells(runs_dir, cat=None, cli_cost=False):
     # benches graded by their own grade.py (a build, a test run, page fetches) cache the verdicts here
     cached = {d.name: json.loads((d / 'grades.json').read_text(encoding='utf-8'))
               for d in runs_dir.iterdir() if d.is_dir() and (d / 'grades.json').exists()}
+    if (runs_dir / 'grades.json').exists():   # --runs pointed at one bench's directory
+        cached[runs_dir.name] = json.loads((runs_dir / 'grades.json').read_text(encoding='utf-8'))
     cells = defaultdict(list)
     files = sorted(runs_dir.glob('runs-*.jsonl')) + sorted(runs_dir.glob('*/runs-*.jsonl'))
     for f in files:

@@ -17,12 +17,13 @@ prefix, and the binary did update from 2.1.314 to 2.1.316 during the day.
 each Agent call per family (ask, auto, off), and shows the rate-limit windows, the 30-day consumption, the
 suggestions with their evidence, and what each recorded change really saved (per unit of the same work,
 in its own window, with the family's regression verdict beside it). Item 11 is closed by that, item 12 is
-now measurable instead of asserted. Still open, in the order worth doing: (1) a synthesis rubric family,
-the largest unmeasured subagent spend on every machine seen so far; (4) a capability tier with tasks in
-the 30 to 70% band, so a new model can be ranked; (5) contamination control on a private tree for
-find_feature; (6) paraphrases per family; (7) harness ablation; (8) the price of a wrong answer, measured;
-(9) browser work as the agent file describes it; (10) the Codex runner arm, only with the user's say.
-Also open: a macOS install check (Linux and Windows are verified), and a license file for the public repo.
+now measurable instead of asserted. Cell 9 (same day): (1) a research-notes family, code-graded on facts and
+sources, decided sonnet low; (5) the find-feature families on a private tree, no contamination effect;
+(6) one paraphrase per family in the regression check, no effect seen; (7) the prefix under five harness
+settings. Still open: (1b) a calibrated prose judge for the notes; (4) a capability tier beyond fix_bug's
+hard set, so a new model can be ranked; (8) the price of a wrong answer, measured; (9) browser work as the
+agent file describes it; (10) the Codex runner arm, only with the user's say; a macOS install check
+(Linux and Windows are verified by use and CI; the Python side runs on macOS in CI).
 
 What this benchmark does not cover, what the public ones do not cover, and what to do first.
 Grounded in two things: a scan of this machine's own Claude Code transcripts

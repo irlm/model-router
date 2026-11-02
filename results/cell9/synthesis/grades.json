@@ -1,0 +1,285 @@
+{
+ "cells": {
+  "research_synthesis / claude-fable-5-1 / low / 1": {
+   "n": 6,
+   "success": 6,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 6
+   },
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "cost_total": 3.11460195,
+   "cost_per_success": 0.519100325,
+   "cost_mean": 0.519100325,
+   "cost_p90": 0.5687177,
+   "cost_max": 0.6912792,
+   "turns_mean": 9.333333333333334,
+   "turns_max": 15,
+   "wall_mean": 44.04666666666667,
+   "wall_total": 264.28,
+   "tokens_mean": {
+    "input": 119.33333333333333,
+    "output": 2313.3333333333335,
+    "cache_read": 119157.5,
+    "cache_write": 16925.5
+   }
+  },
+  "research_synthesis / claude-fable-5-1 / low / 2": {
+   "n": 6,
+   "success": 6,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 6
+   },
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "cost_total": 3.3003660000000004,
+   "cost_per_success": 0.550061,
+   "cost_mean": 0.550061,
+   "cost_p90": 0.5550013,
+   "cost_max": 1.01556935,
+   "turns_mean": 9.666666666666666,
+   "turns_max": 19,
+   "wall_mean": 49.846666666666664,
+   "wall_total": 299.08,
+   "tokens_mean": {
+    "input": 130,
+    "output": 2387.5,
+    "cache_read": 141962,
+    "cache_write": 18147.833333333332
+   }
+  },
+  "research_synthesis / claude-haiku-5-5 / low / 1": {
+   "n": 6,
+   "success": 6,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 6
+   },
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "cost_total": 0.22250334,
+   "cost_per_success": 0.03708389,
+   "cost_mean": 0.03708389,
+   "cost_p90": 0.05487616,
+   "cost_max": 0.0557365,
+   "turns_mean": 8.166666666666666,
+   "turns_max": 12,
+   "wall_mean": 22.898333333333333,
+   "wall_total": 137.39000000000001,
+   "tokens_mean": {
+    "input": 7.666666666666667,
+    "output": 2164.8333333333335,
+    "cache_read": 91757.33333333333,
+    "cache_write": 16118.166666666666
+   }
+  },
+  "research_synthesis / claude-haiku-5-5 / low / 2": {
+   "n": 6,
+   "success": 5,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 5,
+    "right-unsourced": 1
+   },
+   "ci": [
+    0.43649056343635395,
+    0.9699474141282697
+   ],
+   "cost_total": 0.25642583,
+   "cost_per_success": 0.05128516600000001,
+   "cost_mean": 0.042737638333333335,
+   "cost_p90": 0.052954360000000006,
+   "cost_max": 0.06651295,
+   "turns_mean": 10,
+   "turns_max": 16,
+   "wall_mean": 38.16166666666667,
+   "wall_total": 228.97,
+   "tokens_mean": {
+    "input": 9,
+    "output": 2603.8333333333335,
+    "cache_read": 113195.5,
+    "cache_write": 17408.333333333332
+   }
+  },
+  "research_synthesis / claude-haiku-5-5 / low / 3": {
+   "n": 6,
+   "success": 5,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 5,
+    "right-unsourced": 1
+   },
+   "ci": [
+    0.43649056343635395,
+    0.9699474141282697
+   ],
+   "cost_total": 0.30120053,
+   "cost_per_success": 0.060240106,
+   "cost_mean": 0.05020008833333334,
+   "cost_p90": 0.05082048,
+   "cost_max": 0.06849876,
+   "turns_mean": 10.5,
+   "turns_max": 18,
+   "wall_mean": 29.913333333333334,
+   "wall_total": 179.48,
+   "tokens_mean": {
+    "input": 9.666666666666666,
+    "output": 2565.8333333333335,
+    "cache_read": 124578.83333333333,
+    "cache_write": 17966.833333333332
+   }
+  },
+  "research_synthesis / claude-opus-5-5 / low / 1": {
+   "n": 6,
+   "success": 6,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 6
+   },
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "cost_total": 1.0514835,
+   "cost_per_success": 0.17524725,
+   "cost_mean": 0.17524725,
+   "cost_p90": 0.1906236,
+   "cost_max": 0.2272868,
+   "turns_mean": 6,
+   "turns_max": 9,
+   "wall_mean": 27.085,
+   "wall_total": 162.51,
+   "tokens_mean": {
+    "input": 9.666666666666666,
+    "output": 1830,
+    "cache_read": 84544.66666666667,
+    "cache_write": 13824.5
+   }
+  },
+  "research_synthesis / claude-opus-5-5 / low / 2": {
+   "n": 6,
+   "success": 6,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 6
+   },
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "cost_total": 1.1133472,
+   "cost_per_success": 0.18555786666666665,
+   "cost_mean": 0.18555786666666665,
+   "cost_p90": 0.190903,
+   "cost_max": 0.2647607,
+   "turns_mean": 6.5,
+   "turns_max": 10,
+   "wall_mean": 33.92666666666667,
+   "wall_total": 203.56,
+   "tokens_mean": {
+    "input": 11,
+    "output": 1905,
+    "cache_read": 103114.5,
+    "cache_write": 14120.666666666666
+   }
+  },
+  "research_synthesis / claude-sonnet-5-5 / low / 1": {
+   "n": 6,
+   "success": 6,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 6
+   },
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "cost_total": 0.5583287,
+   "cost_per_success": 0.09305478333333334,
+   "cost_mean": 0.09305478333333334,
+   "cost_p90": 0.0973968,
+   "cost_max": 0.1350275,
+   "turns_mean": 6.833333333333333,
+   "turns_max": 11,
+   "wall_mean": 23.006666666666668,
+   "wall_total": 138.04,
+   "tokens_mean": {
+    "input": 10.666666666666666,
+    "output": 1631.5,
+    "cache_read": 98821.16666666667,
+    "cache_write": 14087.166666666666
+   }
+  },
+  "research_synthesis / claude-sonnet-5-5 / low / 2": {
+   "n": 6,
+   "success": 6,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 6
+   },
+   "ci": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "cost_total": 0.5630928000000001,
+   "cost_per_success": 0.09384880000000001,
+   "cost_mean": 0.09384880000000001,
+   "cost_p90": 0.09309450000000001,
+   "cost_max": 0.1454355,
+   "turns_mean": 7,
+   "turns_max": 13,
+   "wall_mean": 23.351666666666667,
+   "wall_total": 140.11,
+   "tokens_mean": {
+    "input": 10.666666666666666,
+    "output": 1678.8333333333333,
+    "cache_read": 98845,
+    "cache_write": 14175
+   }
+  }
+ },
+ "by_family": {},
+ "misses": [
+  {
+   "cell": [
+    "research_synthesis",
+    "claude-haiku-5-5",
+    "low",
+    2
+   ],
+   "id": "rs-03",
+   "family": "research_synthesis",
+   "outcome": "right-unsourced",
+   "detail": "3: right, no cited page states it",
+   "cost": 0.04241626,
+   "cost_cli": 0.04241625999999999,
+   "turns": 10,
+   "wall": 28.67
+  },
+  {
+   "cell": [
+    "research_synthesis",
+    "claude-haiku-5-5",
+    "low",
+    3
+   ],
+   "id": "rs-05",
+   "family": "research_synthesis",
+   "outcome": "right-unsourced",
+   "detail": "3: right, no cited page states it",
+   "cost": 0.06849876,
+   "cost_cli": 0.06849876,
+   "turns": 18,
+   "wall": 59.04
+  }
+ ],
+ "price_source": "catalog prices (catalog/models.json)"
+}

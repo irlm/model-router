@@ -1,0 +1,218 @@
+{
+ "claude-fable-5-1 / low / 1 / rs-01": {
+  "detail": "490 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 1 / rs-02": {
+  "detail": "464 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 1 / rs-03": {
+  "detail": "498 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 1 / rs-04": {
+  "detail": "423 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 1 / rs-05": {
+  "detail": "366 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 1 / rs-06": {
+  "detail": "458 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 2 / rs-01": {
+  "detail": "357 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 2 / rs-02": {
+  "detail": "401 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 2 / rs-03": {
+  "detail": "429 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 2 / rs-04": {
+  "detail": "427 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 2 / rs-05": {
+  "detail": "488 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-fable-5-1 / low / 2 / rs-06": {
+  "detail": "491 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 1 / rs-01": {
+  "detail": "272 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 1 / rs-02": {
+  "detail": "223 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 1 / rs-03": {
+  "detail": "311 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 1 / rs-04": {
+  "detail": "321 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 1 / rs-05": {
+  "detail": "317 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 1 / rs-06": {
+  "detail": "234 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 2 / rs-01": {
+  "detail": "293 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 2 / rs-02": {
+  "detail": "267 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 2 / rs-03": {
+  "detail": "3: right, no cited page states it",
+  "outcome": "right-unsourced"
+ },
+ "claude-haiku-5-5 / low / 2 / rs-04": {
+  "detail": "328 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 2 / rs-05": {
+  "detail": "287 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 2 / rs-06": {
+  "detail": "277 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 3 / rs-01": {
+  "detail": "265 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 3 / rs-02": {
+  "detail": "266 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 3 / rs-03": {
+  "detail": "311 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 3 / rs-04": {
+  "detail": "267 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-haiku-5-5 / low / 3 / rs-05": {
+  "detail": "3: right, no cited page states it",
+  "outcome": "right-unsourced"
+ },
+ "claude-haiku-5-5 / low / 3 / rs-06": {
+  "detail": "277 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 1 / rs-01": {
+  "detail": "470 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 1 / rs-02": {
+  "detail": "463 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 1 / rs-03": {
+  "detail": "435 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 1 / rs-04": {
+  "detail": "504 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 1 / rs-05": {
+  "detail": "398 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 1 / rs-06": {
+  "detail": "406 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 2 / rs-01": {
+  "detail": "435 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 2 / rs-02": {
+  "detail": "551 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 2 / rs-03": {
+  "detail": "406 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 2 / rs-04": {
+  "detail": "492 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 2 / rs-05": {
+  "detail": "412 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-opus-5-5 / low / 2 / rs-06": {
+  "detail": "371 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-01": {
+  "detail": "274 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-02": {
+  "detail": "291 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-03": {
+  "detail": "261 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-04": {
+  "detail": "349 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-05": {
+  "detail": "355 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-06": {
+  "detail": "245 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 2 / rs-01": {
+  "detail": "349 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 2 / rs-02": {
+  "detail": "250 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 2 / rs-03": {
+  "detail": "289 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 2 / rs-04": {
+  "detail": "343 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 2 / rs-05": {
+  "detail": "311 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 2 / rs-06": {
+  "detail": "267 words, 3/3 sourced",
+  "outcome": "correct"
+ }
+}

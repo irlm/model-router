@@ -131,9 +131,9 @@ reset; the change log, the agent files and `/config` options are not in the plug
 Agent calls are classed by agent type first, then by the prompt: code searches (Explore, Plan,
 Codebase Onboarding Engineer), fact lookups (Web Researcher, or a short prompt asking for one
 thing), browser flows (an agent whose name says browser, Evidence Collector, or a prompt that
-reads as driving a page), code reviews, research reports, code changes, other. The first three
-map to measured families and can carry a measured suggestion; the others never get a downgrade
-suggested. A suggestion whose known saving is under $0.50 per window is not shown.
+reads as driving a page), code reviews, research reports, code changes, other. Code searches, fact
+lookups, browser flows and research reports map to measured families and can carry a measured
+suggestion; the others never get a downgrade suggested. A suggestion whose known saving is under $0.50 per window is not shown.
 
 ### After a change: what was really saved
 

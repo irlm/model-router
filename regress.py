@@ -108,7 +108,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--sample', type=int, default=6)
     ap.add_argument('--seed', type=int, default=1)
-    ap.add_argument('--families', default='find_feature,repo_fix,web_research')
+    ap.add_argument('--families', default='find_feature,repo_fix,web_research,research_synthesis')
     ap.add_argument('--kernel-worktree', type=Path, default=None, help='a free linux-v6.12 worktree for the agent (fix_bug, write_tests)')
     ap.add_argument('--build-dir', type=Path, default=None, help='its KUnit build dir')
     ap.add_argument('--browser', action='store_true', help='also run browser_flow (Chrome must be open)')

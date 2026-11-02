@@ -143,6 +143,26 @@ test('no checkout at the configured path: the clone the plugin install made serv
   expect(runs.find(r => r.argv[1] === 'tools/status.py')?.cwd).toBe(CLONE)
 })
 
+test('auto mode routes a research note to the decided family once it is measured', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const withNotes = { ...STATUS, families: [...STATUS.families,
+    { name: 'research_synthesis', model: 'sonnet', effort: 'low', variant: '', rate: '12/12', cost_per_success: 0.0935, can_run: true, why: '', last_check: null }] }
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(withNotes) } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return { result: {} } })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call({ tool: 'Agent', description: 'compare options', prompt: 'Research and compare three message queues; write up a report.', subagent_type: 'general-purpose' })
+  const call = seen.find(x => x.tool === 'Agent')
+  expect([call?.model, call?.effort]).toEqual(['sonnet', 'low'])
+})
+
 type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]
 const ROUTING_MOCKS = (on: On, seen: Record<string, unknown>[], ask: 'deny' | string) => {
   on('command.register', () => ({ value: { command: 'router' } }))

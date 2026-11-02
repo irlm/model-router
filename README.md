@@ -4,7 +4,11 @@ Which model, at which effort, for which kind of agent work, measured on our own 
 The output is a routing strategy per task family that agents read, with the numbers behind it,
 re-decided when a new model appears and repriced when a price changes.
 
-Status: routing v1 decided 2026-10-30 from four families, all Haiku at effort low (two of them
+Status 2026-11-02 (`results/cell9`): a research-notes family decided sonnet low (Haiku missed the bar on
+citations, 16/18); the find-feature families on a private tree, 100% for every tier (no contamination
+effect); a paraphrase check in the regression run; the prefix measured under five harness settings.
+
+Routing v1 decided 2026-10-30 from four families, all Haiku at effort low (two of them
 only with a test runner in the loop); see `ROUTING.md`. `results/` holds what has actually run.
 2026-11-01 (`results/cell8`): two families on what this machine actually does (`GAPS.md`): a bug fix in
 the user's own TypeScript repo with an effort sweep of the big models (every Claude tier fixes 24/24 at
@@ -107,6 +111,10 @@ table, so a change of habit shows up as a change between entries.
   line at a time and keeps the mutants the suite catches, the agent gets the failing output and the test
   command, `grade.py` reruns the suite on the patched tree. A private tree, so no training-data leak;
   `--prompt-variant b` asks the same thing in other words.
+- `bench/research_synthesis/`: a 250-700 word research note that answers three of the web_research
+  questions, each claim with the page read; graded in code by the same checker (cell 9: sonnet low).
+- `bench/find_feature/private_tree.py`: the find_feature families on a repository of your own, truth by
+  word search; the contamination control (cell 9: no effect). Its tasks and receipts stay local.
 - `bench/web_research/`: look up one technical fact on the web and cite the page (18 questions, mostly
   PostgreSQL and DuckDB defaults and limits). `grade.py` checks the answer by pattern, then fetches every
   cited URL and looks for the evidence in its text: a right answer with a made-up or wrong URL is

@@ -1,0 +1,169 @@
+{
+ "cells": {
+  "find_feature_private / claude-fable-5-1 / low / 1": {
+   "n": 21,
+   "success": 21,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 21
+   },
+   "ci": [
+    0.8453561767357979,
+    0.9999999999999999
+   ],
+   "cost_total": 5.706483,
+   "cost_per_success": 0.27173728571428574,
+   "cost_mean": 0.27173728571428574,
+   "cost_p90": 0.28571075,
+   "cost_max": 0.34405275,
+   "turns_mean": 2.142857142857143,
+   "turns_max": 3,
+   "wall_mean": 6.883333333333333,
+   "wall_total": 144.55,
+   "tokens_mean": {
+    "input": 38.57142857142857,
+    "output": 150.38095238095238,
+    "cache_read": 49307.23809523809,
+    "cache_write": 12575.285714285714
+   }
+  },
+  "find_feature_private / claude-haiku-5-5 / low / 1": {
+   "n": 21,
+   "success": 21,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 21
+   },
+   "ci": [
+    0.8453561767357979,
+    0.9999999999999999
+   ],
+   "cost_total": 0.06802248000000001,
+   "cost_per_success": 0.003239165714285715,
+   "cost_mean": 0.003239165714285715,
+   "cost_p90": 0.0034744300000000006,
+   "cost_max": 0.00472256,
+   "turns_mean": 2.1904761904761907,
+   "turns_max": 3,
+   "wall_mean": 4.996190476190476,
+   "wall_total": 104.92,
+   "tokens_mean": {
+    "input": 4.380952380952381,
+    "output": 304.95238095238096,
+    "cache_read": 48411.80952380953,
+    "cache_write": 13010.666666666666
+   }
+  },
+  "find_feature_private / claude-haiku-5-5 / low / 2": {
+   "n": 21,
+   "success": 21,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 21
+   },
+   "ci": [
+    0.8453561767357979,
+    0.9999999999999999
+   ],
+   "cost_total": 0.01941777,
+   "cost_per_success": 0.0009246557142857144,
+   "cost_mean": 0.0009246557142857144,
+   "cost_p90": 0.00117314,
+   "cost_max": 0.0027642100000000005,
+   "turns_mean": 2.238095238095238,
+   "turns_max": 5,
+   "wall_mean": 4.8100000000000005,
+   "wall_total": 101.01,
+   "tokens_mean": {
+    "input": 4.380952380952381,
+    "output": 305.95238095238096,
+    "cache_read": 60277.47619047619,
+    "cache_write": 842.3333333333334
+   }
+  },
+  "find_feature_private / claude-haiku-5-5 / low / 3": {
+   "n": 21,
+   "success": 21,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 21
+   },
+   "ci": [
+    0.8453561767357979,
+    0.9999999999999999
+   ],
+   "cost_total": 0.020634230000000003,
+   "cost_per_success": 0.000982582380952381,
+   "cost_mean": 0.000982582380952381,
+   "cost_p90": 0.0017105500000000001,
+   "cost_max": 0.0027311500000000003,
+   "turns_mean": 2.238095238095238,
+   "turns_max": 4,
+   "wall_mean": 4.915238095238095,
+   "wall_total": 103.22,
+   "tokens_mean": {
+    "input": 4.380952380952381,
+    "output": 314,
+    "cache_read": 60283.95238095238,
+    "cache_write": 1111.5238095238096
+   }
+  },
+  "find_feature_private / claude-opus-5-5 / low / 1": {
+   "n": 21,
+   "success": 21,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 21
+   },
+   "ci": [
+    0.8453561767357979,
+    0.9999999999999999
+   ],
+   "cost_total": 2.3437314,
+   "cost_per_success": 0.11160625714285713,
+   "cost_mean": 0.11160625714285714,
+   "cost_p90": 0.1219642,
+   "cost_max": 0.125078,
+   "turns_mean": 2.0476190476190474,
+   "turns_max": 3,
+   "wall_mean": 5.558571428571429,
+   "wall_total": 116.73,
+   "tokens_mean": {
+    "input": 4.095238095238095,
+    "output": 122.95238095238095,
+    "cache_read": 42804.619047619046,
+    "cache_write": 12571.238095238095
+   }
+  },
+  "find_feature_private / claude-sonnet-5-5 / low / 1": {
+   "n": 21,
+   "success": 21,
+   "not_model": 0,
+   "outcomes": {
+    "correct": 21
+   },
+   "ci": [
+    0.8453561767357979,
+    0.9999999999999999
+   ],
+   "cost_total": 1.2028318,
+   "cost_per_success": 0.05727770476190476,
+   "cost_mean": 0.05727770476190476,
+   "cost_p90": 0.06323039999999999,
+   "cost_max": 0.0643857,
+   "turns_mean": 2.2857142857142856,
+   "turns_max": 4,
+   "wall_mean": 5.024761904761904,
+   "wall_total": 105.52,
+   "tokens_mean": {
+    "input": 4.571428571428571,
+    "output": 158.8095238095238,
+    "cache_read": 49149.42857142857,
+    "cache_write": 12691.380952380952
+   }
+  }
+ },
+ "by_family": {},
+ "misses": [],
+ "price_source": "catalog prices (catalog/models.json)"
+}

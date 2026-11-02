@@ -996,12 +996,109 @@
   },
   "research_synthesis": {
    "what": "write a short research note (250-700 words) that answers three looked-up questions, each claim with the page that states it; graded in code (answer patterns, every cited page fetched), prose quality beyond that not judged",
-   "default": null,
+   "default": {
+    "model": "sonnet",
+    "effort": "low"
+   },
    "step_up": null,
    "escalation_rule": null,
-   "why_no_escalation": null,
-   "evidence": {},
-   "status": "measuring"
+   "why_no_escalation": "none: every tier above Haiku wrote every note with sources; Haiku missed the bar on citations, not on facts. The failure to watch is a right claim with a page that does not state it, the same as web_research.",
+   "evidence": {
+    "haiku low": "16/18 over 3 trials (2 notes right but one claim cited a page that did not state it)",
+    "sonnet low": "12/12 over 2 trials",
+    "opus low": "12/12 over 2 trials",
+    "fable low": "12/12 over 2 trials"
+   },
+   "status": "decided",
+   "decided": {
+    "bar": 0.7375,
+    "rule": "cheapest candidate whose Wilson 95% lower bound >= best - 0.02, by cost per success; harness-lost runs excluded from the rate",
+    "evidence": {
+     "claude-fable-5-1 low": {
+      "n": 12,
+      "success": 12,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.7575,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
+      "cost_per_success": 0.5346,
+      "cost_total": 6.415,
+      "wall_mean": 46.9467,
+      "trials": {
+       "research_synthesis": 2
+      },
+      "covers": true
+     },
+     "claude-haiku-5-5 low": {
+      "n": 18,
+      "success": 16,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 0.8889,
+      "ci": [
+       0.672,
+       0.969
+      ],
+      "k": 3,
+      "pass_k": 0.6667,
+      "cost_per_success": 0.0488,
+      "cost_total": 0.7801,
+      "wall_mean": 30.3244,
+      "trials": {
+       "research_synthesis": 3
+      },
+      "covers": true
+     },
+     "claude-opus-5-5 low": {
+      "n": 12,
+      "success": 12,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.7575,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
+      "cost_per_success": 0.1804,
+      "cost_total": 2.1648,
+      "wall_mean": 30.5058,
+      "trials": {
+       "research_synthesis": 2
+      },
+      "covers": true
+     },
+     "claude-sonnet-5-5 low": {
+      "n": 12,
+      "success": 12,
+      "not_model": 0,
+      "pending": 0,
+      "rate": 1.0,
+      "ci": [
+       0.7575,
+       1.0
+      ],
+      "k": 2,
+      "pass_k": 1.0,
+      "cost_per_success": 0.0935,
+      "cost_total": 1.1214,
+      "wall_mean": 23.1792,
+      "trials": {
+       "research_synthesis": 2
+      },
+      "covers": true
+     }
+    },
+    "n_tasks": 6,
+    "default_rate": 1.0
+   },
+   "note": "first measurement 2026-11-02 (results/cell9): fact-dense notes graded in code; prose quality beyond the facts and sources is not judged. Sonnet low writes a sourced note at 1/5.7 of Fable low and 1/1.9 of Opus low."
   }
  },
  "rules": [
@@ -1057,10 +1154,245 @@
  "decided_by": "decide.py --margin 0.02 --min-trials 1 --rule lower (catalog prices)",
  "plan_for_unmeasured_models": [
   {
+   "model": "claude-fable-5",
+   "provider": "anthropic",
+   "list_price_in_plus_out_per_mtok": 60.0,
+   "families": [
+    {
+     "family": "web_research",
+     "run": true,
+     "n_tasks": 26,
+     "expected_cost_usd": 9.94,
+     "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
+    },
+    {
+     "family": "research_synthesis",
+     "run": false,
+     "n_tasks": 6,
+     "expected_cost_usd": 2.79,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "repo_fix",
+     "run": false,
+     "n_tasks": 24,
+     "expected_cost_usd": 17.14,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "write_tests",
+     "run": false,
+     "n_tasks": 10,
+     "expected_cost_usd": 25.86,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "fix_bug",
+     "run": false,
+     "n_tasks": 21,
+     "expected_cost_usd": 30.37,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "find_feature",
+     "run": false,
+     "n_tasks": 72,
+     "expected_cost_usd": 32.81,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "browser_flow",
+     "run": false,
+     "n_tasks": 26,
+     "expected_cost_usd": 92.54,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    }
+   ],
+   "harness": "claude"
+  },
+  {
+   "model": "claude-opus-5",
+   "provider": "anthropic",
+   "list_price_in_plus_out_per_mtok": 30.0,
+   "families": [
+    {
+     "family": "web_research",
+     "run": true,
+     "n_tasks": 26,
+     "expected_cost_usd": 4.97,
+     "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
+    },
+    {
+     "family": "research_synthesis",
+     "run": false,
+     "n_tasks": 6,
+     "expected_cost_usd": 1.39,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "repo_fix",
+     "run": false,
+     "n_tasks": 24,
+     "expected_cost_usd": 8.57,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "write_tests",
+     "run": false,
+     "n_tasks": 10,
+     "expected_cost_usd": 12.93,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "fix_bug",
+     "run": false,
+     "n_tasks": 21,
+     "expected_cost_usd": 15.18,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "find_feature",
+     "run": false,
+     "n_tasks": 72,
+     "expected_cost_usd": 16.41,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "browser_flow",
+     "run": false,
+     "n_tasks": 26,
+     "expected_cost_usd": 46.27,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    }
+   ],
+   "harness": "claude"
+  },
+  {
+   "model": "claude-opus-4-8",
+   "provider": "anthropic",
+   "list_price_in_plus_out_per_mtok": 30.0,
+   "families": [
+    {
+     "family": "web_research",
+     "run": true,
+     "n_tasks": 26,
+     "expected_cost_usd": 4.97,
+     "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
+    },
+    {
+     "family": "research_synthesis",
+     "run": false,
+     "n_tasks": 6,
+     "expected_cost_usd": 1.39,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "repo_fix",
+     "run": false,
+     "n_tasks": 24,
+     "expected_cost_usd": 8.57,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "write_tests",
+     "run": false,
+     "n_tasks": 10,
+     "expected_cost_usd": 12.93,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "fix_bug",
+     "run": false,
+     "n_tasks": 21,
+     "expected_cost_usd": 15.18,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "find_feature",
+     "run": false,
+     "n_tasks": 72,
+     "expected_cost_usd": 16.41,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "browser_flow",
+     "run": false,
+     "n_tasks": 26,
+     "expected_cost_usd": 46.27,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    }
+   ],
+   "harness": "claude"
+  },
+  {
+   "model": "claude-haiku-4-5-20251001",
+   "provider": "anthropic",
+   "list_price_in_plus_out_per_mtok": 6.0,
+   "families": [
+    {
+     "family": "research_synthesis",
+     "run": true,
+     "n_tasks": 6,
+     "expected_cost_usd": 0.28,
+     "why": "not dearer than the current default, so it could win on cost"
+    },
+    {
+     "family": "web_research",
+     "run": true,
+     "n_tasks": 26,
+     "expected_cost_usd": 0.99,
+     "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
+    },
+    {
+     "family": "repo_fix",
+     "run": false,
+     "n_tasks": 24,
+     "expected_cost_usd": 1.71,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "write_tests",
+     "run": false,
+     "n_tasks": 10,
+     "expected_cost_usd": 2.59,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "fix_bug",
+     "run": false,
+     "n_tasks": 21,
+     "expected_cost_usd": 3.04,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "find_feature",
+     "run": false,
+     "n_tasks": 72,
+     "expected_cost_usd": 3.28,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
+     "family": "browser_flow",
+     "run": false,
+     "n_tasks": 26,
+     "expected_cost_usd": 9.25,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    }
+   ],
+   "harness": "claude"
+  },
+  {
    "model": "openai:gpt-6.1-sol",
    "provider": "openai",
    "list_price_in_plus_out_per_mtok": 12.0,
    "families": [
+    {
+     "family": "research_synthesis",
+     "run": true,
+     "n_tasks": 6,
+     "expected_cost_usd": 0.5,
+     "why": "not dearer than the current default, so it could win on cost"
+    },
     {
      "family": "web_research",
      "run": true,
@@ -1119,6 +1451,13 @@
      "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
     },
     {
+     "family": "research_synthesis",
+     "run": false,
+     "n_tasks": 6,
+     "expected_cost_usd": 2.79,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
+    },
+    {
      "family": "repo_fix",
      "run": false,
      "n_tasks": 24,
@@ -1167,6 +1506,13 @@
      "n_tasks": 26,
      "expected_cost_usd": 1.82,
      "why": "dearer, but the default is below the bar ceiling, so a perfect run could raise the bar"
+    },
+    {
+     "family": "research_synthesis",
+     "run": false,
+     "n_tasks": 6,
+     "expected_cost_usd": 0.54,
+     "why": "dearer than the current default and the default is at the ceiling; it cannot change the decision"
     },
     {
      "family": "repo_fix",

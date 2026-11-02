@@ -48,9 +48,39 @@ const statusLine = (s: StatusJson, limits: RateLimit[], at: number, routedN = 0)
   return `router: ${parts.filter(Boolean).join(' · ')} · /router · ${clock(at)}`
 }
 
+/** One line of the pane or of /router check's text, with how the pane paints it. */
+type Line = { text: string; color?: string; bold?: boolean; dim?: boolean }
+const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
+const BLANK = line('')
+
+const BLOCKS = '▁▂▃▄▅▆▇█'
+/** A sparkline: one block per value, scaled to the largest. */
+const spark = (values: number[]) => {
+  const max = Math.max(0, ...values)
+  return values.map(v => BLOCKS[max > 0 ? Math.min(7, Math.round((v / max) * 7)) : 0]).join('')
+}
+/** A horizontal bar of `width` cells, `frac` of them full. */
+const bar = (frac: number, width = 10) => {
+  const n = Math.max(0, Math.min(width, Math.round((Number.isFinite(frac) ? frac : 0) * width)))
+  return '█'.repeat(n) + '░'.repeat(width - n)
+}
+const money = (n: number) => `$${n >= 10 ? n.toFixed(0) : n.toFixed(2)}`
+const rateFrac = (rate: string | null) => {
+  const m = rate?.match(/^(\d+)\/(\d+)$/)
+  return m && Number(m[2]) > 0 ? Number(m[1]) / Number(m[2]) : null
+}
+const rateColor = (f: number | null) => (f === null ? undefined : f >= 0.9 ? 'green' : f >= 0.7 ? 'yellow' : 'red')
+const KIND_COLOR: Record<string, string | undefined> = { measured: 'green', extrapolated: 'cyan' }
+
+/** The rate-limit windows as bars, one line each. */
+const limitLines = (limits: RateLimit[]): Line[] =>
+  limits.map(l =>
+    line(`${windowName(l.kind).padEnd(4)}${bar(l.percentUsed / 100, 20)} ${String(Math.round(l.percentUsed)).padStart(3)}% used${l.resetsAt ? ', resets ' + clock(Date.parse(l.resetsAt)) : ''}`,
+      { color: l.percentUsed >= 80 ? 'red' : l.percentUsed >= 50 ? 'yellow' : 'green', bold: true }))
+
 /** The pane's body and /router check's text. `full` (the text, or the pane with Details on) adds the long
- * sections; the pane's default is a glance: checkout, families, to check, one line per suggestion. */
-const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = '', full = true): string[] => {
+ * sections; the pane's default is a glance: checkout, spend, families, to check, one line per suggestion. */
+const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = '', full = true): Line[] => {
   const g = s.repo
   const sync = !g.is_repo
     ? 'not a git checkout'
@@ -59,57 +89,64 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
        g.ahead ? `${g.ahead} ahead` : '']
         .filter(Boolean).join(', ')
   const reg = s.ledger.regress_last
-  const lines = [
-    `read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · repo ${g.head ?? '-'} (${sync}${where ? ', ' + where : ''})`,
-    `routing v${s.routing.version}, decided ${s.routing.decided}`,
-    '',
-    `${'family'.padEnd(13)}${'default'.padEnd(19)}${'evidence'.padEnd(9)}${'$/ok'.padEnd(8)}${'here'.padEnd(5)}last check`,
+  const u = s.usage
+  const total = u ? u.main_total + u.subagents_total : 0
+  const lines: Line[] = [
+    line(`read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · repo ${g.head ?? '-'} (${sync}${where ? ', ' + where : ''}) · routing v${s.routing.version}, decided ${s.routing.decided}`, { dim: true }),
   ]
+  if (u) {
+    const prev = u.previous.main_total + u.previous.subagents_total
+    const daily = u.daily ?? []
+    lines.push(line(`spend ${u.days}d ${daily.length ? spark(daily.map(d => d.cost)) + ' ' : ''}${money(total)} (main ${money(u.main_total)}, agents ${money(u.subagents_total)}) · previous ${u.days}d ${money(prev)}`, { bold: true }))
+  }
+  lines.push(BLANK, line(`${'family'.padEnd(13)}${'default'.padEnd(19)}${'ok'.padEnd(11)}${'evidence'.padEnd(9)}${'$/ok'.padEnd(8)}${'here'.padEnd(5)}last check`, { bold: true }))
   for (const f of s.families) {
     const d = f.model ? `${f.model} ${f.effort}${f.variant ? ' +' + f.variant : ''}` : 'none'
     const lc = f.last_check
     const last = lc ? (lc.sample ? `${lc.verdict} ${lc.successes}/${lc.sample}` : lc.verdict) : '-'
     const cost = f.cost_per_success === null ? '-' : f.cost_per_success.toFixed(4)
-    lines.push(`${f.name.padEnd(13)}${d.padEnd(19)}${(f.rate ?? '-').padEnd(9)}${cost.padEnd(8)}${(f.can_run ? 'yes' : 'no').padEnd(5)}${last}`)
+    const fr = rateFrac(f.rate)
+    lines.push(line(`${f.name.padEnd(13)}${d.padEnd(19)}${fr === null ? '-'.padEnd(10) : bar(fr)} ${(f.rate ?? '-').padEnd(9)}${cost.padEnd(8)}${(f.can_run ? 'yes' : 'no').padEnd(5)}${last}`,
+      { color: rateColor(fr), dim: fr === null }))
   }
   const applied = s.agents.routed.filter(r => r.state === 'applied').length
   if (full) {
     lines.push(
-      '',
-      `agents: ${s.agents.files} files, ${s.agents.unused} unused; routed ${applied}/${s.agents.routed.length} applied`,
-      `prices verified ${s.catalog.verified_oldest ?? '?'} (${s.catalog.age_days ?? '?'} days) · ledger: usage ${s.ledger.usage_last ?? 'none'}, regress ${reg?.date ?? 'none'} on ${reg?.claude ?? '-'}`,
-      `timer: ${s.timer.next ? 'next ' + s.timer.next : s.timer.note ?? 'none'}`,
+      BLANK,
+      line(`agents: ${s.agents.files} files, ${s.agents.unused} unused; routed ${applied}/${s.agents.routed.length} applied`, { dim: true }),
+      line(`prices verified ${s.catalog.verified_oldest ?? '?'} (${s.catalog.age_days ?? '?'} days) · ledger: usage ${s.ledger.usage_last ?? 'none'}, regress ${reg?.date ?? 'none'} on ${reg?.claude ?? '-'}`, { dim: true }),
+      line(`timer: ${s.timer.next ? 'next ' + s.timer.next : s.timer.note ?? 'none'}`, { dim: true }),
     )
   }
-  lines.push('')
-  if (s.advice.length === 0) lines.push('nothing to do')
-  else lines.push('to check:', ...s.advice.map(a => `  - ${a}`))
-  const u = s.usage
+  lines.push(BLANK)
+  if (s.advice.length === 0) lines.push(line('nothing to check', { color: 'green', bold: true }))
+  else lines.push(line('to check:', { bold: true }), ...s.advice.map(a => line(`  - ${a}`, { color: 'yellow' })))
   if (u && full) {
-    lines.push(
-      '',
-      `consumption, last ${u.days} days since ${u.since} (catalog $ = headroom on a subscription):`,
-      `  main sessions $${u.main_total.toFixed(0)} (output $${u.main_out_cost.toFixed(0)}) · subagents $${u.subagents_total.toFixed(0)} in ${u.subagent_calls} calls · previous ${u.days} days: main $${u.previous.main_total.toFixed(0)}, subagents $${u.previous.subagents_total.toFixed(0)}`,
-    )
+    lines.push(BLANK, line(`consumption, last ${u.days} days since ${u.since} (catalog $ = headroom on a subscription): main ${money(u.main_total)} (output ${money(u.main_out_cost)}) · subagents ${money(u.subagents_total)} in ${u.subagent_calls} calls`, { bold: true }))
+    const top = Math.max(0, ...u.main_rows.map(r => r.cost), ...Object.values(u.by_class).map(b => b.cost))
     for (const r of u.main_rows.slice(0, 6)) {
-      lines.push(`  ${r.model.padEnd(30)}${r.effort.padEnd(8)}${String(r.msgs).padStart(5)} msgs  $${r.cost.toFixed(2).padStart(7)}`)
+      lines.push(line(`  ${r.model.padEnd(30)}${r.effort.padEnd(8)}${bar(top > 0 ? r.cost / top : 0, 20)} ${money(r.cost).padStart(5)}  ${String(r.msgs).padStart(5)} msgs`))
     }
     for (const [cls, b] of Object.entries(u.by_class).sort((a, b) => b[1].cost - a[1].cost)) {
       const types = Object.entries(b.types).map(([t, n]) => `${t} x${n}`).join(', ')
-      lines.push(`  subagents ${cls.padEnd(20)}${String(b.n).padStart(4)} calls  $${b.cost.toFixed(2).padStart(7)}  ${types}`)
+      lines.push(line(`  ${('agents ' + cls).padEnd(30)}${''.padEnd(8)}${bar(top > 0 ? b.cost / top : 0, 20)} ${money(b.cost).padStart(5)}  ${String(b.n).padStart(5)} calls  ${types}`))
     }
   }
-  const sug = s.suggestions ?? []
-  lines.push('', sug.length === 0 ? 'suggestions: none from the last window'
-    : full ? 'suggestions (catalog $ per window; the kind says how far the evidence reaches):' : 'suggestions (catalog $ per 30 days; Details for the basis):')
+  // Suggestions: largest saving first, unknown last; each with its share of the window's spend.
+  const sug = [...(s.suggestions ?? [])].sort((a, b) => (b.saving?.[1] ?? -1) - (a.saving?.[1] ?? -1))
+  const upTo = sug.reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
+  lines.push(BLANK, line(sug.length === 0 ? 'suggestions: none from the last window'
+    : `suggestions: up to ${money(upTo)} of ${money(total)} in ${u?.days ?? 30} days${total > 0 ? ` (${Math.round((upTo / total) * 100)}%)` : ''}${full ? '; the kind says how far the evidence reaches' : '; Details for the basis'}`, { bold: true }))
   for (const g of sug) {
-    const sv = g.saving === null ? 'saving unknown' : g.saving[0] === g.saving[1] ? `saves $${g.saving[0].toFixed(0)}` : `saves $${g.saving[0].toFixed(0)}-${g.saving[1].toFixed(0)}`
-    lines.push(`* [${g.kind}] ${g.title}: ${sv}`)
-    if (full) lines.push(`    basis: ${g.basis}`, `    do: ${g.action}`)
+    const sv = g.saving === null ? 'unknown' : g.saving[0] === g.saving[1] ? `saves ${money(g.saving[0])}` : `saves ${money(g.saving[0])}-${money(g.saving[1])}`
+    const share = g.saving && total > 0 ? g.saving[1] / total : 0
+    lines.push(line(`${sv.padEnd(16)}${bar(share)} ${String(Math.round(share * 100)).padStart(2)}%  [${g.kind}] ${g.title}`, { color: KIND_COLOR[g.kind] }))
+    if (full) lines.push(line(`    basis: ${g.basis}`, { dim: true }), line(`    do: ${g.action}`, { dim: true }))
   }
   if (seen.length > 0) {
-    lines.push('', `routed this session (${seen.length}; mode ${routingMode}, /router routing <ask|auto|off>):`)
-    for (const r of seen.slice(full ? -8 : -3)) lines.push(`  ${clock(r.at)}  ${r.agent}: ${r.from} -> ${r.to}  [${r.family}] ${r.decision}  ${r.description}`)
+    const kept = seen.filter(r => r.decision === 'kept').length
+    lines.push(BLANK, line(`routed this session: ${seen.length - kept} routed, ${kept} kept (mode ${routingMode}; /router routing ask|auto|off)`, { bold: true }))
+    for (const r of seen.slice(full ? -8 : -3)) lines.push(line(`  ${clock(r.at)}  ${r.agent}: ${r.from} -> ${r.to}  [${r.family}] ${r.decision}  ${r.description}`, { dim: r.decision === 'kept' }))
   }
   return lines
 }
@@ -331,7 +368,7 @@ export const register: Register = (on, options) => {
     if (verb === 'check' || verb === 'fetch') {
       await refresh($, verb === 'fetch')
       const s = await read($, status)
-      return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where).join('\n') : (s?.error ?? 'no status') }
+      return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where).map(l => l.text).join('\n') : (s?.error ?? 'no status') }
     }
     if (verb === 'routing') {
       if (arg === 'ask' || arg === 'auto' || arg === 'off') routingMode = arg
@@ -379,9 +416,9 @@ export const register: Register = (on, options) => {
     const busy = j?.isRunning === true
     const full = await read($, details)
     const limits = s?.rateLimits ?? []
-    const body = [
-      ...(limits.length ? [`rate limits: ${limits.map(l => `${windowName(l.kind)} ${l.percentUsed}% used${l.resetsAt ? ', resets ' + clock(Date.parse(l.resetsAt)) : ''}`).join(' · ')}`] : []),
-      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full) : [s?.error ?? 'reading the checkout…']),
+    const body: Line[] = [
+      ...limitLines(limits),
+      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined })]),
     ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     const logRoom = Math.max(3, rows - body.length - 3)
@@ -399,13 +436,9 @@ export const register: Register = (on, options) => {
           <Button key="apply" hotkey="a" dimColor={busy} onPress={() => { void runJob($, 'apply') }}>Apply agents</Button>
           <Button key="pull" hotkey="p" dimColor={busy} onPress={() => { void runJob($, 'pull') }}>Pull</Button>
         </Box>
-        {body.map(line => (
-          <Text
-            color={line.startsWith('  - ') ? 'yellow' : line.startsWith('* [measured]') ? 'green' : line.startsWith('* [') ? 'cyan' : undefined}
-            weight={line.startsWith('* [') || line.startsWith('rate limits:') ? 'bold' : undefined}
-            dimColor={line === '' || line.startsWith('    basis:')}
-          >
-            {line === '' ? ' ' : line}
+        {body.map(l => (
+          <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>
+            {l.text === '' ? ' ' : l.text}
           </Text>
         ))}
         {j && (

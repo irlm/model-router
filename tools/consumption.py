@@ -62,6 +62,7 @@ def collect(days=30, now=None):
     calls = {}                                               # tool_use_id -> Agent call
     agent_of = {}                                            # tool_use_id -> agentId
     agent_cost = collections.Counter(); agent_model = {}
+    daily = collections.Counter()                            # day -> catalog $ (main and subagents)
     seen = set()
     files = 0
     for f in ROOT.glob('**/*.jsonl'):
@@ -100,6 +101,8 @@ def collect(days=30, now=None):
                         for k in TOKENS:
                             tok[key][k] += u.get(k, 0) or 0
                         msgs[key] += 1; cost[key] += c; out_cost[key] += oc
+                        if window == 'cur':
+                            daily[ts[:10]] += c
                     if is_sub and r.get('agentId'):
                         agent_cost[r['agentId']] += c; agent_model[r['agentId']] = model
                 for it in m['content']:
@@ -131,20 +134,24 @@ def collect(days=30, now=None):
                 out.append({'model': model, 'effort': eff, 'msgs': n, **{k: tok[(w, where, model, eff)][k] for k in TOKENS},
                             'cost': round(cost[(w, where, model, eff)], 2), 'out_cost': round(out_cost[(w, where, model, eff)], 2)})
         return out
-    by_class = collections.defaultdict(lambda: {'n': 0, 'cost': 0.0, 'types': collections.Counter(), 'unpriced': 0})
+    by_class = collections.defaultdict(lambda: {'n': 0, 'cost': 0.0, 'types': collections.Counter(), 'unpriced': 0,
+                                                'models': collections.defaultdict(lambda: {'n': 0, 'cost': 0.0})})
     for c in calls.values():
         if c['window'] != 'cur':
             continue
         b = by_class[c['class']]; b['n'] += 1; b['types'][c['type']] += 1
+        bm = b['models'][c['model'] or '?']; bm['n'] += 1; bm['cost'] += c['cost'] or 0.0
         if c['cost'] is None:
             b['unpriced'] += 1
         else:
             b['cost'] += c['cost']
     for b in by_class.values():
         b['cost'] = round(b['cost'], 2); b['types'] = dict(b['types'])
+        b['models'] = {m: {'n': v['n'], 'cost': round(v['cost'], 4)} for m, v in b['models'].items()}
+    day_list = [(now - datetime.timedelta(days=i)).date().isoformat() for i in range(days - 1, -1, -1)]
     sub_total = {w: round(sum(v for k, v in cost.items() if k[0] == w and k[1] == 'sub'), 2) for w in ('cur', 'prev')}
     main_total = {w: round(sum(v for k, v in cost.items() if k[0] == w and k[1] == 'main'), 2) for w in ('cur', 'prev')}
-    return {'days': days, 'since': since_cur[:10], 'files': files,
+    return {'days': days, 'since': since_cur[:10], 'files': files, 'daily': [{'date': d, 'cost': round(daily[d], 2)} for d in day_list],
             'main': {'rows': rows('cur'), 'total': main_total['cur'], 'out_cost': round(sum(v for k, v in out_cost.items() if k[0] == 'cur' and k[1] == 'main'), 2)},
             'subagents': {'calls': sorted((c for c in calls.values() if c['window'] == 'cur'), key=lambda c: c['ts']),
                           'by_class': dict(by_class), 'total': sub_total['cur']},

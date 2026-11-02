@@ -37,8 +37,10 @@ export type Usage = {
   main_rows: { model: string; effort: string; msgs: number; cost: number; out_cost: number }[]
   subagents_total: number
   subagent_calls: number
-  by_class: Record<string, { n: number; cost: number; types: Record<string, number> }>
+  by_class: Record<string, { n: number; cost: number; types: Record<string, number>; models?: Record<string, { n: number; cost: number }> }>
   previous: { since: string; main_total: number; subagents_total: number }
+  /** catalog $ per day over the window, oldest first: the pane's sparkline */
+  daily?: { date: string; cost: number }[]
 }
 
 /** One place the window could have consumed less for the same work, with its evidence. */

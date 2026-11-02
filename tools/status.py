@@ -39,6 +39,7 @@ EFFORT_RATIO = {'xhigh': {'claude-opus-5-5': 1.30, 'claude-fable-5-1': 1.52}, 'h
 # repo_fix 0.178/0.481 = 0.37, web_research 0.12/0.30 = 0.40 (results/cell8), same results on both.
 OPUS_OVER_FABLE = (0.37, 0.40)
 WEB_RESEARCHER_COST = 0.022   # Haiku low per fact lookup, 76/78 correct (results/cell8)
+FIND_FEATURE_COST = 0.0046    # Haiku low per code search, 214/216 found (routing.json evidence)
 AGENTS_DIR = Path.home() / '.claude/agents'
 UNUSED_DIR = Path.home() / '.claude/agents.unused'
 
@@ -232,14 +233,23 @@ def suggest(usage, agents):
                     'title': f"{n} fact lookups ran on general-purpose agents (${cost:.2f})",
                     'basis': f'web_research family: Haiku low 76/78 correct with sources at ${WEB_RESEARCHER_COST} each (results/cell8)',
                     'action': 'ask for the Web Researcher agent for lookups (model haiku, effort low in ~/.claude/agents/web-researcher.md)'})
-    # 3. research synthesis: the stake is known, no cheaper model is
+    # 3. code searches that ran above haiku: the find_feature family covers them, the widget routes them
+    ce = bc.get('code-explore')
+    dear = {m: v for m, v in (ce or {}).get('models', {}).items() if m != '?' and not m.startswith('claude-haiku')}
+    if dear:
+        n = sum(v['n'] for v in dear.values()); cost = round(sum(v['cost'] for v in dear.values()), 2)
+        out.append({'id': 'explore', 'kind': 'measured', 'stake': cost, 'saving': [round(max(0.0, cost - n * FIND_FEATURE_COST), 2)] * 2,
+                    'title': f"{n} code searches ran above haiku (${cost:.2f}; {', '.join(sorted(dear))})",
+                    'basis': f'find_feature family: Haiku low found 214/216 at ${FIND_FEATURE_COST} per search; the widget routes Explore calls when routing is ask or auto',
+                    'action': '/router routing auto, so these calls run on haiku low without asking (or pick the measured option when the router asks)'})
+    # 4. research synthesis: the stake is known, no cheaper model is
     rs = bc.get('research-synthesis')
     if rs and rs['n']:
         out.append({'id': 'synthesis', 'kind': 'unmeasured', 'stake': rs['cost'], 'saving': None,
                     'title': f"{rs['n']} research reports on general-purpose agents at the session model (${rs['cost']:.2f})",
                     'basis': 'no family grades report writing yet; the fact-lookup result (Haiku 76/78) does not transfer to synthesis',
                     'action': f"worth measuring next: a synthesis rubric family (GAPS.md open item); until then no blind downgrade"})
-    # 4. Fable in main sessions where the measured families saw Opus equal
+    # 5. Fable in main sessions where the measured families saw Opus equal
     fable = [r for r in rows if r['model'].startswith('claude-fable-5-1')]
     if fable:
         spend = sum(r['cost'] for r in fable)
@@ -323,7 +333,8 @@ def collect(fetch=False):
             'usage': {'days': usage['days'], 'since': usage['since'], 'main_total': usage['main']['total'], 'main_out_cost': usage['main']['out_cost'],
                       'main_rows': [{k: r[k] for k in ('model', 'effort', 'msgs', 'cost', 'out_cost')} for r in usage['main']['rows'] if r['cost'] >= 0.5 or r['model'].endswith('(no price)')],
                       'subagents_total': usage['subagents']['total'], 'subagent_calls': len(usage['subagents']['calls']),
-                      'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types']} for k, v in usage['subagents']['by_class'].items()},
+                      'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types'], 'models': v.get('models', {})} for k, v in usage['subagents']['by_class'].items()},
+                      'daily': usage.get('daily', []),
                       'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
             'suggestions': suggestions,
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}

@@ -9,10 +9,11 @@ What you see:
 - A status line under the prompt: `router: 5h 37% · 7d 62% · 2 suggestions · /router · 12:01`.
   The percentages are the subscription's rate-limit windows as the last API response reported
   them. Then the count of things to check and of suggestions, or `router ok`.
-- `/router` opens a pane with, top to bottom: the rate-limit windows; one line on the checkout;
-  the families table (default model and effort, evidence, cost per success, whether the family's
-  regression sample can run on this machine, the last check); the things to check; one line per
-  suggestion; the Agent calls routed this session. `Details` (`d`) adds the long sections: the
+- `/router` opens a pane with, top to bottom: the rate-limit windows as bars; one line on the
+  checkout; the window's spend as a daily sparkline; the families table (default model and effort,
+  a success bar with the evidence, cost per success, whether the family's regression sample can run
+  on this machine, the last check); the things to check; the suggestions, largest saving first, each
+  with its share of the window's spend as a bar; the Agent calls routed this session. `Details` (`d`) adds the long sections: the
   agent files (applied or drifted), price freshness, ledger dates, the timer, what the last 30 days
   consumed (main sessions by model and effort, subagent calls by kind), and each suggestion's
   basis and action. `/router check` prints everything as text.

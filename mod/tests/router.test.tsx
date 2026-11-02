@@ -18,7 +18,8 @@ const STATUS = {
   usage: { days: 30, since: '2026-10-02', main_total: 517.2, main_out_cost: 133.1,
     main_rows: [{ model: 'claude-opus-5-5', effort: 'medium', msgs: 2152, cost: 258.86, out_cost: 53.1 }],
     subagents_total: 74.75, subagent_calls: 20, by_class: { 'research-synthesis': { n: 19, cost: 73.12, types: { 'general-purpose': 19 } } },
-    previous: { since: '2026-09-02', main_total: 491.9, subagents_total: 7.8 } },
+    previous: { since: '2026-09-02', main_total: 491.9, subagents_total: 7.8 },
+    daily: [{ date: '2026-10-28', cost: 1 }, { date: '2026-10-29', cost: 2 }, { date: '2026-10-30', cost: 4 }, { date: '2026-10-31', cost: 6 }, { date: '2026-11-01', cost: 8 }] },
   suggestions: [{ id: 'effort', kind: 'extrapolated', title: 'main sessions at high/xhigh effort: $225 in 30 days', stake: 225,
     saving: [72, 72], basis: 'results/cell8 sweep', action: 'claude --effort low' }],
 }
@@ -48,26 +49,29 @@ test('/router check prints the table and the status line counts the advice', asy
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
-  expect(text).toContain('find_feature haiku low          214/216  0.0046  yes  ok 6/6')
+  expect(text).toContain('find_feature haiku low          ██████████ 214/216  0.0046  yes  ok 6/6')
+  expect(text).toContain('spend 30d ▂▃▅▆█ $592 (main $517, agents $75) · previous 30d $500')
 
   expect((await $.command.run({ ...RUN, command: 'router', args: '' })).text).toBe('Model router pane opened.')
   expect((await $.command.run({ ...RUN, command: 'router', args: '  ' })).text).toBe('Model router pane opened.')
-  expect(text).toContain('fix_bug      haiku low +kunit   16/21    0.0158  no   -')
+  expect(text).toContain('fix_bug      haiku low +kunit   ████████░░ 16/21    0.0158  no   -')
   expect(text).toContain('  - prices verified 40 days ago')
   expect(pinned.at(-1)).toContain('1 to check · 1 suggestion')
-  expect(text).toContain('* [extrapolated] main sessions at high/xhigh effort: $225 in 30 days: saves $72')
-  expect(text).toContain('subagents research-synthesis    19 calls  $  73.12  general-purpose x19')
+  expect(text).toContain('suggestions: up to $72 of $592 in 30 days (12%)')
+  expect(text).toContain('saves $72       █░░░░░░░░░ 12%  [extrapolated] main sessions at high/xhigh effort: $225 in 30 days')
+  expect(text).toContain('agents research-synthesis')
+  expect(text).toContain('general-purpose x19')
 
   for (const surface of ['terminal', 'desktop', 'vscode', 'mobile'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect((await ui.find({ type: 'Text', text: /routing v1.1/ }))?.text).toBe('routing v1.1, decided 2026-11-01')
+    expect((await ui.find({ type: 'Text', text: /routing v1.1/ }))?.text).toContain('routing v1.1, decided 2026-11-01')
     expect(await ui.find({ type: 'Button', text: /Re-check routing/ })).toBeTruthy()
     await ui.unmount()
   }
 
   // The pane is a glance by default; Details adds the long sections.
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect((await ui.find({ type: 'Text', text: /^\* \[extrapolated\]/ }))?.text).toBe('* [extrapolated] main sessions at high/xhigh effort: $225 in 30 days: saves $72')
+  expect((await ui.find({ type: 'Text', text: /\[extrapolated\]/ }))?.text).toContain('saves $72')
   expect(await ui.find({ type: 'Text', text: /basis:/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /consumption, last 30 days/ })).toBeUndefined()
   await ui.press({ key: 'details' })
@@ -149,7 +153,7 @@ test('auto mode runs an Explore call on haiku low, the measured find_feature def
   expect(call?.model).toBe('haiku')
   expect(call?.effort).toBe('low')
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
-  expect(text).toContain('routed this session (1; mode auto')
+  expect(text).toContain('routed this session: 1 routed, 0 kept (mode auto')
   expect(text).toContain('Explore: inherit -> haiku low  [find_feature] auto  find the parser')
 })
 

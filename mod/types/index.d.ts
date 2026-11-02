@@ -10,7 +10,7 @@ export type Family = {
   last_check: { sample: string; successes: string; verdict: string } | null
 }
 
-export type RoutedAgent = { file: string; want: string; have: string | null; state: 'applied' | 'drifted' | 'missing' }
+export type RoutedAgent = { file: string; name?: string; want: string; have: string | null; state: 'applied' | 'drifted' | 'missing' }
 
 export type StatusJson = {
   at: string
@@ -57,11 +57,23 @@ export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
 /** The last status read: the JSON when the script ran, else why not. */
 export type Status = { at: number; json: StatusJson | null; error: string | null; rateLimits: RateLimit[] }
 
+/** One Agent call the router saw: what was asked, which measured family covered it, what ran. */
+export type Routed = {
+  at: number
+  agent: string
+  family: string
+  from: string
+  to: string
+  /** auto: rewritten without asking; routed: the person chose it; kept: the person kept what was asked, or no one could be asked */
+  decision: 'auto' | 'routed' | 'kept'
+  description: string
+}
+
 /** One command the widget is running or last ran, with its output. */
 export type Job = { name: string; lines: string[]; isRunning: boolean; exitCode: number | null; startedAt: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null> }
+    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]> }
   }
 }

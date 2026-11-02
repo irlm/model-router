@@ -1,14 +1,17 @@
 import { atom, read, update } from 'claude-code'
 import type { Hook, Register } from 'claude-code'
 
-import type { Job, RateLimit, Status, StatusJson } from '../types'
+import type { Job, RateLimit, Routed, Status, StatusJson } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
+type RoutingMode = 'ask' | 'auto' | 'off'
 
 const PANE = 'model-router'
 // status-2: the rate-limit windows and the consumption block joined the value
 const status = atom({ plugin: 'model-router', key: 'status' } as const, null, { shape: 'status-2' })
 const job = atom({ plugin: 'model-router', key: 'job' } as const, null, { shape: 'job-1' })
+// routed-1: the Agent calls the router saw this session, newest last
+const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Routed[], { shape: 'routed-1' })
 
 // What the buttons and /router <verb> run, from the checkout's root.
 const JOBS: Record<string, { title: string; argv: (python: string) => string[] }> = {
@@ -32,17 +35,18 @@ const windowName = (kind: string) => (kind === 'five_hour' ? '5h' : kind === 'se
 const limitsText = (limits: RateLimit[]) => limits.map(l => `${windowName(l.kind)} ${Math.round(l.percentUsed)}%`).join(' · ')
 
 /** The status line under the prompt: the rate-limit windows, then what is worth doing. */
-const statusLine = (s: StatusJson, limits: RateLimit[], at: number) => {
+const statusLine = (s: StatusJson, limits: RateLimit[], at: number, routedN = 0) => {
   const parts = [limitsText(limits)]
   const n = s.suggestions?.length ?? 0
   if (s.advice.length > 0) parts.push(`${s.advice.length} to check`)
   if (n > 0) parts.push(`${n} suggestion${n > 1 ? 's' : ''}`)
+  if (routedN > 0) parts.push(`${routedN} routed`)
   if (s.advice.length === 0 && n === 0) parts.push(`router ok · v${s.routing.version}`)
   return `router: ${parts.filter(Boolean).join(' · ')} · /router · ${clock(at)}`
 }
 
 /** The pane's body and /router check's text: the same lines. */
-const summaryLines = (s: StatusJson, at: number): string[] => {
+const summaryLines = (s: StatusJson, at: number, seen: Routed[] = []): string[] => {
   const g = s.repo
   const sync = !g.is_repo
     ? 'not a git checkout'
@@ -95,6 +99,10 @@ const summaryLines = (s: StatusJson, at: number): string[] => {
     const sv = g.saving === null ? 'saving unknown' : g.saving[0] === g.saving[1] ? `saves $${g.saving[0].toFixed(0)}` : `saves $${g.saving[0].toFixed(0)}-${g.saving[1].toFixed(0)}`
     lines.push(`* [${g.kind}] ${g.title}: ${sv}`, `    basis: ${g.basis}`, `    do: ${g.action}`)
   }
+  if (seen.length > 0) {
+    lines.push('', `routed this session (${seen.length}; mode ${routingMode}, /router routing <ask|auto|off>):`)
+    for (const r of seen.slice(-8)) lines.push(`  ${clock(r.at)}  ${r.agent}: ${r.from} -> ${r.to}  [${r.family}] ${r.decision}  ${r.description}`)
+  }
   return lines
 }
 
@@ -104,6 +112,7 @@ let pythonOption = ''
 let refreshMinutes = 30
 let repo = repoOption
 let python = ''
+let routingMode: RoutingMode = 'ask'
 
 async function resolveRepo($: Dollar) {
   const home = (await $.env.get('HOME')) || (await $.env.get('USERPROFILE')) || ''
@@ -149,7 +158,7 @@ async function refresh($: Dollar, fetch = false) {
     const json = JSON.parse(r.stdout) as StatusJson
     const rateLimits = await readLimits($)
     await update($, status, () => ({ at, json, error: null, rateLimits }))
-    $.ui.status(statusLine(json, rateLimits, at))
+    $.ui.status(statusLine(json, rateLimits, at, (await read($, routed)).length))
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
     const rateLimits = await readLimits($)
@@ -203,10 +212,69 @@ async function runJob($: Dollar, name: string) {
   return true
 }
 
+// ---- Routing each Agent call to the model and effort the benchmark measured for its kind of task.
+// The keyword lists mirror tools/consumption.py (LOOKUP, SYNTHESIS, CODE), so the ledger and the router agree.
+const LOOKUP = ['what is the', 'which version', 'latest version', 'look up', 'find out', 'check the docs', 'default value',
+  'release date', 'is it supported', 'what does the doc', 'current version', 'find the url']
+const SYNTHESIS = ['research', 'compare', 'comparison', 'report', 'compile', 'deep dive', 'survey', 'landscape', 'fact-dense',
+  'summarize the', 'write up', 'notes that let']
+const CODE = ['fix', 'implement', 'refactor', 'write tests', 'bug', 'add a', 'change the', 'migrate', 'failing test']
+const RUNNER = ['failing test', 'test command', 'run the tests', 'run the test', 'npm test', 'vitest', 'pytest', 'cargo test', 'go test',
+  'make test', 'tests pass', 'test passes', 'the suite']
+const BROWSER = ['in the browser', 'chrome', 'web page', 'the page at', 'fill the form', 'fill in the form', 'click', 'sign in', 'log in',
+  'navigate to', 'open http', 'checklist', 'pass/fail']
+const EXPLORE_TYPES = new Set(['Explore', 'Codebase Onboarding Engineer'])
+const MODELS = new Set(['sonnet', 'opus', 'haiku', 'fable'])
+const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max'])
+const RUNNER_NOTE = '\n\nRun the test command before you finish; the task counts as done only when the suite passes.'
+
+type Match = { family: string; why: string }
+/** The measured family a call belongs to, from its agent type and prompt; null where none covers it (no blind downgrade). */
+const matchFamily = (agent: string, prompt: string): Match | null => {
+  const p = prompt.toLowerCase()
+  if (EXPLORE_TYPES.has(agent)) return { family: 'find_feature', why: `${agent}: read-only code search` }
+  if (agent === 'Web Researcher') return { family: 'web_research', why: 'the lookup agent' }
+  if (agent === 'Evidence Collector') return { family: 'browser_flow', why: 'the browser agent' }
+  if (p.length < 900 && LOOKUP.some(k => p.includes(k))) return { family: 'web_research', why: 'a short fact lookup' }
+  if (SYNTHESIS.some(k => p.includes(k))) return null
+  if (BROWSER.filter(k => p.includes(k)).length >= 2) return { family: 'browser_flow', why: 'a browser flow' }
+  if (CODE.some(k => p.includes(k)) && RUNNER.some(k => p.includes(k))) return { family: 'repo_fix', why: 'a fix with the test runner in the loop' }
+  return null
+}
+
+type Candidate = { family: string; why: string; agent: string; asked: string; model: string; effort: string; rate: string; cost: string }
+/** What the evidence says this call should run on, or null when it already does or nothing measured covers it. */
+const decideCall = (s: StatusJson, agent: string, prompt: string, model?: string, effort?: string): Candidate | null => {
+  const m = matchFamily(agent, prompt)
+  if (!m) return null
+  const f = s.families.find(x => x.name === m.family)
+  if (!f?.model || !f.effort || !MODELS.has(f.model) || !EFFORTS.has(f.effort)) return null
+  const asked = model ? `${model} ${effort ?? '(default effort)'}` : (s.agents.routed.find(r => r.name === agent)?.have ?? 'inherit')
+  if (asked === `${f.model} ${f.effort}`) return null
+  return { family: f.name, why: m.why, agent, asked, model: f.model, effort: f.effort, rate: f.rate ?? '?',
+    cost: f.cost_per_success === null ? '?' : f.cost_per_success.toFixed(3) }
+}
+
+/** Asks the person; 'keep' when they keep what was asked, dismiss, or no one can be asked (a -p run, a background loop). */
+async function askRoute($: Dollar, c: Candidate): Promise<'route' | 'keep' | 'auto'> {
+  const route = `${c.model} ${c.effort} (measured ${c.rate}, $${c.cost}/success)`
+  const keep = `Keep ${c.asked}`
+  const always = 'Always route this session'
+  try {
+    const a = await $.ui.ask(`Run ${c.why} on ${c.model} ${c.effort} instead of ${c.asked}? (${c.family} on the benchmark: ${c.rate})`,
+      { options: [route, keep, always], header: 'Router' })
+    return a === route ? 'route' : a === always ? 'auto' : 'keep'
+  } catch {
+    return 'keep'
+  }
+}
+
 export const register: Register = (on, options) => {
   repoOption = String(options.repo || '~/Projects/Github/model-router')
   pythonOption = String(options.python || '')
   refreshMinutes = Number(options.refreshMinutes ?? 30)
+  const mode = String(options.routing ?? 'ask')
+  routingMode = mode === 'auto' || mode === 'off' ? mode : 'ask'
   repo = repoOption
   python = ''
 
@@ -214,7 +282,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'router',
       description: 'Model router: where the routing stands, re-check it, ledger, apply, pull',
-      argumentHint: 'open | check | fetch | update | ledger | apply | pull',
+      argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off',
     })
     await resolveRepo($)
     void refresh($)
@@ -227,7 +295,7 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'router' }, async ($, e) => {
-    const verb = e.args.trim().split(/\s+/)[0] || 'open'
+    const [verb = 'open', arg = ''] = e.args.trim().split(/\s+/)
     if (verb === 'open') {
       const opened = await $.ui.open({ id: PANE, title: 'Model router' })
       void refresh($)
@@ -236,7 +304,11 @@ export const register: Register = (on, options) => {
     if (verb === 'check' || verb === 'fetch') {
       await refresh($, verb === 'fetch')
       const s = await read($, status)
-      return { text: s?.json ? summaryLines(s.json, s.at).join('\n') : (s?.error ?? 'no status') }
+      return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed)).join('\n') : (s?.error ?? 'no status') }
+    }
+    if (verb === 'routing') {
+      if (arg === 'ask' || arg === 'auto' || arg === 'off') routingMode = arg
+      return { text: `routing ${routingMode} for this session${arg ? '' : ' (routing ask|auto|off sets it)'}; /config makes it permanent.` }
     }
     const spec = JOBS[verb]
     if (spec) {
@@ -244,8 +316,34 @@ export const register: Register = (on, options) => {
       const started = await runJob($, verb)
       return { text: started ? `${spec.title} started; the pane shows its output.` : 'Not started.' }
     }
-    return { text: 'Usage: /router [open | check | fetch | update | ledger | apply | pull]' }
+    return { text: 'Usage: /router [open | check | fetch | update | ledger | apply | pull | routing ask|auto|off]' }
   })
+
+  // Every Agent call: when a measured family covers the task and the call asks for something dearer than
+  // the family's decision, rewrite it (auto), ask (ask), or leave it (off). Nothing unmeasured is touched.
+  on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
+    if (routingMode === 'off') return next(e)
+    const s = await read($, status)
+    const agent = e.subagent_type ?? 'general-purpose'
+    const c = s?.json ? decideCall(s.json, agent, e.prompt, e.model, e.effort) : null
+    if (!c) return next(e)
+    let decision: Routed['decision'] = 'auto'
+    if (routingMode === 'ask') {
+      const choice = await askRoute($, c)
+      if (choice === 'auto') routingMode = 'auto'
+      decision = choice === 'keep' ? 'kept' : choice === 'auto' ? 'auto' : 'routed'
+    }
+    const at = await $.clock.now()
+    await update($, routed, r => [...r, { at, agent, family: c.family, from: c.asked, to: `${c.model} ${c.effort}`, decision, description: e.description }].slice(-50))
+    if (decision === 'kept') return next(e)
+    $.ui.toast(`router: ${agent} on ${c.model} ${c.effort} (${c.family} ${c.rate})`)
+    return next({
+      ...e,
+      model: c.model as 'sonnet' | 'opus' | 'haiku' | 'fable',
+      effort: c.effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max',
+      ...(c.family === 'repo_fix' ? { prompt: e.prompt + RUNNER_NOTE } : {}),
+    })
+  }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
@@ -255,7 +353,7 @@ export const register: Register = (on, options) => {
     const limits = s?.rateLimits ?? []
     const body = [
       ...(limits.length ? [`rate limits: ${limits.map(l => `${windowName(l.kind)} ${l.percentUsed}% used${l.resetsAt ? ', resets ' + clock(Date.parse(l.resetsAt)) : ''}`).join(' · ')}`] : []),
-      ...(s?.json ? summaryLines(s.json, s.at) : [s?.error ?? 'reading the checkout…']),
+      ...(s?.json ? summaryLines(s.json, s.at, await read($, routed)) : [s?.error ?? 'reading the checkout…']),
     ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     const logRoom = Math.max(3, rows - body.length - 3)

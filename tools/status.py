@@ -168,7 +168,7 @@ def agents_state(routing):
             continue
         fm = frontmatter(p)
         have = f"{fm.get('model', '-')} {fm.get('effort', '-')}"
-        routed.append({'file': file, 'family': spec.get('family'), 'want': want, 'have': have,
+        routed.append({'file': file, 'name': fm.get('name') or p.stem, 'family': spec.get('family'), 'want': want, 'have': have,
                        'state': 'applied' if have == want else 'drifted'})
     files = len(list(AGENTS_DIR.glob('*.md'))) if AGENTS_DIR.exists() else 0
     unused = len(list(UNUSED_DIR.glob('*.md'))) if UNUSED_DIR.exists() else 0

@@ -32,10 +32,34 @@ The numbers come from `tools/consumption.py` (the local transcripts, last 30 day
 effort of each request) and the rules in `tools/status.py`, where every ratio is a named
 constant with the cell it came from.
 
+Routing each Agent call. When the main model starts a task through the Agent tool, the widget
+looks at the agent type and the prompt. If a measured family covers that kind of task (a read-only
+code search on Explore, a short fact lookup, a browser flow, a fix with the test runner in the
+loop) and the call asks for something dearer than the family's decision (the main model by
+inheritance, or an explicit bigger model), it acts by the "Route Agent calls" option:
+
+- `ask` (the default): a question in the terminal with three answers: the measured model and
+  effort with its evidence (`haiku low (measured 214/216, $0.005/success)`), keep what was asked,
+  or always route for this session. A dismissed question keeps the call; so does a run with no
+  one to ask.
+- `auto`: the call is rewritten and a toast says so.
+- `off`: nothing.
+
+Nothing unmeasured is touched: a research report, a design, a review, a plan keep their model
+(no blind downgrade). A call to an agent whose file already carries the routed model and effort is
+left alone. For a fix with a runner the prompt gets one line asking the agent to run the test
+command before finishing, since the 72/72 was measured with the runner in the loop. The pane and
+`/router check` list the calls routed this session with their decision; `/router routing
+ask|auto|off` switches the mode for the session, `/config` for good. The keyword lists that
+classify a prompt are the same as `tools/consumption.py`'s, so what the ledger counts and what the
+router acts on agree. The main session's own model is not touched: a mod can set a subagent's
+model per call, the main model only `/model` can.
+
 Buttons and verbs (`/router <verb>`):
 
 | Button | Verb | Runs |
 |---|---|---|
+| | `routing ask\|auto\|off` | sets how Agent calls are routed for this session |
 | Refresh | `check` | `tools/status.py` (also prints the table as text) |
 | Fetch origin | `fetch` | the same after `git fetch`, so behind/ahead are current |
 | Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry |

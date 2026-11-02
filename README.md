@@ -50,7 +50,9 @@ On Windows `~` is `C:\Users\<you>`, so clone there or set the option to the fold
 `mod/README.md` has the Windows steps (Git for Windows, Python 3, the GitHub CLI, then the same install line).
 `mod/README.md` has the rest; `claude plugin validate mod` and `claude plugin test mod` check it.
 
-The pane also shows the subscription's rate-limit windows, what the last 30 days consumed (main
+The widget also routes each Agent call: when a measured family covers the task and the call asks
+for a dearer model than the decision, it asks you, rewrites the call (auto) or stays out (off), per
+the "Route Agent calls" option; nothing unmeasured is touched. The pane also shows the subscription's rate-limit windows, what the last 30 days consumed (main
 sessions by model and effort from the transcripts, each Agent call priced and classified) and
 suggestions: where the same work could consume less, each labelled `measured`, `extrapolated`
 or `unmeasured` with the cell its number comes from. The monthly ledger keeps the same 30-day

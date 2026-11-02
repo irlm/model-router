@@ -10,7 +10,7 @@ const STATUS = {
     { name: 'fix_bug', model: 'haiku', effort: 'low', variant: 'kunit', rate: '16/21', cost_per_success: 0.0158, can_run: false,
       why: 'needs a kernel worktree', last_check: null },
   ],
-  agents: { files: 6, unused: 179, routed: [{ file: 'a.md', want: 'haiku low', have: 'haiku low', state: 'applied' }] },
+  agents: { files: 6, unused: 179, routed: [{ file: 'web-researcher.md', name: 'Web Researcher', want: 'haiku low', have: 'haiku low', state: 'applied' }] },
   catalog: { verified_oldest: '2026-10-06', age_days: 26 },
   ledger: { usage_last: '2026-11-01', regress_last: { date: '2026-11-01', claude: '2.1.316' } },
   timer: { kind: 'systemd', installed: true, next: 'Tue 2026-12-01 09:00:00 EST' },
@@ -77,4 +77,87 @@ test('a missing checkout is said in the pane, not thrown', async ($, on) => {
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /no model-router checkout/ }))?.text).toContain('set the path in /config')
   await ui.unmount()
+})
+
+type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]
+const ROUTING_MOCKS = (on: On, seen: Record<string, unknown>[], ask: 'deny' | string) => {
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({
+    value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(STATUS) },
+  }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('tool.call', (_, e) => {
+    seen.push(e as unknown as Record<string, unknown>)
+    if (e.tool === 'AskUserQuestion') return ask === 'deny' ? { deny: 'no one to ask' } : { result: { questions: e.questions, answers: { [e.questions[0]?.question ?? '']: ask, [e.questions[0]?.header ?? '']: ask } } }
+    return { result: {} }
+  })
+}
+
+const EXPLORE = { tool: 'Agent', description: 'find the parser', prompt: 'Find where the config file is parsed and report the function.', subagent_type: 'Explore' } as const
+
+test('auto mode runs an Explore call on haiku low, the measured find_feature default', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  ROUTING_MOCKS(on, seen, 'deny')
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  const call = seen.find(x => x.tool === 'Agent')
+  expect(call?.model).toBe('haiku')
+  expect(call?.effort).toBe('low')
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('routed this session (1; mode auto')
+  expect(text).toContain('Explore: inherit -> haiku low  [find_feature] auto  find the parser')
+})
+
+test('a research report (unmeasured) and a routed agent already on haiku low are left alone', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  ROUTING_MOCKS(on, seen, 'deny')
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call({ tool: 'Agent', description: 'compare options', prompt: 'Research and compare three message queues; write up a report.', subagent_type: 'general-purpose' })
+  await $.tool.call({ tool: 'Agent', description: 'look up', prompt: 'What is the default value of shared_buffers?', subagent_type: 'Web Researcher' })
+  for (const call of seen.filter(x => x.tool === 'Agent')) expect(call.model).toBeUndefined()
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).not.toContain('routed this session')
+})
+
+test('ask mode keeps the call when no one can answer', { options: { routing: 'ask' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  ROUTING_MOCKS(on, seen, 'deny')
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  const kept = seen.find(x => x.tool === 'Agent')
+  expect(kept?.model).toBeUndefined()
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('[find_feature] kept')
+})
+
+test('off mode touches nothing', { options: { routing: 'off' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  ROUTING_MOCKS(on, seen, 'deny')
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  expect(seen.find(x => x.tool === 'Agent')?.model).toBeUndefined()
+  expect(seen.some(x => x.tool === 'AskUserQuestion')).toBe(false)
+})
+
+test('ask mode routes the call when the person picks the measured option', { options: { routing: 'ask' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  ROUTING_MOCKS(on, seen, 'haiku low (measured 214/216, $0.005/success)')
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  const ask = seen.find(x => x.tool === 'AskUserQuestion') as { questions?: { options?: { label: string }[] }[] } | undefined
+  expect(ask?.questions?.[0]?.options?.map(o => o.label)).toEqual(['haiku low (measured 214/216, $0.005/success)', 'Keep inherit', 'Always route this session'])
+  const call = seen.find(x => x.tool === 'Agent')
+  expect(call?.model).toBe('haiku')
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('[find_feature] routed')
 })

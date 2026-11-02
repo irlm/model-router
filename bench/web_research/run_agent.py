@@ -38,19 +38,19 @@ def main():
     ap.add_argument('--harness', default='claude', choices=['claude'])
     ap.add_argument('--out', type=Path, default=HERE.parents[1] / 'runs/web_research')
     args = ap.parse_args()
-    tasks = json.loads((HERE / 'tasks.json').read_text())['tasks']
+    tasks = json.loads((HERE / 'tasks.json').read_text(encoding='utf-8'))['tasks']
     if args.ids:
         tasks = [t for t in tasks if t['id'] in set(args.ids)]
     args.out.mkdir(parents=True, exist_ok=True)
     out = args.out / f'runs-{args.model}-{args.effort}-t{args.trial}.jsonl'
     kept = []
     if out.exists():
-        kept = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
+        kept = [json.loads(l) for l in out.read_text(encoding='utf-8').splitlines() if l.strip()]
         kept = [r for r in kept if not r.get('operational_error')]
-        out.write_text(''.join(json.dumps(r) + '\n' for r in kept))
+        out.write_text(''.join(json.dumps(r) + '\n' for r in kept), encoding='utf-8')
     done = {r['id'] for r in kept}
     cwd = Path(tempfile.mkdtemp(prefix='web_research_'))  # an empty directory: no CLAUDE.md, no repo
-    with out.open('a') as sink:
+    with out.open('a', encoding='utf-8') as sink:
         for task in tasks:
             if task['id'] in done:
                 continue

@@ -22,7 +22,7 @@ def claude_version():
     if not exe:
         return 'not found'
     try:
-        return subprocess.run([exe, '--version'], capture_output=True, text=True, timeout=30).stdout.strip().splitlines()[0]
+        return subprocess.run([exe, '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30).stdout.strip().splitlines()[0]
     except (OSError, IndexError, subprocess.TimeoutExpired):
         return 'unknown'
 
@@ -34,18 +34,18 @@ def main():
     today = datetime.date.today().isoformat()
     (HERE / 'ledger').mkdir(exist_ok=True)
     out = HERE / f'ledger/usage-{today}.md'
-    scan = subprocess.run([sys.executable, str(HERE / 'tools/usage_scan.py')], capture_output=True, text=True, cwd=HERE)
+    scan = subprocess.run([sys.executable, str(HERE / 'tools/usage_scan.py')], capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=HERE)
     if scan.returncode != 0:
         sys.exit(f'usage_scan failed:\n{scan.stderr}')
-    window = subprocess.run([sys.executable, str(HERE / 'tools/consumption.py')], capture_output=True, text=True, cwd=HERE)
+    window = subprocess.run([sys.executable, str(HERE / 'tools/consumption.py')], capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=HERE)
     out.write_text(f"# Usage ledger, {today}\n\nClaude Code {claude_version()}. Catalog-equivalent prices (catalog/models.json); "
                    "on a subscription they measure rate-limit headroom, not a bill.\n\n```\n" + scan.stdout + "```\n\n"
-                   "## Last 30 days by model and effort\n\n```\n" + (window.stdout if window.returncode == 0 else window.stderr) + "```\n")
+                   "## Last 30 days by model and effort\n\n```\n" + (window.stdout if window.returncode == 0 else window.stderr) + "```\n", encoding='utf-8')
     print(f'wrote {out.relative_to(HERE)}')
     if args.commit:
         git = shutil.which('git') or 'git'
         subprocess.run([git, 'add', str(out)], cwd=HERE, check=True)
-        c = subprocess.run([git, 'commit', '-qm', f'ledger: usage {today}'], cwd=HERE, capture_output=True, text=True)
+        c = subprocess.run([git, 'commit', '-qm', f'ledger: usage {today}'], cwd=HERE, capture_output=True, text=True, encoding='utf-8', errors='replace')
         if c.returncode != 0:
             print('nothing new to commit' if 'nothing to commit' in c.stdout + c.stderr else c.stderr.strip())
             return

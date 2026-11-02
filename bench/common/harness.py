@@ -56,7 +56,7 @@ def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=Fa
            '--max-turns', str(max_turns), '--effort', effort, '--allowed-tools', tools]
     if chrome:
         cmd.insert(2, '--chrome')
-    proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, capture_output=True, timeout=timeout)
+    proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, encoding='utf-8', errors='replace', capture_output=True, timeout=timeout)
     try:
         data = json.loads(proc.stdout)
     except ValueError:
@@ -86,7 +86,7 @@ def call_codex(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=Fal
         cmd += ['-c', 'sandbox_workspace_write.writable_roots=' + json.dumps(roots)]
     cmd.append('-')
     try:
-        proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, capture_output=True, timeout=timeout)
+        proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, encoding='utf-8', errors='replace', capture_output=True, timeout=timeout)
     except subprocess.TimeoutExpired as e:
         return {'harness': 'codex', 'text': (e.stdout or '')[-2000:] if isinstance(e.stdout, str) else '',
                 'usage': None, 'cost_usd': None, 'operational_error': 'timeout'}

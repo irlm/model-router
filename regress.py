@@ -45,7 +45,7 @@ TASK_FILES = {'find_feature': None, 'fix_bug_hard': 'bench/fix_bug/tasks-hard.js
 
 def claude_version():
     try:
-        return subprocess.run([CLAUDE, '--version'], capture_output=True, text=True, timeout=30).stdout.split()[0]
+        return subprocess.run([CLAUDE, '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30).stdout.split()[0]
     except (OSError, IndexError, subprocess.TimeoutExpired):
         return 'unknown'
 
@@ -59,7 +59,7 @@ def prefix_tokens(n=2):
     plugin on or off made no difference)."""
     cwd = tempfile.mkdtemp(prefix='prefix_')
     no_mcp = Path(tempfile.mkdtemp(prefix='prefix_cfg_')) / 'no-mcp.json'   # outside cwd: a file in cwd costs ~90 tokens
-    no_mcp.write_text('{"mcpServers": {}}')
+    no_mcp.write_text('{"mcpServers": {}}', encoding='utf-8')
     rows = []
     for _ in range(n):
         if any((parent / '.git').exists() for parent in Path(cwd).parents):
@@ -70,7 +70,7 @@ def prefix_tokens(n=2):
             p = subprocess.run([CLAUDE, '-p', '--output-format', 'json', '--model', 'claude-haiku-5-5', '--effort', 'low',
                                 '--max-turns', '1', '--allowed-tools', 'Read', '--strict-mcp-config', '--mcp-config', str(no_mcp)],
                                input='Reply with the single word OK.',
-                               capture_output=True, text=True, timeout=180, cwd=cwd)
+                               capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=180, cwd=cwd)
             u = json.loads(p.stdout)['usage']
             rows.append(u['input_tokens'] + u['cache_creation_input_tokens'] + u['cache_read_input_tokens'])
         except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
@@ -81,7 +81,7 @@ def prefix_tokens(n=2):
 def task_ids(bench):
     if bench == 'find_feature':
         return sorted(report.load_ff_tasks()[1])
-    return [t['id'] for t in json.loads((HERE / TASK_FILES[bench]).read_text())['tasks']]
+    return [t['id'] for t in json.loads((HERE / TASK_FILES[bench]).read_text(encoding='utf-8'))['tasks']]
 
 
 def variant_of(requires):
@@ -115,7 +115,7 @@ def main():
             tag = f"{datetime.date.today().isoformat()}-claude-{version}-r{n}"
             n += 1
     out_root = HERE / 'runs/regress' / tag
-    routing = json.loads((HERE / 'routing.json').read_text())
+    routing = json.loads((HERE / 'routing.json').read_text(encoding='utf-8'))
     lines = [f'# Regression check {tag}', '', f'Claude Code {version}, sample {args.sample} tasks per family, seed {args.seed}, alpha {args.alpha}.', '']
     if not args.no_prefix:
         pre = prefix_tokens()
@@ -185,7 +185,7 @@ def main():
         print(lines[-1], flush=True)
     text = '\n'.join(lines) + '\n'
     (HERE / 'ledger').mkdir(exist_ok=True)
-    (HERE / 'ledger' / f'regress-{tag}.md').write_text(text)
+    (HERE / 'ledger' / f'regress-{tag}.md').write_text(text, encoding='utf-8')
     print(text)
 
 

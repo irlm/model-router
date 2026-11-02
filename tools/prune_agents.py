@@ -25,7 +25,7 @@ TRANSCRIPTS = Path.home() / '.claude/projects'
 def called_agents():
     names = {}
     for f in TRANSCRIPTS.glob('**/*.jsonl'):
-        for line in f.open(errors='replace'):
+        for line in f.open(encoding='utf-8', errors='replace'):
             if '"subagent_type"' not in line:
                 continue
             try:
@@ -44,7 +44,7 @@ def called_agents():
 
 
 def frontmatter_name(path):
-    text = path.read_text(errors='replace')
+    text = path.read_text(encoding='utf-8', errors='replace')
     m = re.search(r'^name:\s*(.+?)\s*$', text, re.M)
     return m.group(1).strip().strip('"\'') if m else path.stem
 
@@ -67,7 +67,7 @@ def main():
         print(f'{len(files)} files {"would be " if args.dry_run else ""}restored to {args.agents_dir}')
         return
     called = called_agents()
-    routed = set(json.loads(args.routing.read_text()).get('agents', {}).keys()) if args.routing.exists() else set()
+    routed = set(json.loads(args.routing.read_text(encoding='utf-8')).get('agents', {}).keys()) if args.routing.exists() else set()
     keep_names = set(called) | set(args.keep)
     kept, moved = [], []
     for f in sorted(args.agents_dir.glob('*.md')):

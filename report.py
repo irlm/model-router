@@ -45,15 +45,15 @@ SUCCESS = {'find_feature': {'correct'}, 'fix_bug': {'fixed'}, 'fix_bug_hard': {'
 # Outcomes the harness caused, not the model's judgement (a lost browser tab, a CLI
 # failure). In use these runs are retried; decide.py leaves them out of the rate.
 NOT_MODEL = {'operational', 'incomplete'}
-BF_TASKS = {t['id']: t for t in json.loads((HERE / 'bench/browser_flow/tasks.json').read_text())['tasks']}
+BF_TASKS = {t['id']: t for t in json.loads((HERE / 'bench/browser_flow/tasks.json').read_text(encoding='utf-8'))['tasks']}
 _ds = HERE / 'bench/own_app_flow/tasks.json'
-DS_TASKS = {t['id']: t for t in json.loads(_ds.read_text())['tasks']} if _ds.exists() else {}
+DS_TASKS = {t['id']: t for t in json.loads(_ds.read_text(encoding='utf-8'))['tasks']} if _ds.exists() else {}
 
 
 def load_ff_tasks():
     tree, tasks = None, {}
     for f in FF_TASK_FILES:
-        spec = json.loads(f.read_text())
+        spec = json.loads(f.read_text(encoding='utf-8'))
         tree = tree or spec['tree']
         tasks.update({t['id']: t for t in spec['tasks']})
     return tree, tasks
@@ -88,14 +88,14 @@ def load_cells(runs_dir, cat=None, cli_cost=False):
     """Grade every receipt under runs_dir. Returns {(bench, model, effort, trial): [row]}."""
     tree, ff_tasks = load_ff_tasks()
     # benches graded by their own grade.py (a build, a test run, page fetches) cache the verdicts here
-    cached = {d.name: json.loads((d / 'grades.json').read_text())
+    cached = {d.name: json.loads((d / 'grades.json').read_text(encoding='utf-8'))
               for d in runs_dir.iterdir() if d.is_dir() and (d / 'grades.json').exists()}
     cells = defaultdict(list)
     files = sorted(runs_dir.glob('runs-*.jsonl')) + sorted(runs_dir.glob('*/runs-*.jsonl'))
     for f in files:
         if 'smoke' in f.parts:
             continue
-        for line in f.read_text().splitlines():
+        for line in f.read_text(encoding='utf-8').splitlines():
             if not line.strip():
                 continue
             r = json.loads(line)
@@ -222,8 +222,8 @@ def main():
     print(text)
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
-        (args.out / 'grades.json').write_text(json.dumps(out, indent=1, default=str))
-        (args.out / 'tables.md').write_text(text)
+        (args.out / 'grades.json').write_text(json.dumps(out, indent=1, default=str), encoding='utf-8')
+        (args.out / 'tables.md').write_text(text, encoding='utf-8')
 
 
 if __name__ == '__main__':

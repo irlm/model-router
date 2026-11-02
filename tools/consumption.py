@@ -69,7 +69,7 @@ def collect(days=30, now=None):
         files += 1
         is_sub = 'subagents' in f.parts
         effort = None
-        for line in f.open(errors='replace'):
+        for line in f.open(encoding='utf-8', errors='replace'):
             if not ('"api-request"' in line or '"assistant"' in line or 'agentId' in line or '"tool_use"' in line):
                 continue
             try:

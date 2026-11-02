@@ -43,7 +43,7 @@ UNUSED_DIR = Path.home() / '.claude/agents.unused'
 
 def sh(argv, cwd=None, timeout=30):
     try:
-        p = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        p = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout, cwd=cwd)
         return p.returncode, p.stdout.strip(), p.stderr.strip()
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, '', str(e)
@@ -87,13 +87,13 @@ def variant_of(requires):
 def can_run(bench):
     """Whether this family's regression sample can run on this machine, and why not."""
     if bench == 'find_feature':
-        spec = json.loads((HERE / 'bench/find_feature/tasks/lexical.json').read_text())
+        spec = json.loads((HERE / 'bench/find_feature/tasks/lexical.json').read_text(encoding='utf-8'))
         tree = Path(os.path.expanduser(spec['tree']))
         return (True, '') if tree.exists() else (False, f'needs the source tree {spec["tree"]}')
     if bench in ('fix_bug_hard', 'write_tests'):
         return False, 'needs a kernel worktree and KUnit build (regress.py --kernel-worktree): by hand'
     if bench == 'repo_fix':
-        spec = json.loads((HERE / 'bench/repo_fix/repos/private-ts.json').read_text())
+        spec = json.loads((HERE / 'bench/repo_fix/repos/private-ts.json').read_text(encoding='utf-8'))
         clone, wts = Path(os.path.expanduser(spec['clone'])), Path(os.path.expanduser(spec['worktrees']))
         if not clone.exists() or not wts.exists():
             return False, f'needs the clone and worktrees under {spec["worktrees"]}'
@@ -110,7 +110,7 @@ def can_run(bench):
 def regress_rows(path):
     """The per-family rows of a ledger/regress-*.md table."""
     rows = {}
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding='utf-8').splitlines():
         if not line.startswith('| ') or line.startswith('| Family') or line.startswith('|---'):
             continue
         cells = [c.strip() for c in line.strip().strip('|').split('|')]
@@ -247,8 +247,8 @@ def suggest(usage, agents):
 
 def collect(fetch=False):
     today = datetime.date.today()
-    routing = json.loads((HERE / 'routing.json').read_text())
-    catalog = json.loads((HERE / 'catalog/models.json').read_text())
+    routing = json.loads((HERE / 'routing.json').read_text(encoding='utf-8'))
+    catalog = json.loads((HERE / 'catalog/models.json').read_text(encoding='utf-8'))
     version = claude_version()
     families = []
     for fam, rf in routing['families'].items():

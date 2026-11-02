@@ -45,17 +45,17 @@ def main():
     ap.add_argument('--revert', action='store_true')
     ap.add_argument('--dry-run', action='store_true')
     args = ap.parse_args()
-    agents = json.loads(args.routing.read_text())['agents']
+    agents = json.loads(args.routing.read_text(encoding='utf-8'))['agents']
     missing = [f for f in agents if not (args.agents_dir / f).exists()]
     if missing:
         raise SystemExit(f'missing agent files: {missing}')
     for name, route in agents.items():
         path = args.agents_dir / name
-        before = path.read_text()
+        before = path.read_text(encoding='utf-8')
         after = rewrite(before, route['model'], route['effort'], args.revert, route.get('instruction'))
         state = 'unchanged' if after == before else ('would change' if args.dry_run else 'changed')
         if not args.dry_run and after != before:
-            path.write_text(after)
+            path.write_text(after, encoding='utf-8')
         print(f"{state:12} {name}: {'removed' if args.revert else route['model'] + ' / ' + route['effort']} ({route['family']})")
 
 

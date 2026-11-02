@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Model router widget: rate-limit headroom, what the last 30 days consumed and where cheaper would do the same work, the routing status, and one key to re-check it.",
   "author": {
     "name": "irlm"

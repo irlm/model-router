@@ -69,7 +69,7 @@ def main():
         assert args.build_dir and args.build_dir.is_absolute(), '--kunit needs an absolute --build-dir'
         args.tools = args.tools + ' Bash(python3 tools/testing/kunit/kunit.py:*)'
         args.timeout = max(args.timeout, 3600)
-    tasks = json.loads(args.tasks.read_text())['tasks']
+    tasks = json.loads(args.tasks.read_text(encoding='utf-8'))['tasks']
     if args.ids:
         tasks = [t for t in tasks if t['id'] in set(args.ids)]
     args.out.mkdir(parents=True, exist_ok=True)
@@ -77,19 +77,19 @@ def main():
     out = args.out / f'runs-{args.model}-{args.effort}{suffix}-t{args.trial}.jsonl'
     kept = []
     if out.exists():
-        kept = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
+        kept = [json.loads(l) for l in out.read_text(encoding='utf-8').splitlines() if l.strip()]
         kept = [r for r in kept if not r.get('operational_error')]
-        out.write_text(''.join(json.dumps(r) + '\n' for r in kept))
+        out.write_text(''.join(json.dumps(r) + '\n' for r in kept), encoding='utf-8')
     done = {r['id'] for r in kept}
     wt = args.worktree
-    with out.open('a') as sink:
+    with out.open('a', encoding='utf-8') as sink:
         for task in tasks:
             if task['id'] in done:
                 continue
             W.reset(wt)
             wiring.apply(wt)
             if args.kunit:
-                (Path(wt) / 'agent.kunitconfig').write_text((HERE / 'kunitconfig').read_text())
+                (Path(wt) / 'agent.kunitconfig').write_text((HERE / 'kunitconfig').read_text(encoding='utf-8'), encoding='utf-8')
             W.git(wt, 'add', '-A')
             W.git(wt, '-c', 'user.email=bench@local', '-c', 'user.name=bench',
                   'commit', '-qm', 'wiring')
@@ -108,7 +108,7 @@ def main():
                          'operational_error': type(error).__name__}
             if not reply.get('operational_error') and not (reply.get('text') or '').strip():
                 reply['operational_error'] = 'empty-response'
-            test_file = (Path(wt) / 'lib/agent_kunit.c').read_text()
+            test_file = (Path(wt) / 'lib/agent_kunit.c').read_text(encoding='utf-8')
             status = W.git(wt, 'status', '--porcelain').stdout
             changed = [l[3:].strip() for l in status.splitlines()]
             other_patch = W.git(wt, 'diff', 'HEAD', '--', '.', ':!lib/agent_kunit.c').stdout

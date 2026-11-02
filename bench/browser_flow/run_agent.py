@@ -62,7 +62,7 @@ def main():
     ap.add_argument('--out', type=Path, default=HERE.parents[1] / 'runs/browser_flow')
     ap.add_argument('--harness', default='claude', choices=harness.harnesses(need=('browser',)))
     args = ap.parse_args()
-    spec = json.loads(args.tasks.read_text())
+    spec = json.loads(args.tasks.read_text(encoding='utf-8'))
     tasks = spec['tasks']
     if args.ids:
         tasks = [t for t in tasks if t['id'] in set(args.ids)]
@@ -71,13 +71,13 @@ def main():
     out = args.out / f'runs-{args.model}-{args.effort}-t{args.trial}.jsonl'
     kept = []
     if out.exists():
-        kept = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
+        kept = [json.loads(l) for l in out.read_text(encoding='utf-8').splitlines() if l.strip()]
         kept = [r for r in kept if not r.get('operational_error')]
-        out.write_text(''.join(json.dumps(r) + '\n' for r in kept))
+        out.write_text(''.join(json.dumps(r) + '\n' for r in kept), encoding='utf-8')
     done = {r['id'] for r in kept}
     cwd = HERE.parents[1] / 'runs/browser_flow/cwd'
     cwd.mkdir(parents=True, exist_ok=True)
-    with out.open('a') as sink:
+    with out.open('a', encoding='utf-8') as sink:
         for n, task in enumerate(tasks):
             if task['id'] in done:
                 continue

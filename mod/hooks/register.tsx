@@ -18,6 +18,10 @@ const JOBS: Record<string, { title: string; argv: (python: string) => string[] }
   pull: { title: 'git pull', argv: () => ['git', 'pull', '--ff-only'] },
 }
 
+// Python reads and writes UTF-8 everywhere (transcripts, ledger, git output), also on Windows,
+// where its default is the console code page.
+const PY_ENV = { PYTHONUTF8: '1' }
+
 const clock = (ms: number) => {
   const d = new Date(ms)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -140,7 +144,7 @@ async function refresh($: Dollar, fetch = false) {
     }
     const py = await findPython($)
     const argv = [py, 'tools/status.py', '--json', ...(fetch ? ['--fetch'] : [])]
-    const r = await $.process.run(argv, { cwd: repo, timeoutMs: 180000 })
+    const r = await $.process.run(argv, { cwd: repo, env: PY_ENV, timeoutMs: 180000 })
     if (r.exitCode !== 0) throw new Error(`status.py exit ${r.exitCode}: ${r.stderr.trim().split('\n').pop() ?? ''}`)
     const json = JSON.parse(r.stdout) as StatusJson
     const rateLimits = await readLimits($)
@@ -178,7 +182,7 @@ async function runJob($: Dollar, name: string) {
     const append = (text: string) =>
       update($, job, j => (j ? { ...j, lines: [...j.lines, ...text.split('\n')].slice(-400) } : j))
     try {
-      const child = $.process.spawn({ argv, cwd: repo })
+      const child = $.process.spawn({ argv, cwd: repo, env: PY_ENV })
       for await (const piece of child) {
         rest += piece.text
         const cut = rest.lastIndexOf('\n')

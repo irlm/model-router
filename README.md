@@ -46,6 +46,8 @@ that has this repository cloned, Python 3 and the `claude` CLI, at the prompt of
 ```
 
 The checkout path is an option in `/config` (default `~/Projects/Github/model-router`).
+On Windows `~` is `C:\Users\<you>`, so clone there or set the option to the folder you chose;
+`mod/README.md` has the Windows steps (Git for Windows, Python 3, the GitHub CLI, then the same install line).
 `mod/README.md` has the rest; `claude plugin validate mod` and `claude plugin test mod` check it.
 
 The pane also shows the subscription's rate-limit windows, what the last 30 days consumed (main

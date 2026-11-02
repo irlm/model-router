@@ -58,6 +58,38 @@ Answer `y` to add the marketplace, then pick the user scope. A private repositor
 only for GitHub accounts that can read it and whose machine already has a git credential
 for github.com (`gh auth login` then `gh auth setup-git`, or an SSH key).
 
+### Windows
+
+Native Windows, from PowerShell or CMD. Inside WSL it is Linux: follow the steps above there.
+
+1. Tools, once: [Git for Windows](https://git-scm.com/downloads/win) (git, which the install and
+   the buttons use, and Git Bash for Claude Code's Bash tool); Python 3 (the python.org installer
+   with "Add python.exe to PATH" ticked, or `winget install Python.Python.3.13`); the GitHub CLI
+   (`winget install GitHub.cli`, then `gh auth login` and `gh auth setup-git`, so git can read the
+   private repository); Claude Code (PowerShell: `irm https://claude.ai/install.ps1 | iex`).
+2. Clone where the default path points. `~` is your profile folder on Windows, so the default
+   `~/Projects/Github/model-router` means `C:\Users\<you>\Projects\Github\model-router`:
+
+   ```powershell
+   git clone https://github.com/irlm/model-router "$env:USERPROFILE\Projects\Github\model-router"
+   ```
+
+   Any other folder works too: install the mod, then set "model-router checkout" in `/config` to
+   that folder, written as Windows writes it (`D:\src\model-router`).
+3. At the prompt of a Claude Code session, as above:
+   `/plugin install model-router --marketplace irlm/model-router`.
+
+What differs on Windows. `python3` and `python` may be the Microsoft Store placeholders that
+print "Python was not found" and fail; the mod skips a name that does not answer `Python 3` and
+tries the next, down to `py`, the launcher the python.org installer adds. When none answers, the
+status line says `no Python 3 on PATH`, and the "Python command" option names the one to use.
+The ledger timer is a Linux systemd unit; on Windows the ledger runs when you press `l` in the
+pane (or `/router ledger`), and the pane says so instead of advising the timer. Re-check can run
+web_research, which needs only the `claude` CLI; the kernel families need Linux, and repo_fix
+needs its clone and worktrees set up by hand. The scripts read and write UTF-8 on every platform:
+the mod runs them with `PYTHONUTF8=1`, and each file read, write and git call names the encoding
+itself, so they behave the same from a plain PowerShell window.
+
 Which families can run here depends on the fixtures: web research needs only the `claude`
 CLI; find_feature needs the linux-v6.12 tree; repo_fix needs a repo config (`bench/repo_fix/repos/<name>.json`, local) with its clone
 and worktrees; fix_bug and write_tests need a kernel worktree and KUnit build and run by hand.

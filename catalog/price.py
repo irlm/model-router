@@ -16,9 +16,9 @@ _CATALOG = None
 def catalog(path=None):
     global _CATALOG
     if path is not None:
-        return json.loads(Path(path).read_text())
+        return json.loads(Path(path).read_text(encoding='utf-8'))
     if _CATALOG is None:
-        _CATALOG = json.loads((HERE / 'models.json').read_text())
+        _CATALOG = json.loads((HERE / 'models.json').read_text(encoding='utf-8'))
     return _CATALOG
 
 

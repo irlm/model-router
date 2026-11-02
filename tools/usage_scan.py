@@ -24,7 +24,7 @@ for f in ROOT.glob('**/*.jsonl'):
     kind = 'bench' if any(b in proj for b in BENCH) else 'interactive'
     sub = 'subagent-file' if 'subagents' in f.parts else 'main'
     files += 1
-    for line in f.open(errors='replace'):
+    for line in f.open(encoding='utf-8', errors='replace'):
         try: r = json.loads(line)
         except ValueError: bad += 1; continue
         m = r.get('message') or {}

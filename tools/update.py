@@ -52,12 +52,12 @@ def main():
         sys.exit(f'regress.py exit {r.returncode}, new entries: {[p.name for p in new]}')
     entry = new[-1]
     print()
-    print(entry.read_text())
+    print(entry.read_text(encoding='utf-8'))
     if args.no_commit:
         return
     git = shutil.which('git') or 'git'
     subprocess.run([git, 'add', 'ledger', 'runs/regress'], cwd=HERE, check=True)
-    c = subprocess.run([git, 'commit', '-qm', f'regress: {entry.stem[len("regress-"):]}'], cwd=HERE, capture_output=True, text=True)
+    c = subprocess.run([git, 'commit', '-qm', f'regress: {entry.stem[len("regress-"):]}'], cwd=HERE, capture_output=True, text=True, encoding='utf-8', errors='replace')
     if c.returncode != 0:
         print('nothing new to commit' if 'nothing to commit' in c.stdout + c.stderr else c.stderr.strip())
         return

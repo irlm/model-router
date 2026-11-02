@@ -74,7 +74,7 @@ def main():
         args.tools = args.tools + f" Bash({cfg['test_cmd_text']}:*)"
     bench = 'repo_fix' + ('' if args.prompt_variant == 'a' else '_p' + args.prompt_variant)
     args.out = args.out or HERE.parents[1] / 'runs' / bench
-    tasks = json.loads(args.tasks.read_text())['tasks']
+    tasks = json.loads(args.tasks.read_text(encoding='utf-8'))['tasks']
     if args.ids:
         tasks = [t for t in tasks if t['id'] in set(args.ids)]
     args.out.mkdir(parents=True, exist_ok=True)
@@ -82,11 +82,11 @@ def main():
     out = args.out / f'runs-{args.model}-{args.effort}{suffix}-t{args.trial}.jsonl'
     kept = []
     if out.exists():
-        kept = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
+        kept = [json.loads(l) for l in out.read_text(encoding='utf-8').splitlines() if l.strip()]
         kept = [r for r in kept if not r.get('operational_error')]
-        out.write_text(''.join(json.dumps(r) + '\n' for r in kept))
+        out.write_text(''.join(json.dumps(r) + '\n' for r in kept), encoding='utf-8')
     done = {r['id'] for r in kept}
-    with out.open('a') as sink:
+    with out.open('a', encoding='utf-8') as sink:
         for task in tasks:
             if task['id'] in done:
                 continue

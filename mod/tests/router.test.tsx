@@ -23,6 +23,11 @@ const STATUS = {
     daily: [{ date: '2026-10-28', cost: 1 }, { date: '2026-10-29', cost: 2 }, { date: '2026-10-30', cost: 4 }, { date: '2026-10-31', cost: 6 }, { date: '2026-11-01', cost: 8 }] },
   suggestions: [{ id: 'effort', kind: 'extrapolated', title: 'main sessions at high/xhigh effort: $225 in 30 days', stake: 225,
     saving: [72, 72], basis: 'results/cell8 sweep', action: 'claude --effort low' }],
+  changes: { events: [{ at: '2026-10-30T10:00Z', kind: 'apply', detail: 'agents: web-researcher.md', projected: 25 }],
+    realized: { since: '2026-10-30T10:00Z', kind: 'apply', what: 'agents: web-researcher.md', projected: 25, days: 2,
+      classes: [{ class: 'code-explore', family: 'find_feature', saved: 7.69, check: { sample: '6', successes: '6', verdict: 'ok' },
+        before: { n: 16, cost: 24.71, per_call: 1.544, models: { 'claude-opus-5-5': 16 } }, after: { n: 5, cost: 0.03, per_call: 0.006, models: { 'claude-haiku-5-5': 5 } } }],
+      main: { before: { msgs: 2000, cost: 234, per_msg: 0.117 }, after: { msgs: 140, cost: 11.48, per_msg: 0.082 }, saved: 4.9, rows: [] }, saved: 12.59 } },
 }
 
 const PANE = {
@@ -41,9 +46,11 @@ test('/router check prints the table and the status line counts the advice', asy
   mock.clock(on, { now: 1_762_000_000_000 })
   mock.env(on, { HOME: '/home/me' })
   on('fs.exists', () => ({ value: true }))
-  on('process.run', (_, e) => ({
-    value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(STATUS) },
-  }))
+  const argvs: string[] = []
+  on('process.run', (_, e) => {
+    argvs.push(e.argv.join(' '))
+    return { value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(STATUS) } }
+  })
   const pinned: (string | undefined)[] = []
   on('ui.status', (_, e) => { pinned.push(e.text); return { value: undefined } })
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -53,6 +60,11 @@ test('/router check prints the table and the status line counts the advice', asy
   expect(text).toContain('find_feature haiku low          ██████████ 214/216  0.0046  yes  ok 6/6')
   expect(text).toContain('spend 30d ▂▃▅▆█ $592 (main $517, agents $75) · prev $500')
   expect(text).toContain('agents: 6 files, 179 unused; routed 1/1 applied, 1 not on this machine')
+  expect(text).toContain('(apply: agents: web-researcher.md), 2 days: saved $13 · projected $25 per 30d · regress find_feature ok')
+  expect(text).toContain('code-explore       before 16 calls $1.54/call (opus-5-5 x16) · after 5 calls $0.0060/call (haiku-5-5 x5) · saved $7.69 · find_feature regress ok 6/6')
+  expect(text).toContain('main sessions      before 2000 msgs $0.1170/msg · after 140 msgs $0.0820/msg · saved $4.90')
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'mark effort low from today' })).text).toContain('change recorded: effort low from today')
+  expect(argvs.some(a => a.endsWith('tools/changes.py add mark effort low from today'))).toBe(true)
 
   expect((await $.command.run({ ...RUN, command: 'router', args: '' })).text).toBe('Model router pane opened.')
   expect((await $.command.run({ ...RUN, command: 'router', args: '  ' })).text).toBe('Model router pane opened.')

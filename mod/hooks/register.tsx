@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Hook, Register } from 'claude-code'
 
-import type { Job, RateLimit, Routed, Status, StatusJson } from '../types'
+import type { Job, RateLimit, RealizedMainSide, RealizedSide, Routed, Status, StatusJson } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
 type RoutingMode = 'ask' | 'auto' | 'off'
@@ -66,6 +66,15 @@ const bar = (frac: number, width = 10) => {
   return '█'.repeat(n) + '░'.repeat(width - n)
 }
 const money = (n: number) => `$${n >= 10 ? n.toFixed(0) : n.toFixed(2)}`
+const fine = (n: number) => (n < 1 ? `$${n.toFixed(4)}` : money(n))
+const when = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${clock(d.getTime())}`
+}
+const saidSaved = (n: number | null) => (n === null ? 'no basis' : `${n >= 0 ? 'saved' : 'cost up'} ${money(Math.abs(n))}`)
+const savedColor = (n: number | null) => (n === null ? undefined : n > 0 ? 'green' : n < 0 ? 'yellow' : undefined)
+/** What the measured suggestions project per window: recorded with a routing change, to compare with what came. */
+const measuredProjected = (s: StatusJson | null | undefined) => (s?.suggestions ?? []).filter(g => g.kind === 'measured').reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
 const rateFrac = (rate: string | null) => {
   const m = rate?.match(/^(\d+)\/(\d+)$/)
   return m && Number(m[2]) > 0 ? Number(m[1]) / Number(m[2]) : null
@@ -101,6 +110,15 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     const daily = u.daily ?? []
     lines.push(line(`spend ${u.days}d ${daily.length ? spark(daily.map(d => d.cost)) + ' ' : ''}${money(total)} (main ${money(u.main_total)}, agents ${money(u.subagents_total)}) · prev ${money(prev)}`, { bold: true }))
   }
+  // The triple check after a change: projected (the benchmark), realized (your transcripts since), regress (the family here).
+  const r = s.changes?.realized
+  if (r) {
+    const checks = r.classes.filter(c => c.family && c.check).map(c => `${c.family} ${c.check!.verdict}`)
+    lines.push(line(`since ${when(r.since)} (${r.kind}: ${r.what})${r.days ? `, ${r.days} days` : ''}: ${saidSaved(r.saved)}${r.projected != null ? ` · projected ${money(r.projected)} per ${u?.days ?? 30}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
+      { color: savedColor(r.saved), bold: true }))
+  } else if (full) {
+    lines.push(line('no change recorded yet: Apply agents, /router routing auto and /router mark <note> start the before/after count', { dim: true }))
+  }
   lines.push(BLANK, line(`${'family'.padEnd(13)}${'default'.padEnd(19)}${'ok'.padEnd(11)}${'evidence'.padEnd(9)}${'$/ok'.padEnd(8)}${'here'.padEnd(5)}last check`, { bold: true }))
   for (const f of s.families) {
     const d = f.model ? `${f.model} ${f.effort}${f.variant ? ' +' + f.variant : ''}` : 'none'
@@ -134,6 +152,19 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     for (const [cls, b] of Object.entries(u.by_class).sort((a, b) => b[1].cost - a[1].cost)) {
       const types = Object.entries(b.types).map(([t, n]) => `${t} x${n}`).join(', ')
       lines.push(line(`  ${('agents ' + cls).padEnd(30)}${''.padEnd(8)}${bar(top > 0 ? b.cost / top : 0, 20)} ${money(b.cost).padStart(5)}  ${String(b.n).padStart(5)} calls  ${types}`))
+    }
+  }
+  if (r && full) {
+    lines.push(BLANK, line(`since the change: cost per unit of the same work before vs after, times the units after (the regress column: the family still passes here)`, { bold: true }))
+    const side = (x: RealizedSide) => `${x.n} calls${x.per_call === null ? '' : ` ${fine(x.per_call)}/call`} (${Object.entries(x.models).map(([m, n]) => `${m.replace(/^claude-/, '')} x${n}`).join(', ')})`
+    for (const c of r.classes) {
+      const check = c.family ? ` · ${c.family} regress ${c.check ? c.check.verdict + (c.check.sample ? ` ${c.check.successes}/${c.check.sample}` : '') : 'not checked here'}` : ' · no family measures this'
+      lines.push(line(`  ${c.class.padEnd(19)}before ${side(c.before)} · after ${side(c.after)} · ${saidSaved(c.saved)}${check}`, { color: savedColor(c.saved) }))
+    }
+    const ms = (x: RealizedMainSide | { msgs: number; per_msg: number }) => `${x.msgs} msgs${x.per_msg === null ? '' : ` ${fine(x.per_msg)}/msg`}`
+    lines.push(line(`  ${'main sessions'.padEnd(19)}before ${ms(r.main.before)} · after ${ms(r.main.after)} · ${saidSaved(r.main.saved)} (same unit, a message; the mix of work may differ)`, { color: savedColor(r.main.saved) }))
+    for (const row of r.main.rows.slice(0, 4)) {
+      lines.push(line(`    ${row.model.replace(/^claude-/, '')} ${row.effort}: ${row.before ? ms(row.before) : '-'} -> ${row.after ? ms(row.after) : '-'}`, { dim: true }))
     }
   }
   // Suggestions: largest saving first, unknown last; each with its share of the window's spend.
@@ -233,6 +264,19 @@ async function refresh($: Dollar, fetch = false) {
     await update($, status, () => ({ at, json: null, error, rateLimits, where }))
     $.ui.status(`router: ${error}`)
   }
+}
+
+/** Record a routing change on this machine (tools/changes.py): the pane counts the saving from now. */
+async function recordChange($: Dollar, kind: string, detail: string, projected?: number) {
+  try {
+    const py = await findPython($)
+    const argv = [py, 'tools/changes.py', 'add', kind, detail, ...(projected ? ['--projected', projected.toFixed(2)] : [])]
+    const r = await $.process.run(argv, { cwd: repo, env: PY_ENV, timeoutMs: 20000 })
+    if (r.exitCode !== 0) throw new Error(r.stderr.trim().split('\n').pop() ?? `exit ${r.exitCode}`)
+  } catch (err) {
+    $.ui.toast(`router: could not record the change: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  void refresh($)
 }
 
 async function runJob($: Dollar, name: string) {
@@ -350,7 +394,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'router',
       description: 'Model router: where the routing stands, re-check it, ledger, apply, pull',
-      argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off',
+      argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off | mark <note>',
     })
     void refresh($)
     if (refreshMinutes > 0) {
@@ -374,8 +418,18 @@ export const register: Register = (on, options) => {
       const s = await read($, status)
       return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where).map(l => l.text).join('\n') : (s?.error ?? 'no status') }
     }
+    if (verb === 'mark') {
+      const note = e.args.trim().replace(/^mark\s*/, '')
+      if (!note) return { text: 'mark needs a note of what you changed, e.g. /router mark effort low from today' }
+      await recordChange($, 'mark', note)
+      return { text: `change recorded: ${note}. The pane counts what the transcripts save from now.` }
+    }
     if (verb === 'routing') {
-      if (arg === 'ask' || arg === 'auto' || arg === 'off') routingMode = arg
+      if (arg === 'ask' || arg === 'auto' || arg === 'off') {
+        const was = routingMode
+        routingMode = arg
+        if (arg === 'auto' && was !== 'auto') void recordChange($, 'routing', 'auto for this session', measuredProjected((await read($, status))?.json))
+      }
       return { text: `routing ${routingMode} for this session${arg ? '' : ' (routing ask|auto|off sets it)'}; /config makes it permanent.` }
     }
     const spec = JOBS[verb]
@@ -398,7 +452,10 @@ export const register: Register = (on, options) => {
     let decision: Routed['decision'] = 'auto'
     if (routingMode === 'ask') {
       const choice = await askRoute($, c)
-      if (choice === 'auto') routingMode = 'auto'
+      if (choice === 'auto') {
+        routingMode = 'auto'
+        void recordChange($, 'routing', 'auto for this session (always)', measuredProjected(s?.json))
+      }
       decision = choice === 'keep' ? 'kept' : choice === 'auto' ? 'auto' : 'routed'
     }
     const at = await $.clock.now()

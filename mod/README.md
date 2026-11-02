@@ -64,6 +64,7 @@ Buttons and verbs (`/router <verb>`):
 |---|---|---|
 | | `routing ask\|auto\|off` | sets how Agent calls are routed for this session |
 | Details / Less | | shows or hides the pane's long sections |
+| | `mark <note>` | records a change you made by hand (effort, model), so the saving is counted from now |
 | Refresh | `check` | `tools/status.py` (also prints the table as text) |
 | Fetch origin | `fetch` | the same after `git fetch`, so behind/ahead are current |
 | Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
@@ -89,6 +90,27 @@ clone nothing is committed: "Ledger now" prints the entry into the pane instead 
 
 A checkout of your own is for the benchmark, the ledger timer and changing the code: clone the
 repository to the default path, or anywhere and set the path in `/config`.
+
+### After a change: what was really saved
+
+A projected saving is the benchmark's number applied to your window. After a change, the pane
+shows what your own transcripts saved since it, per unit of the same work:
+
+- each class of Agent call (code searches, fact lookups, ...): cost per call before and after the
+  change, times the calls after it, with the models on each side;
+- main sessions: cost per message before and after (same unit; the mix of work can differ, so
+  read it as a trend, not a receipt), and the top model/effort rows.
+
+Next to each class stands the family's last regression verdict: the cheaper model still does the
+work here. Projected, realized, regress: three checks on one line of the pane, for example
+`since 2026-11-02 10:40 (apply: agents: web-researcher.md), 3 days: saved $7.70 · projected $25 per 30d · regress find_feature ok`.
+Details shows the per-class and main-session lines.
+
+A change is recorded in `~/.claude/model-router/changes.jsonl` (never in the repository) by Apply
+agents when it writes a file, by `/router routing auto` or "Always route this session", and by
+`/router mark <note>` for changes the widget does not make itself, such as `claude --effort low`
+or `claude --model opus` from today. The count starts at the latest change; `python3
+tools/changes.py list` prints them.
 
 ### Windows
 

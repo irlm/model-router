@@ -12,9 +12,12 @@ Usage: python3 apply_agents.py [--agents-dir ~/.claude/agents] [--revert] [--dry
 """
 import argparse
 import json
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE / 'tools'))
+import changes  # noqa: E402
 TEMPLATES = HERE / 'agents'   # agent files the repository ships, installed when missing
 KEYS = ('model:', 'effort:')
 MARK = '<!-- model-router -->'
@@ -49,6 +52,7 @@ def main():
     ap.add_argument('--dry-run', action='store_true')
     args = ap.parse_args()
     agents = json.loads(args.routing.read_text(encoding='utf-8'))['agents']
+    done = []
     for name, route in agents.items():
         path = args.agents_dir / name
         install = False
@@ -68,7 +72,12 @@ def main():
         if not args.dry_run and (install or after != before):
             args.agents_dir.mkdir(parents=True, exist_ok=True)
             path.write_text(after, encoding='utf-8')
+            done.append(name)
         print(f"{state:13} {name}: {'removed' if args.revert else route['model'] + ' / ' + route['effort']} ({route['family']})")
+    if done:
+        # The change log: from now on the widget counts what the transcripts save (tools/changes.py).
+        e = changes.add('revert' if args.revert else 'apply', 'agents: ' + ', '.join(done))
+        print(f"change recorded at {e['at']}: the pane counts the saving from here")
 
 
 if __name__ == '__main__':

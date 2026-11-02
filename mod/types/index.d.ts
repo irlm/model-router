@@ -26,6 +26,7 @@ export type StatusJson = {
   advice: string[]
   usage?: Usage
   suggestions?: Suggestion[]
+  changes?: { events: Change[]; realized: Realized | null }
 }
 
 /** The last 30 days of interactive work, catalog-priced: headroom on a subscription. */
@@ -55,6 +56,22 @@ export type Suggestion = {
 }
 
 export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
+
+/** A routing change recorded on this machine (tools/changes.py): the point the saving is counted from. */
+export type Change = { at: string; kind: string; detail: string; projected?: number | null }
+export type RealizedSide = { n: number; cost: number; per_call: number | null; models: Record<string, number> }
+export type RealizedMainSide = { msgs: number; cost: number; per_msg: number | null }
+/** What the transcripts saved since the last change: cost per unit of the same work before vs after, times the units after. */
+export type Realized = {
+  since: string
+  kind: string
+  what: string
+  projected?: number | null
+  days: number | null
+  classes: { class: string; family: string | null; before: RealizedSide; after: RealizedSide; saved: number | null; check: { sample: string; successes: string; verdict: string } | null }[]
+  main: { before: RealizedMainSide; after: RealizedMainSide; saved: number | null; rows: { model: string; effort: string; before: { msgs: number; per_msg: number } | null; after: { msgs: number; per_msg: number } | null }[] }
+  saved: number
+}
 
 /** The last status read: the JSON when the script ran, else why not. */
 export type Status = {

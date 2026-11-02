@@ -10,6 +10,7 @@ prints it. Thresholds are stated in ADVICE_* below, not hidden.
 Usage: python3 tools/status.py [--json] [--fetch]
 """
 import argparse
+import collections
 import datetime
 import json
 import os
@@ -25,6 +26,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / 'tools'))
 sys.path.insert(0, str(HERE / 'bench/common'))
 import decide  # noqa: E402
+import changes  # noqa: E402
 import consumption  # noqa: E402
 import local  # noqa: E402
 
@@ -40,6 +42,8 @@ EFFORT_RATIO = {'xhigh': {'claude-opus-5-5': 1.30, 'claude-fable-5-1': 1.52}, 'h
 OPUS_OVER_FABLE = (0.37, 0.40)
 WEB_RESEARCHER_COST = 0.022   # Haiku low per fact lookup, 76/78 correct (results/cell8)
 FIND_FEATURE_COST = 0.0046    # Haiku low per code search, 214/216 found (routing.json evidence)
+# Which measured family stands behind each class of Agent call the consumption scan sees.
+CLASS_FAMILY = {'code-explore': 'find_feature', 'fact-lookup': 'web_research', 'code-change': 'repo_fix'}
 AGENTS_DIR = Path.home() / '.claude/agents'
 UNUSED_DIR = Path.home() / '.claude/agents.unused'
 
@@ -264,6 +268,51 @@ def suggest(usage, agents):
     return out
 
 
+def realized_savings(usage, events, families):
+    """What the transcripts show since the last recorded change (tools/changes.py): the cost per unit of the
+    same work before and after it, times the units after it. The unit is one Agent call of a class, and
+    one main-session message. Positive is saved, negative is dearer. Next to each class, the family's last
+    regression verdict: the check that the cheaper model still does the work here."""
+    if not events or not usage.get('phases'):
+        return None
+    ev = events[-1]
+    split = ev['at'][:16]
+    checks = {f['name']: f.get('last_check') for f in families}
+    calls = usage['subagents']['calls']
+
+    def side(cs):
+        priced = [c for c in cs if c['cost'] is not None]
+        return {'n': len(cs), 'cost': round(sum(c['cost'] or 0 for c in cs), 2),
+                'per_call': round(sum(c['cost'] for c in priced) / len(priced), 4) if priced else None,
+                'models': dict(collections.Counter(c['model'] or '?' for c in cs))}
+    classes = []
+    for cls in sorted({c['class'] for c in calls}):
+        before = side([c for c in calls if c['class'] == cls and c['ts'] < split])
+        after = side([c for c in calls if c['class'] == cls and c['ts'] >= split])
+        if not after['n']:
+            continue
+        saved = round((before['per_call'] - after['per_call']) * after['n'], 2) if before['per_call'] is not None and after['per_call'] is not None else None
+        fam = CLASS_FAMILY.get(cls)
+        classes.append({'class': cls, 'family': fam, 'before': before, 'after': after, 'saved': saved, 'check': checks.get(fam) if fam else None})
+    ph = usage['phases']
+
+    def per_msg(p):
+        return round(p['main_total'] / p['main_msgs'], 4) if p['main_msgs'] else None
+    pb, pa = per_msg(ph['before']), per_msg(ph['after'])
+    rb = {(r['model'], r['effort']): r for r in ph['before']['main_rows']}
+    ra = {(r['model'], r['effort']): r for r in ph['after']['main_rows']}
+    rows = [{'model': k[0], 'effort': k[1],
+             'before': {'msgs': rb[k]['msgs'], 'per_msg': round(rb[k]['cost'] / rb[k]['msgs'], 4)} if k in rb else None,
+             'after': {'msgs': ra[k]['msgs'], 'per_msg': round(ra[k]['cost'] / ra[k]['msgs'], 4)} if k in ra else None}
+            for k in sorted(set(rb) | set(ra), key=lambda k: -((ra.get(k) or rb.get(k))['cost']))]
+    main = {'before': {'msgs': ph['before']['main_msgs'], 'cost': ph['before']['main_total'], 'per_msg': pb},
+            'after': {'msgs': ph['after']['main_msgs'], 'cost': ph['after']['main_total'], 'per_msg': pa},
+            'saved': round((pb - pa) * ph['after']['main_msgs'], 2) if pb is not None and pa is not None else None, 'rows': rows}
+    saved = round(sum(c['saved'] or 0 for c in classes) + (main['saved'] or 0), 2)
+    return {'since': ev['at'], 'kind': ev['kind'], 'what': ev['detail'], 'projected': ev.get('projected'),
+            'days': days_since(ev['at'][:10], datetime.date.today()), 'classes': classes, 'main': main, 'saved': saved}
+
+
 def collect(fetch=False):
     today = datetime.date.today()
     routing = json.loads((HERE / 'routing.json').read_text(encoding='utf-8'))
@@ -290,8 +339,10 @@ def collect(fetch=False):
     timer = timer_state()
     for f in families:
         f['last_check'] = (reg or {}).get('rows', {}).get(f['name'])
-    usage = consumption.collect(USAGE_DAYS)
+    events = changes.read()
+    usage = consumption.collect(USAGE_DAYS, split=events[-1]['at'] if events else None)
     suggestions = suggest(usage, agents)
+    realized = realized_savings(usage, events, families)
 
     advice = []
     if version and reg and reg.get('claude') and reg['claude'] != version:
@@ -340,7 +391,7 @@ def collect(fetch=False):
                       'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types'], 'models': v.get('models', {})} for k, v in usage['subagents']['by_class'].items()},
                       'daily': usage.get('daily', []),
                       'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
-            'suggestions': suggestions,
+            'suggestions': suggestions, 'changes': {'events': events[-5:], 'realized': realized},
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}
 
 

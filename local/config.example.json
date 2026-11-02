@@ -1,0 +1,5 @@
+{
+ "kernel_tree": "~/src/linux-v6.12",
+ "kernel_worktrees": "~/src/linux-v6.12-wt",
+ "skip_projects": ["linux-v6-12", "my-evaluation-dir"]
+}

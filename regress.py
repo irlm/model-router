@@ -43,6 +43,12 @@ TASK_FILES = {'find_feature': None, 'fix_bug_hard': 'bench/fix_bug/tasks-hard.js
               'browser_flow': 'bench/browser_flow/tasks.json'}
 
 
+def repo_fix_repo():
+    """The repository configured for repo_fix on this machine (bench/repo_fix/repos/<name>.json, a local file), or None."""
+    names = sorted(p.stem for p in (HERE / 'bench/repo_fix/repos').glob('*.json') if p.stem != 'example')
+    return names[0] if names else None
+
+
 def claude_version():
     try:
         return subprocess.run([CLAUDE, '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30).stdout.split()[0]
@@ -135,6 +141,9 @@ def main():
         if bench == 'browser_flow' and not args.browser:
             lines.append(f'| {fam} | {d["model"]} {effort} | | | | | skipped: needs --browser | |')
             continue
+        if bench == 'repo_fix' and not (repo_fix_repo() and (HERE / TASK_FILES[bench]).exists()):
+            lines.append(f'| {fam} | {d["model"]} {effort} | | | | | skipped: needs a repository of your own, bench/repo_fix/repos/<name>.json and its tasks (local) | |')
+            continue
         ids = sorted(random.Random(args.seed).sample(task_ids(bench), min(args.sample, len(task_ids(bench)))))
         out = out_root / bench
         common = ['--model', model, '--effort', effort, '--ids', *ids, '--out', str(out), '--trial', '1']
@@ -153,8 +162,8 @@ def main():
             run = [PY, 'bench/write_tests/run_agent.py', *common, '--worktree', str(wt)] + (['--kunit', '--build-dir', str(bd)] if variant == 'kunit' else [])
             grade = [PY, 'bench/write_tests/grade.py', '--worktree', str(gwt), '--build-dir', str(gbd), '--runs', str(out)]
         elif bench == 'repo_fix':
-            run = [PY, 'bench/repo_fix/run_agent.py', *common, '--repo', 'private-ts', '--slot', args.slot] + ([] if variant == 'vitest' else ['--noexec'])
-            grade = [PY, 'bench/repo_fix/grade.py', '--repo', 'private-ts', '--slot', args.grade_slot, '--runs', str(out)]
+            run = [PY, 'bench/repo_fix/run_agent.py', *common, '--repo', repo_fix_repo(), '--slot', args.slot] + ([] if variant == 'vitest' else ['--noexec'])
+            grade = [PY, 'bench/repo_fix/grade.py', '--repo', repo_fix_repo(), '--slot', args.grade_slot, '--runs', str(out)]
         elif bench == 'web_research':
             run = [PY, 'bench/web_research/run_agent.py', *common]
             grade = [PY, 'bench/web_research/grade.py', '--runs', str(out)]

@@ -12,8 +12,12 @@ subtags land in 'detail':
 import argparse
 import json
 import subprocess
+import sys
 from collections import defaultdict
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'common'))
+import local  # noqa: E402
 
 from grade import extract_json
 
@@ -69,7 +73,7 @@ def main():
                     default=here / 'results/kernel-semantic')
     args = ap.parse_args()
     spec = json.loads((args.dir / 'tasks.json').read_text())
-    tree, tasks = spec['tree'], {t['id']: t for t in spec['tasks']}
+    tree, tasks = local.resolve(spec['tree']), {t['id']: t for t in spec['tasks']}
     cells = defaultdict(lambda: defaultdict(int))
     details = []
     for runs in sorted(args.dir.glob('runs-*.jsonl')):

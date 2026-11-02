@@ -1,0 +1,13 @@
+{
+ "name": "example",
+ "language": "TypeScript",
+ "clone": "~/Projects/Github/model-router-evaluation/<repo>",
+ "worktrees": "~/Projects/Github/model-router-evaluation/<repo>-wt",
+ "base": "<the commit the tasks were made at>",
+ "src_glob": "src/**/*.ts",
+ "test_cmd": ["npx", "vitest", "run"],
+ "test_cmd_text": "npx vitest run",
+ "test_dirs": "test/",
+ "typecheck_cmd": ["npx", "tsc", "-p", "tsconfig.json", "--noEmit"],
+ "setup": "git clone <repo> clone; npm ci in clone; git worktree add <worktrees>/<slot> <base> per run slot; ln -s clone/node_modules into each worktree; echo node_modules >> clone/.git/info/exclude. Copy this file to <name>.json (any name but example), then python3 bench/repo_fix/make_tasks.py --repo <name> --worktree <worktrees>/mk. The file, the tasks and the receipts stay local (.gitignore)."
+}

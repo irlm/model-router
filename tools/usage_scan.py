@@ -12,10 +12,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'catalog'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bench/common'))
 import price
+import local
 CAT = price.catalog(Path(__file__).resolve().parents[1] / 'catalog/models.json')
 ROOT = Path.home() / '.claude/projects'
-BENCH = ('model-router-runs',)
+BENCH = local.skip_projects()   # benchmark sessions on this machine (local/config.json), not the user's own work
 agent_calls = collections.Counter(); agent_by_proj = collections.Counter(); agent_by_month = collections.Counter()
 tok = collections.defaultdict(lambda: collections.Counter()); cost = collections.Counter(); msgs = collections.Counter()
 seen_ids = set(); files = 0; bad = 0
@@ -58,9 +60,10 @@ print('bench-session agent calls:', sum(n for (k, _), n in agent_calls.items() i
 print('\n== Agent calls by month (interactive)')
 for (kind, ts), n in sorted(agent_by_month.items()):
     if kind == 'interactive': print(f'{ts}  {n}')
-print('\n== Agent calls by project (interactive, top 12)')
-for (kind, p), n in agent_by_proj.most_common(40):
-    if kind == 'interactive': print(f'{n:5d}  {p}')
+if '--projects' in sys.argv:   # project directory names stay off the ledger: they name the user's repositories
+    print('\n== Agent calls by project (interactive, top 12)')
+    for (kind, p), n in agent_by_proj.most_common(40):
+        if kind == 'interactive': print(f'{n:5d}  {p}')
 print('\n== Tokens and catalog cost by kind / file / month / model')
 rows = sorted(tok.keys())
 print(f"{'kind':12} {'file':14} {'month':8} {'model':24} {'msgs':>7} {'in':>10} {'cache_w':>12} {'cache_r':>14} {'out':>10} {'cost$':>10}")

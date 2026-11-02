@@ -14,6 +14,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'common'))
+import local  # noqa: E402
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / 'kernel_probe'))
@@ -91,7 +94,7 @@ def main():
         for task in tasks:
             if task['id'] in done:
                 continue
-            prompt = build_prompt(task, args.arm, spec['tree'], noise_pool)
+            prompt = build_prompt(task, args.arm, local.resolve(spec['tree']), noise_pool)
             start = time.perf_counter()
             try:
                 if args.endpoint == 'ollama':

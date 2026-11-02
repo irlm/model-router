@@ -21,11 +21,13 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE / 'catalog'))
+sys.path.insert(0, str(HERE / 'bench/common'))
 import price  # noqa: E402
+import local  # noqa: E402
 
 CAT = price.catalog(HERE / 'catalog/models.json')
 ROOT = Path.home() / '.claude/projects'
-BENCH = ('model-router-runs', 'tmp-prefix')
+BENCH = local.skip_projects()   # benchmark sessions on this machine (local/config.json), not the user's own work
 AGENT_IDS = (re.compile(r'agentId\\?":\\?"([0-9a-f]{12,24})'), re.compile(r'\b([0-9a-f]{15,24}) \(internal ID'))
 TOKENS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
 

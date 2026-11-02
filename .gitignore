@@ -2,3 +2,16 @@ __pycache__/
 *.pyc
 scratch/
 runs/web_research/fetch_cache.json
+# machine-local: fixtures on the author's own repositories and this machine's paths (local/README.md)
+local/config.json
+bench/repo_fix/repos/*.json
+!bench/repo_fix/repos/example.json
+bench/repo_fix/tasks.json
+bench/repo_fix/tasks-*.json
+bench/repo_fix/mutants.json
+bench/own_app_flow/
+runs/repo_fix/
+runs/own_app_flow/
+runs/repo_fix_pb/
+runs/regress/*/repo_fix/
+runs/smoke/repo_fix/

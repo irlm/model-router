@@ -23,8 +23,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / 'tools'))
+sys.path.insert(0, str(HERE / 'bench/common'))
 import decide  # noqa: E402
 import consumption  # noqa: E402
+import local  # noqa: E402
 
 ADVICE_PRICE_DAYS = 30     # prices verified longer ago than this: check the sources
 ADVICE_LEDGER_DAYS = 35    # no usage ledger for this long: write one
@@ -88,12 +90,15 @@ def can_run(bench):
     """Whether this family's regression sample can run on this machine, and why not."""
     if bench == 'find_feature':
         spec = json.loads((HERE / 'bench/find_feature/tasks/lexical.json').read_text(encoding='utf-8'))
-        tree = Path(os.path.expanduser(spec['tree']))
-        return (True, '') if tree.exists() else (False, f'needs the source tree {spec["tree"]}')
+        tree = Path(local.resolve(spec['tree']))
+        return (True, '') if tree.exists() else (False, f'needs the kernel tree {spec["tree"]} (local/config.json: kernel_tree)')
     if bench in ('fix_bug_hard', 'write_tests'):
         return False, 'needs a kernel worktree and KUnit build (regress.py --kernel-worktree): by hand'
     if bench == 'repo_fix':
-        spec = json.loads((HERE / 'bench/repo_fix/repos/private-ts.json').read_text(encoding='utf-8'))
+        repos = sorted(p for p in (HERE / 'bench/repo_fix/repos').glob('*.json') if p.stem != 'example')
+        if not repos or not (HERE / 'bench/repo_fix/tasks.json').exists():
+            return False, 'needs a repository of your own: bench/repo_fix/repos/<name>.json and its tasks (local/README.md)'
+        spec = json.loads(repos[0].read_text(encoding='utf-8'))
         clone, wts = Path(os.path.expanduser(spec['clone'])), Path(os.path.expanduser(spec['worktrees']))
         if not clone.exists() or not wts.exists():
             return False, f'needs the clone and worktrees under {spec["worktrees"]}'

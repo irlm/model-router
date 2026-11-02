@@ -20,6 +20,7 @@ import run_retrieval  # build_prompt_t, restore_tree (K3 arm T contract)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'common'))
 import harness  # noqa: E402
+import local  # noqa: E402
 
 
 def load_tasks(files, ids, limit):
@@ -27,8 +28,8 @@ def load_tasks(files, ids, limit):
     for f in files:
         spec = json.loads(Path(f).read_text(encoding='utf-8'))
         if tree is None:
-            tree = spec['tree']
-        elif spec['tree'] != tree:
+            tree = local.resolve(spec['tree'])
+        elif local.resolve(spec['tree']) != tree:
             raise SystemExit('task files point at different trees')
         tasks.extend(spec['tasks'])
     if ids:

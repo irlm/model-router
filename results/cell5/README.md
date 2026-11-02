@@ -1,7 +1,6 @@
 # Cell 5: the author's own web store through the Chrome extension (2026-10-30)
 
-The browser-flow family of cell 4 repeated on a real application: the Go store of the user's
-author's own Go store (Postgres, server-rendered templates, one
+The browser-flow family of cell 4 repeated on a real application: the author's own Go web store (Postgres, server-rendered templates, one
 small `app.js`), at commit `24211d9`. 15 flows (14 planted defects plus a clean store), a numbered
 10-item checklist, three models at effort low: two trials for Haiku and Sonnet, one for Fable plus
 a rerun of its one lost flow. The

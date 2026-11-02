@@ -14,6 +14,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parents[1] / 'common'))
+import local  # noqa: E402
 import kunit_lab
 from run_edit import extract_function
 
@@ -64,7 +66,7 @@ def main():
             if r.get('operational_error'):
                 graded[key] = 'operational'
             else:
-                graded[key] = grade_response(spec['tree'], tasks[r['id']],
+                graded[key] = grade_response(local.resolve(spec['tree']), tasks[r['id']],
                                              r['text'])
             print(key, '->', graded[key], flush=True)
             graded_path.write_text(json.dumps(graded, indent=1))

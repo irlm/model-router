@@ -15,8 +15,10 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(HERE / 'bench/common'))
+import local  # noqa: E402
 OUT = HERE / 'results/kernel-semantic/tasks.json'
-TREE = '$KERNEL_TREE'
+TREE = local.resolve('$KERNEL_TREE')   # local/config.json: kernel_tree
 
 # family callers: per function, {candidate: [(line, class), ...]};
 # class 'call' marks an actual runtime invocation. A file is in truth

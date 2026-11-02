@@ -9,10 +9,14 @@ Usage: python3 run_retrieval.py --endpoint E --model M --arm M|T
 """
 import argparse
 import json
+import sys
 import subprocess
 import tempfile
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'common'))
+import local  # noqa: E402
 
 import mech_packet
 import run_probe  # SCHEMAS, QUESTIONS, ENDPOINTS (single-turn, no tools)
@@ -164,7 +168,7 @@ def main():
     if args.arm == 'T' and args.endpoint not in T_ENDPOINTS:
         raise SystemExit(f'{args.endpoint} has no tool harness')
     spec = json.loads(args.tasks.read_text())
-    tree = spec['tree']
+    tree = local.resolve(spec['tree'])
     tasks = spec['tasks'][:args.limit] if args.limit else spec['tasks']
     args.out.mkdir(parents=True, exist_ok=True)
     out = args.out / (f"runs-{args.endpoint}-"

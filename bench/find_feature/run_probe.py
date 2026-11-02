@@ -8,12 +8,16 @@ files until the context roughly triples (capped). Usage:
 """
 import argparse
 import json
+import sys
 import re
 import subprocess
 import tempfile
 import time
 import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'common'))
+import local  # noqa: E402
 
 # Agent CLIs (agy, grok) get an empty cwd so file tools find nothing;
 # web/tool use is restricted where a flag exists and num_turns is
@@ -204,7 +208,7 @@ def main():
         for task in tasks:
             if task['id'] in done:
                 continue
-            prompt = build_prompt(task, args.arm, spec['tree'], spec['noise_pool'])
+            prompt = build_prompt(task, args.arm, local.resolve(spec['tree']), spec['noise_pool'])
             start = time.perf_counter()
             try:
                 reply = ENDPOINTS[args.endpoint](prompt, args.model, args.timeout)

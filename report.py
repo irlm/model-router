@@ -22,8 +22,10 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / 'bench/find_feature'))
+sys.path.insert(0, str(HERE / 'bench/common'))
 import grade  # noqa: E402
 import grade_semantic  # noqa: E402
+import local  # noqa: E402
 
 
 def _load(name, rel):
@@ -34,7 +36,8 @@ def _load(name, rel):
 
 
 bf_grade = _load('bf_grade', 'bench/browser_flow/grade.py')
-ds_grade = _load('ds_grade', 'bench/own_app_flow/grade.py')
+# The author's own-app fixture is a local directory (local/README.md); without it those receipts are not graded.
+ds_grade = _load('ds_grade', 'bench/own_app_flow/grade.py') if (HERE / 'bench/own_app_flow/grade.py').exists() else None
 price = _load('price', 'catalog/price.py')
 
 FF_TASK_FILES = [HERE / 'bench/find_feature/tasks/lexical.json',
@@ -54,7 +57,7 @@ def load_ff_tasks():
     tree, tasks = None, {}
     for f in FF_TASK_FILES:
         spec = json.loads(f.read_text(encoding='utf-8'))
-        tree = tree or spec['tree']
+        tree = tree or local.resolve(spec['tree'])
         tasks.update({t['id']: t for t in spec['tasks']})
     return tree, tasks
 

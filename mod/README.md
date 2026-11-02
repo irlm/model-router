@@ -68,7 +68,7 @@ Buttons and verbs (`/router <verb>`):
 | Fetch origin | `fetch` | the same after `git fetch`, so behind/ahead are current |
 | Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
 | Ledger now | `ledger` | `tools/ledger.py --commit` (`--stdout` in the marketplace clone: the entry goes to the pane) |
-| Apply agents | `apply` | `apply_agents.py`: write routing.json's model and effort into `~/.claude/agents` |
+| Apply agents | `apply` | `apply_agents.py`: write routing.json's model and effort into the agent files you have in `~/.claude/agents`; installs `agents/web-researcher.md` from the repository when missing; agent files you do not have are absent and skipped |
 | Pull | `pull` | `git pull --ff-only` |
 
 Setup on a machine: Python 3 on PATH (`python3`, `python` or `py`), git, and the `claude` CLI; then,

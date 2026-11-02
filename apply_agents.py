@@ -3,6 +3,8 @@
 For each file named in routing.json["agents"], set `model:` and `effort:` in
 the YAML frontmatter and, when the entry has an `instruction`, a marked
 paragraph right after the frontmatter. Nothing else in the file is touched.
+A file you do not have is absent and skipped, unless the repository ships it
+as a template in agents/ (web-researcher.md): then it is installed first.
 `--revert` removes the two keys and the paragraph (no agent file had either
 key before routing v1, verified 2026-10-30 over 184 files).
 
@@ -13,6 +15,7 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+TEMPLATES = HERE / 'agents'   # agent files the repository ships, installed when missing
 KEYS = ('model:', 'effort:')
 MARK = '<!-- model-router -->'
 
@@ -46,17 +49,26 @@ def main():
     ap.add_argument('--dry-run', action='store_true')
     args = ap.parse_args()
     agents = json.loads(args.routing.read_text(encoding='utf-8'))['agents']
-    missing = [f for f in agents if not (args.agents_dir / f).exists()]
-    if missing:
-        raise SystemExit(f'missing agent files: {missing}')
     for name, route in agents.items():
         path = args.agents_dir / name
-        before = path.read_text(encoding='utf-8')
+        install = False
+        if path.exists():
+            before = path.read_text(encoding='utf-8')
+        elif args.revert or not (TEMPLATES / name).exists():
+            print(f"{'absent':12} {name}: not on this machine, skipped ({route['family']})")
+            continue
+        else:
+            before = (TEMPLATES / name).read_text(encoding='utf-8')
+            install = True
         after = rewrite(before, route['model'], route['effort'], args.revert, route.get('instruction'))
-        state = 'unchanged' if after == before else ('would change' if args.dry_run else 'changed')
-        if not args.dry_run and after != before:
+        if install:
+            state = 'would install' if args.dry_run else 'installed'
+        else:
+            state = 'unchanged' if after == before else ('would change' if args.dry_run else 'changed')
+        if not args.dry_run and (install or after != before):
+            args.agents_dir.mkdir(parents=True, exist_ok=True)
             path.write_text(after, encoding='utf-8')
-        print(f"{state:12} {name}: {'removed' if args.revert else route['model'] + ' / ' + route['effort']} ({route['family']})")
+        print(f"{state:13} {name}: {'removed' if args.revert else route['model'] + ' / ' + route['effort']} ({route['family']})")
 
 
 if __name__ == '__main__':

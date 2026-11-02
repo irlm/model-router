@@ -22,7 +22,7 @@ bench/<family>/run_agent.py   run a family for one model x effort, receipts with
 bench/<family>/grade.py       the mechanical checker (KUnit build, scripted user, string truth)
 report.py                grades every receipt and prices it from the catalog (no judge model)
 decide.py                the rule: cheapest candidate whose Wilson lower bound is at or above the best minus a margin
-apply_agents.py          writes the decision into ~/.claude/agents/*.md (--revert undoes)
+apply_agents.py          writes the decision into the agent files you have in ~/.claude/agents/ (--revert undoes); installs agents/web-researcher.md when missing
 regress.py               after a Claude Code update or monthly: each default on a small sample, binomial check
 tools/ledger.py          monthly: what this machine actually ran (subagent calls, tokens, cost), from the transcripts
 tools/prune_agents.py    moves the agent files no transcript ever called out of the prefix (reversible)

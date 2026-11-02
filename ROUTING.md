@@ -80,7 +80,10 @@ decision there.
 - Agent files (`~/.claude/agents/*.md`): `model:` and `effort:` frontmatter, plus a marked
   "Routing rule" paragraph after the frontmatter where cell 3 showed the instruction matters more
   than the model (run the tests before finishing). Set by `python3 apply_agents.py`, removed by
-  `python3 apply_agents.py --revert`. Applied:
+  `python3 apply_agents.py --revert`. The first four files below belong to an agent pack the author
+  uses, not to this repository: on a machine without them they are absent and skipped (the widget
+  routes the same kinds of work per Agent call, by agent type and prompt). `web-researcher.md` is this
+  repository's own (`agents/`), installed when missing. Applied:
 
   | Agent file | Family | Set to |
   |---|---|---|

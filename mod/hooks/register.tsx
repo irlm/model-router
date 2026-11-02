@@ -62,6 +62,7 @@ const spark = (values: number[]) => {
 /** A horizontal bar of `width` cells, `frac` of them full. */
 const bar = (frac: number, width = 10) => {
   const n = Math.max(0, Math.min(width, Math.round((Number.isFinite(frac) ? frac : 0) * width)))
+  if (n === 0 && frac > 0) return '▏' + '░'.repeat(width - 1)
   return '█'.repeat(n) + '░'.repeat(width - n)
 }
 const money = (n: number) => `$${n >= 10 ? n.toFixed(0) : n.toFixed(2)}`
@@ -92,12 +93,13 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   const u = s.usage
   const total = u ? u.main_total + u.subagents_total : 0
   const lines: Line[] = [
-    line(`read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · repo ${g.head ?? '-'} (${sync}${where ? ', ' + where : ''}) · routing v${s.routing.version}, decided ${s.routing.decided}`, { dim: true }),
+    line(`read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · routing v${s.routing.version}, decided ${s.routing.decided}`, { dim: true }),
+    line(`repo ${g.head ?? '-'} · ${sync}${where ? ' · ' + where : ''}`, { dim: true }),
   ]
   if (u) {
     const prev = u.previous.main_total + u.previous.subagents_total
     const daily = u.daily ?? []
-    lines.push(line(`spend ${u.days}d ${daily.length ? spark(daily.map(d => d.cost)) + ' ' : ''}${money(total)} (main ${money(u.main_total)}, agents ${money(u.subagents_total)}) · previous ${u.days}d ${money(prev)}`, { bold: true }))
+    lines.push(line(`spend ${u.days}d ${daily.length ? spark(daily.map(d => d.cost)) + ' ' : ''}${money(total)} (main ${money(u.main_total)}, agents ${money(u.subagents_total)}) · prev ${money(prev)}`, { bold: true }))
   }
   lines.push(BLANK, line(`${'family'.padEnd(13)}${'default'.padEnd(19)}${'ok'.padEnd(11)}${'evidence'.padEnd(9)}${'$/ok'.padEnd(8)}${'here'.padEnd(5)}last check`, { bold: true }))
   for (const f of s.families) {
@@ -109,11 +111,13 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     lines.push(line(`${f.name.padEnd(13)}${d.padEnd(19)}${fr === null ? '-'.padEnd(10) : bar(fr)} ${(f.rate ?? '-').padEnd(9)}${cost.padEnd(8)}${(f.can_run ? 'yes' : 'no').padEnd(5)}${last}`,
       { color: rateColor(fr), dim: fr === null }))
   }
-  const applied = s.agents.routed.filter(r => r.state === 'applied').length
+  const present = s.agents.routed.filter(r => r.state !== 'absent')
+  const applied = present.filter(r => r.state === 'applied').length
+  const absent = s.agents.routed.length - present.length
   if (full) {
     lines.push(
       BLANK,
-      line(`agents: ${s.agents.files} files, ${s.agents.unused} unused; routed ${applied}/${s.agents.routed.length} applied`, { dim: true }),
+      line(`agents: ${s.agents.files} files, ${s.agents.unused} unused; routed ${applied}/${present.length} applied${absent ? `, ${absent} not on this machine` : ''}`, { dim: true }),
       line(`prices verified ${s.catalog.verified_oldest ?? '?'} (${s.catalog.age_days ?? '?'} days) · ledger: usage ${s.ledger.usage_last ?? 'none'}, regress ${reg?.date ?? 'none'} on ${reg?.claude ?? '-'}`, { dim: true }),
       line(`timer: ${s.timer.next ? 'next ' + s.timer.next : s.timer.note ?? 'none'}`, { dim: true }),
     )

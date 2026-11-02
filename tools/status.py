@@ -167,7 +167,9 @@ def agents_state(routing):
         want = f"{spec['model']} {spec['effort']}"
         p = AGENTS_DIR / file
         if not p.exists():
-            routed.append({'file': file, 'family': spec.get('family'), 'want': want, 'have': None, 'state': 'missing'})
+            # missing: the repository ships it (agents/), apply installs it; absent: an agent file this machine does not have
+            state = 'missing' if (HERE / 'agents' / file).exists() else 'absent'
+            routed.append({'file': file, 'family': spec.get('family'), 'want': want, 'have': None, 'state': state})
             continue
         fm = frontmatter(p)
         have = f"{fm.get('model', '-')} {fm.get('effort', '-')}"
@@ -239,7 +241,7 @@ def suggest(usage, agents):
     if dear:
         n = sum(v['n'] for v in dear.values()); cost = round(sum(v['cost'] for v in dear.values()), 2)
         out.append({'id': 'explore', 'kind': 'measured', 'stake': cost, 'saving': [round(max(0.0, cost - n * FIND_FEATURE_COST), 2)] * 2,
-                    'title': f"{n} code searches ran above haiku (${cost:.2f}; {', '.join(sorted(dear))})",
+                    'title': f"{n} code searches above haiku (${cost:.2f} on {', '.join(m.removeprefix('claude-') for m in sorted(dear))})",
                     'basis': f'find_feature family: Haiku low found 214/216 at ${FIND_FEATURE_COST} per search; the widget routes Explore calls when routing is ask or auto',
                     'action': '/router routing auto, so these calls run on haiku low without asking (or pick the measured option when the router asks)'})
     # 4. research synthesis: the stake is known, no cheaper model is
@@ -310,8 +312,10 @@ def collect(fetch=False):
     if git.get('dirty'):
         advice.append(f"{git['dirty']} uncommitted change(s) in the repo")
     for a in agents['routed']:
-        if a['state'] != 'applied':
-            advice.append(f"agent {a['file']} is {a['state']} (want {a['want']}, have {a['have']}): /router apply")
+        if a['state'] == 'missing':
+            advice.append(f"agent {a['file']} not installed yet (the repository ships it): /router apply")
+        elif a['state'] == 'drifted':
+            advice.append(f"agent {a['file']} is drifted (want {a['want']}, have {a['have']}): /router apply")
     usage_last = last_usage()
     if usage_last is None or (days_since(usage_last, today) or 0) > ADVICE_LEDGER_DAYS:
         advice.append(f"no usage ledger since {usage_last}: /router ledger")

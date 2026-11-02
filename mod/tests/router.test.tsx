@@ -10,7 +10,8 @@ const STATUS = {
     { name: 'fix_bug', model: 'haiku', effort: 'low', variant: 'kunit', rate: '16/21', cost_per_success: 0.0158, can_run: false,
       why: 'needs a kernel worktree', last_check: null },
   ],
-  agents: { files: 6, unused: 179, routed: [{ file: 'web-researcher.md', name: 'Web Researcher', want: 'haiku low', have: 'haiku low', state: 'applied' }] },
+  agents: { files: 6, unused: 179, routed: [{ file: 'web-researcher.md', name: 'Web Researcher', want: 'haiku low', have: 'haiku low', state: 'applied' },
+    { file: 'testing-evidence-collector.md', want: 'haiku low', have: null, state: 'absent' }] },
   catalog: { verified_oldest: '2026-10-06', age_days: 26 },
   ledger: { usage_last: '2026-11-01', regress_last: { date: '2026-11-01', claude: '2.1.316' } },
   timer: { kind: 'systemd', installed: true, next: 'Tue 2026-12-01 09:00:00 EST' },
@@ -50,7 +51,8 @@ test('/router check prints the table and the status line counts the advice', asy
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('find_feature haiku low          ██████████ 214/216  0.0046  yes  ok 6/6')
-  expect(text).toContain('spend 30d ▂▃▅▆█ $592 (main $517, agents $75) · previous 30d $500')
+  expect(text).toContain('spend 30d ▂▃▅▆█ $592 (main $517, agents $75) · prev $500')
+  expect(text).toContain('agents: 6 files, 179 unused; routed 1/1 applied, 1 not on this machine')
 
   expect((await $.command.run({ ...RUN, command: 'router', args: '' })).text).toBe('Model router pane opened.')
   expect((await $.command.run({ ...RUN, command: 'router', args: '  ' })).text).toBe('Model router pane opened.')
@@ -118,7 +120,7 @@ test('no checkout at the configured path: the clone the plugin install made serv
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
-  expect(text).toContain('repo abc1234 (clean, up to date at last fetch, marketplace clone)')
+  expect(text).toContain('repo abc1234 · clean, up to date at last fetch · marketplace clone')
   expect(runs.find(r => r.argv[1] === 'tools/status.py')?.cwd).toBe(CLONE)
 })
 

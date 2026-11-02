@@ -10,7 +10,7 @@ export type Family = {
   last_check: { sample: string; successes: string; verdict: string } | null
 }
 
-export type RoutedAgent = { file: string; name?: string; want: string; have: string | null; state: 'applied' | 'drifted' | 'missing' }
+export type RoutedAgent = { file: string; name?: string; want: string; have: string | null; state: 'applied' | 'drifted' | 'missing' | 'absent' }
 
 export type StatusJson = {
   at: string

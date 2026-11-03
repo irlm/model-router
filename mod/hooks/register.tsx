@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Hook, Register } from 'claude-code'
 
-import type { Job, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, Status, StatusJson } from '../types'
+import type { Job, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, Status, StatusJson, Switch } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
 type RoutingMode = 'ask' | 'auto' | 'off'
@@ -14,6 +14,8 @@ const job = atom({ plugin: 'model-router', key: 'job' } as const, null, { shape:
 const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Routed[], { shape: 'routed-1' })
 // details-1: whether the pane shows the long sections (agents, dates, consumption, each suggestion's basis)
 const details = atom({ plugin: 'model-router', key: 'details' } as const, false, { shape: 'details-1' })
+// switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
+const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
 
 // What the buttons and /router <verb> run, from the checkout's root. In the clone the plugin install
 // made (`clone`), nothing is committed: the ledger prints its entry, the re-check keeps its results local.
@@ -48,8 +50,9 @@ const savingsMix = (s: StatusJson) => ['measured', 'extrapolated', 'unmeasured']
 /** The status line under the prompt (the host prefixes the plugin's name): the rate-limit windows, what the
  * router did this session, what a change saved, what the suggestions add up to, what to check. Only what
  * changes a decision; `minimal` keeps the windows, the routed count and the to-check count. */
-const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: StatusMode = 'full') => {
+const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: StatusMode = 'full', ctx: number | null = null, model = '') => {
   const parts = [limitsText(limits)]
+  if (ctx !== null && ctx >= contextWarn) parts.push(`ctx ${kilo(ctx)} (${money((ctx / 1e6) * cacheRate(model))}/turn re-read)`)
   if (routedN > 0) parts.push(`routed ${routedN}`)
   const r = s.changes?.realized
   if (mode === 'full' && r && r.saved !== 0 && !caveats(r)) parts.push(`${r.saved > 0 ? 'saved' : 'cost up'} ${money(Math.abs(r.saved))} since ${r.since.slice(5, 10)}`)
@@ -132,7 +135,7 @@ const realText = (g: { real?: { per_window: number | null; state: string } }, da
 
 /** The pane's body and /router check's text. `full` (the text, or the pane with Details on) adds the long
  * sections; the pane's default is a glance: numbers that compare, one line each. */
-const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = '', full = true): Line[] => {
+const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = '', full = true, sw: Switch[] = [], ctxNow: number | null = null, modelNow = ''): Line[] => {
   const g = s.repo
   const sync = !g.is_repo
     ? 'not a git checkout'
@@ -271,6 +274,12 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     }
     lines.push(line(mine.length ? `  this project's overrides: ${mine.map(([c, o]) => `${c} -> ${o.model} ${o.effort}`).join(', ')} (/router prefer clear <class>)` : '  this project: no override (/router prefer <class> <model> <effort> sets one)', { dim: true }))
   }
+  if (sw.length > 0 || ctxNow !== null) {
+    const compacted = sw.filter(x => x.action === 'compacted').length
+    lines.push(BLANK, line(`context: ${ctxNow !== null ? `${kilo(ctxNow)} tokens re-read every turn (${money((ctxNow / 1e6) * cacheRate(modelNow))} per turn)` : 'size unknown'}${sw.length ? ` · ${sw.length} task switch${sw.length === 1 ? '' : 'es'} seen, ${compacted} compacted` : ''}${ctxNow !== null && ctxNow >= contextWarn ? ' · a new window starts at 23k' : ''}`,
+      { bold: true, color: ctxNow !== null && ctxNow >= contextWarn ? 'yellow' : undefined }))
+    if (full) for (const x of sw.slice(-5)) lines.push(line(`  ${clock(x.at)}  ${kilo(x.ctx)} tokens: ${x.why} -> ${x.action}`, { dim: true }))
+  }
   if (seen.length > 0) {
     const kept = seen.filter(x => x.decision === 'kept').length
     lines.push(BLANK, line(`routed this session: ${seen.length - kept} routed, ${kept} kept (mode ${routingMode}; /router routing ask|auto|off${full ? '' : '; Details lists them'})`, { bold: true }))
@@ -290,6 +299,50 @@ let python = ''
 let routingMode: RoutingMode = 'ask'
 let statusMode: StatusMode = 'full'
 let struggleOption = 25
+let contextWarn = 100000   // tokens re-read per turn from which a task switch is worth a word
+
+// ---- Context drift: a prompt that reads as a different task, in a session that already re-reads a lot every turn.
+// The cost is the API's, the same in the terminal, the desktop app and VS Code: every turn re-reads the whole session
+// from the server cache. A new window or terminal is a new session with a small context; that is the fix.
+const STOP = new Set(['that', 'this', 'with', 'from', 'have', 'what', 'when', 'then', 'than', 'they', 'them', 'there', 'here', 'will', 'would', 'should',
+  'could', 'about', 'into', 'just', 'like', 'also', 'been', 'were', 'your', 'make', 'need', 'want', 'some', 'more', 'most', 'very', 'only', 'same', 'each',
+  'other', 'which', 'while', 'where', 'does', 'done', 'doing', 'after', 'before', 'again', 'still', 'please', 'lets', 'check', 'look', 'think', 'maybe'])
+const WORDS = /[a-z]{4,}/g
+const TICKETS = /\b[A-Z][A-Z0-9]+-\d+\b|#\d{2,}|\bissues?\s+\d+/g
+const CACHE_READ: Record<string, number> = { fable: 0.25, opus: 0.2, sonnet: 0.1, haiku: 0.01 }   // $ per million tokens, catalog cache-read prices
+const PREFIX_TOKENS = 23000   // what a fresh session re-reads per turn here (results/prefix)
+const vocab = new Set<string>()
+const ticketsSeen = new Set<string>()
+let vocabSeeded = false
+let lastSwitchTurn = -100
+let driftOff = false
+// A compaction the person chose at a task switch: the host runs it after the turn, not under the prompt hook that asked.
+let pendingCompact: string | null = null
+const wordsOf = (t: string) => new Set((t.toLowerCase().match(WORDS) ?? []).filter(w => !STOP.has(w)))
+const ticketsOf = (t: string) => new Set((t.match(TICKETS) ?? []).map(x => x.toUpperCase().replace(/\s+/g, ' ')))
+const cacheRate = (model: string): number => CACHE_READ[Object.keys(CACHE_READ).find(k => model.toLowerCase().includes(k)) ?? 'opus'] ?? 0.2
+async function seedVocab($: Dollar) {
+  if (vocabSeeded) return
+  vocabSeeded = true
+  try {
+    for (const m of await $.session.messages()) {
+      if (m.role !== 'user') continue
+      for (const w of wordsOf(m.text)) vocab.add(w)
+      for (const t of ticketsOf(m.text)) ticketsSeen.add(t)
+    }
+  } catch {
+    // no transcript to seed from: the vocabulary grows from here
+  }
+}
+/** The live context size in tokens, or null when the host does not say. */
+async function contextTokens($: Dollar) {
+  try {
+    const u = await $.session.usage()
+    return { tokens: u.context.tokens ?? null, window: u.context.window }
+  } catch {
+    return null
+  }
+}
 // The transcript project key of this session's working directory (what Claude Code names the transcript directory).
 let projectKey = ''
 const keyOf = (cwd: string) => cwd.replace(/[^A-Za-z0-9]/g, '-')
@@ -355,7 +408,8 @@ async function refresh($: Dollar, fetch = false) {
     const json = JSON.parse(r.stdout) as StatusJson
     const rateLimits = await readLimits($)
     await update($, status, () => ({ at, json, error: null, rateLimits, where }))
-    $.ui.status(statusMode === 'off' ? undefined : statusLine(json, rateLimits, (await read($, routed)).length, statusMode))
+    const ctx = await contextTokens($)
+    $.ui.status(statusMode === 'off' ? undefined : statusLine(json, rateLimits, (await read($, routed)).length, statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
     const rateLimits = await readLimits($)
@@ -509,6 +563,8 @@ export const register: Register = (on, options) => {
   const sm = String(options.statusLine ?? 'full')
   statusMode = sm === 'minimal' || sm === 'off' ? sm : 'full'
   struggleOption = Math.max(5, Math.min(95, Number(options.struggle ?? 25) || 25))
+  contextWarn = Math.max(20000, Number(options.contextWarn ?? 100000) || 100000)
+  vocab.clear(); ticketsSeen.clear(); vocabSeeded = false; lastSwitchTurn = -100; driftOff = false
   repo = repoOption
   python = ''
 
@@ -528,6 +584,73 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Every prompt: does it read as a different task, in a session that re-reads a lot per turn? Then say what that
+  // costs per turn against a fresh window, and offer to compact down to the new task. Nothing is dropped or rewritten.
+  on('prompt.submit', async ($, e, next) => {
+    if (driftOff || e.text.trim().startsWith('/')) return next(e)
+    await seedVocab($)
+    const words = wordsOf(e.text)
+    const tk = ticketsOf(e.text)
+    const novel = [...words].filter(w => !vocab.has(w)).length
+    const newTicket = [...tk].find(t => !ticketsSeen.has(t))
+    const drift = vocab.size >= 20 && words.size >= 6 && (novel / words.size >= 0.7 || !!newTicket)
+    for (const w of words) vocab.add(w)
+    for (const t of tk) ticketsSeen.add(t)
+    if (!drift) return next(e)
+    const turns = await $.session.turns().catch(() => 0)
+    if (turns - lastSwitchTurn < 10) return next(e)
+    const ctx = await contextTokens($)
+    if (!ctx?.tokens || ctx.tokens < contextWarn) return next(e)
+    lastSwitchTurn = turns
+    const model = await $.session.model().catch(() => '')
+    const rate = cacheRate(model)
+    const perTurn = (ctx.tokens / 1e6) * rate
+    const fresh = (PREFIX_TOKENS / 1e6) * rate
+    const why = `${newTicket ? newTicket + ', ' : ''}${Math.round((100 * novel) / Math.max(1, words.size))}% new words`
+    const at = await $.clock.now()
+    const compact = 'Compact now, keeping only this task'
+    const here = 'Send it here as it is'
+    const never = 'Send it, and stop asking this session'
+    let action: Switch['action'] = 'asked'
+    try {
+      const a = await $.ui.ask(
+        `This reads as a different task (${why}) in a session that re-reads ${kilo(ctx.tokens)} tokens every turn: ${money(perTurn)} per turn on ${model || 'this model'}; a new window or terminal starts at ${kilo(PREFIX_TOKENS)}, ${money(fresh)}. Over 50 turns: ${money(perTurn * 50)} against ${money(fresh * 50)}. Next time, open a new window for a new task.`,
+        { options: [compact, here, never], header: 'Context' })
+      if (a === compact) {
+        pendingCompact = `Keep only what this task needs: "${e.text.slice(0, 240)}". Drop the earlier, unrelated tasks.`
+        action = 'compacted'
+        $.ui.toast('this turn runs as it is; the session compacts down to this task when it ends')
+      } else {
+        action = 'kept'
+        if (a === never) driftOff = true
+      }
+    } catch {
+      action = 'kept'   // no one to ask: a -p run, or dismissed
+    }
+    await update($, switches, xs => [...xs, { at, ctx: ctx.tokens ?? 0, why, action }].slice(-20))
+    return next(e)
+  })
+
+  // After each turn the context grew: keep the status line's ctx figure current without re-running the scripts.
+  on('turn.complete', async ($, e, next) => {
+    if (pendingCompact) {
+      const instructions = pendingCompact
+      pendingCompact = null
+      try {
+        await $.session.compact({ instructions })
+        $.ui.toast('compacted: the earlier tasks are summarised away; the next turns re-read less')
+      } catch (err) {
+        $.ui.toast(`could not compact: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+    const s = await read($, status)
+    if (s?.json && statusMode !== 'off') {
+      const ctx = await contextTokens($)
+      $.ui.status(statusLine(s.json, s.rateLimits, (await read($, routed)).length, statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
+    }
+    return next(e)
+  })
+
   on('command.run', { command: 'router' }, async ($, e) => {
     // No argument is 'open': an empty string splits to [''], which would miss the default.
     const [verb = 'open', arg = ''] = e.args.trim().split(/\s+/).filter(Boolean)
@@ -539,7 +662,8 @@ export const register: Register = (on, options) => {
     if (verb === 'check' || verb === 'fetch') {
       await refresh($, verb === 'fetch')
       const s = await read($, status)
-      return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where).map(l => l.text).join('\n') : (s?.error ?? 'no status') }
+      const ctx = await contextTokens($)
+      return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, await $.session.model().catch(() => '')).map(l => l.text).join('\n') : (s?.error ?? 'no status') }
     }
     if (verb === 'prefer') {
       const words = e.args.trim().split(/\s+/).slice(1)
@@ -636,7 +760,7 @@ export const register: Register = (on, options) => {
       ? [line(`running ${j.name} since ${clock(j.startedAt)} · the summary returns when it ends`, { bold: true })]
       : [
           ...limitLines(limits),
-          ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]),
+          ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full, await read($, switches), (await contextTokens($))?.tokens ?? null, await $.session.model().catch(() => '')) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]),
         ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     // One line stays one line: cut to the pane's width instead of wrapping (/router check keeps the full text).

@@ -196,6 +196,58 @@ test('an override for this project routes before the family default, and prefer 
   expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer nope' })).text).toContain('prefer needs')
 })
 
+const PAST = [
+  'Find where the config parser loads the yaml schema and reports validation errors with line numbers',
+  'The include directive in the parser should resolve relative paths from the document root, not the cwd',
+  'Write a unit test for the grammar tokenizer covering quoted strings, escapes and multiline literals',
+  'Why does the loader cache stale schema versions after a reload; trace the invalidation path',
+]
+test('a prompt that reads as a different task in a big session gets the context question; compact is one answer', async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const compacts: unknown[] = []
+  const COMPACT = 'Compact now, keeping only this task'
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(STATUS) } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { tokens: 240000, window: 1000000 }, rateLimits: [] } }))
+  on('session.model', () => ({ value: 'claude-fable-5-1' }))
+  on('session.turns', () => ({ value: 40 }))
+  on('session.messages', () => ({ value: PAST.map(text => ({ role: 'user' as const, text, toolUses: [] })) }))
+  on('session.compact', (_, e) => { compacts.push(e); return { skip: 'test' } })
+  const toasts: string[] = []
+  on('ui.toast', (_, e) => { toasts.push(e.text); return { value: undefined } })
+  on('prompt.submit', (_, e) => ({ text: e.text }))
+  on('turn.complete', (_, e) => ({ text: e.text }))
+  on('tool.call', (_, e) => {
+    seen.push(e as unknown as Record<string, unknown>)
+    if (e.tool === 'AskUserQuestion') return { result: { questions: e.questions, answers: { [e.questions[0]?.question ?? '']: COMPACT, [e.questions[0]?.header ?? '']: COMPACT } } }
+    return { result: {} }
+  })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const SUBMIT = { wait: false, origin: { kind: 'composer' } } as const
+  await $.prompt.submit({ ...SUBMIT, text: 'Also check that the parser config loader handles the include directive the same way for the schema' })
+  expect(seen.filter(x => x.tool === 'AskUserQuestion').length).toBe(0)   // the same task: no question
+  const r = await $.prompt.submit({ ...SUBMIT, text: 'Now look at issue PAY-4421: the payment webhook retries fail with a timeout in the billing service' })
+  // The kit returns from $.prompt.submit before the hooks have finished: yield until the answer was recorded.
+  for (let i = 0; i < 60 && !toasts.some(t => t.startsWith('this turn runs')); i++) await $.command.run({ ...RUN, command: 'router', args: 'routing' })
+  const asks = seen.filter(x => x.tool === 'AskUserQuestion') as { questions: { question: string }[] }[]
+  expect(compacts.length).toBe(0)   // never under the prompt hook: the host refuses that
+  await $.turn.complete({ text: 'done', reason: 'answer' })   // the turn ends: now the chosen compaction runs
+  for (let i = 0; i < 60 && compacts.length === 0; i++) await $.command.run({ ...RUN, command: 'router', args: 'routing' })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(asks.length).toBe(1)
+  expect(asks[0]?.questions[0]?.question).toContain('240k tokens every turn')
+  expect(asks[0]?.questions[0]?.question).toContain('PAY-4421')
+  expect(compacts.length).toBe(1)
+  expect(toasts.some(t => t.startsWith('compacted'))).toBe(true)
+  expect(r.text).toContain('PAY-4421')   // the prompt itself is never dropped or rewritten
+  expect(text).toContain('context: 240k tokens re-read every turn ($0.06 per turn) · 1 task switch seen, 1 compacted · a new window starts at 23k')
+})
+
 type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]
 const ROUTING_MOCKS = (on: On, seen: Record<string, unknown>[], ask: 'deny' | string) => {
   on('command.register', () => ({ value: { command: 'router' } }))

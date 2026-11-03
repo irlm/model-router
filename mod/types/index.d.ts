@@ -124,11 +124,14 @@ export type Routed = {
   description: string
 }
 
+/** A prompt that read as a different task in a session already re-reading a lot per turn, and what was done. */
+export type Switch = { at: number; ctx: number; why: string; action: 'compacted' | 'kept' | 'asked' }
+
 /** One command the widget is running or last ran, with its output. */
 export type Job = { name: string; lines: string[]; isRunning: boolean; exitCode: number | null; startedAt: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean> }
+    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]> }
   }
 }

@@ -185,6 +185,21 @@ and writes the new tail. Two things follow, both measured per project under Deta
 A project whose sessions re-read more than 150k tokens per message over 200 messages gets a `learned`
 suggestion with the re-reading above 100k per message as its upper saving.
 
+### A different task in a big session
+
+The widget watches each prompt you type. It keeps the words of the session's earlier prompts (seeded
+from the transcript, so the first task counts) and the ticket ids they mention; a prompt whose words
+are 70% new to the session, or that names a ticket the session has not seen, reads as a different
+task. Words only: two tasks that share a vocabulary pass, and the same task said in new words may
+not. When that happens in a session already re-reading more than the "Context warning" option
+(default 100k tokens per turn), one question appears with the numbers: what this session re-reads
+per turn and costs at the model's cache-read price, what a new window would, and the two over 50
+turns. The answers: compact now, keeping only the new task (the widget asks the session to compact
+with that instruction); send it here; or stop asking this session. The prompt is never dropped or
+rewritten. The status line shows `ctx 240k ($0.06/turn re-read)` from the warning size on, and the
+pane counts the switches seen and compacted. The same holds in the desktop app and VS Code: a new
+window or tab is a new session, and that is the cheap way.
+
 ### After a change: what was really saved
 
 A projected saving is the benchmark's number applied to your window. After a change, the pane

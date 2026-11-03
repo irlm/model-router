@@ -221,7 +221,7 @@ test('a prompt that reads as a different task in a big session gets the context 
   const toasts: string[] = []
   on('ui.toast', (_, e) => { toasts.push(e.text); return { value: undefined } })
   on('prompt.submit', (_, e) => ({ text: e.text }))
-  on('turn.complete', (_, e) => ({ text: e.text }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
   on('tool.call', (_, e) => {
     seen.push(e as unknown as Record<string, unknown>)
     if (e.tool === 'AskUserQuestion') return { result: { questions: e.questions, answers: { [e.questions[0]?.question ?? '']: COMPACT, [e.questions[0]?.header ?? '']: COMPACT } } }
@@ -236,7 +236,7 @@ test('a prompt that reads as a different task in a big session gets the context 
   for (let i = 0; i < 60 && !toasts.some(t => t.startsWith('this turn runs')); i++) await $.command.run({ ...RUN, command: 'router', args: 'routing' })
   const asks = seen.filter(x => x.tool === 'AskUserQuestion') as { questions: { question: string }[] }[]
   expect(compacts.length).toBe(0)   // never under the prompt hook: the host refuses that
-  await $.turn.complete({ text: 'done', reason: 'answer' })   // the turn ends: now the chosen compaction runs
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer' })   // the turn ends: now the chosen compaction runs
   for (let i = 0; i < 60 && compacts.length === 0; i++) await $.command.run({ ...RUN, command: 'router', args: 'routing' })
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(asks.length).toBe(1)

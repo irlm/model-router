@@ -65,10 +65,10 @@ test('/router check prints the table and the status line counts the advice', asy
   expect(text).toContain('find_feature haiku low          ██████████ 214/216  0.0046  yes  ok 6/6')
   expect(text).toContain('spend 30d ▂▃▅▆█ $592 (main $517, agents $75) · prev $500')
   expect(text).toContain('agents: 6 files, 179 unused; routed 1/1 applied, 1 not on this machine')
-  expect(text).toContain('(apply: agents: web-researcher.md), 2.0 days so far: saved $13 · projected $25 per 30d · regress find_feature ok')
+  expect(text).toContain('(apply: agents: web-researcher.md), 2.0 days so far: vs previous saved $13 · projected $25 per 30d · regress find_feature ok')
   expect(text).toContain('(mark: effort low) · 2.0 days: cost up $1.20 (main sessions run on the same model and effort as before, so the change is not in effect)')
-  expect(text).toContain('code-explore       before 16 calls $1.54/call (opus-5-5 x16) · after 5 calls $0.0060/call (haiku-5-5 x5) · saved $7.69 · find_feature regress ok 6/6')
-  expect(text).toContain('main sessions      before 2000 msgs $0.1170/msg · after 140 msgs $0.0820/msg · saved $4.90')
+  expect(text).toContain('code-explore       $/call    $1.54 -> $0.0060  ████████ -> ▏░░░░░░░  saved $7.69    5 after')
+  expect(text).toContain('main sessions      $/msg   $0.1170 -> $0.0820  ████████ -> ██████░░  saved $4.90    140 msgs after')
   expect((await $.command.run({ ...RUN, command: 'router', args: 'mark effort low from today' })).text).toContain('change recorded: effort low from today')
   expect(argvs.some(a => a.endsWith('tools/changes.py add mark effort low from today'))).toBe(true)
 
@@ -77,8 +77,12 @@ test('/router check prints the table and the status line counts the advice', asy
   expect(text).toContain('fix_bug      haiku low +kunit   ████████░░ 16/21    0.0158  no   -')
   expect(text).toContain('  - prices verified 40 days ago')
   expect(pinned.at(-1)).toBe('saved $13 since 10-30 · up to $72 less last 30d ($0.00 measured) · 1 to check · /router')
-  expect(text).toContain('suggestions: the last 30 days could have consumed up to $72 less of $592 (12%): $72 extrapolated')
-  expect(text).toContain('saves $72       █░░░░░░░░░ 12%  [extrapolated] main sessions at high/xhigh effort: $225 in 30 days')
+  expect(text).toContain('suggestions (the last 30 days could have consumed up to $72 less of $592: $72 extrapolated):')
+  expect(text).toContain(' 1. [extrapolated] main sessions at high/xhigh effort: $225 in 30 days')
+  expect(text).toContain('est $72/30d')
+  expect(text).toContain('families: 2 decided · 1 checkable here · last checks ok')
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'dismiss 1' })).text).toContain('dismissed effort')
+  expect(argvs.some(a => a.endsWith('tools/overrides.py dismiss effort'))).toBe(true)
   expect(text).toContain('agents research-synthesis')
   expect(text).toContain('general-purpose x19')
 
@@ -91,7 +95,8 @@ test('/router check prints the table and the status line counts the advice', asy
 
   // The pane is a glance by default; Details adds the long sections.
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect((await ui.find({ type: 'Text', text: /\[extrapolated\]/ }))?.text).toContain('saves $72')
+  expect((await ui.find({ type: 'Text', text: /\[extrapolated\]/ }))?.text).toContain('est $72/30d')
+  expect(await ui.find({ type: 'Text', text: /^find_feature haiku low/ })).toBeUndefined()   // the table is under Details
   expect(await ui.find({ type: 'Text', text: /^routed this session/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /basis:/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /consumption, last 30 days/ })).toBeUndefined()

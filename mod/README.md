@@ -14,13 +14,16 @@ What you see:
   up to for the window that was, a look back and not a forecast, with the measured part named, since the
   rest is extrapolated or unmeasured; `to check` counts the advice. Each part appears only when it has something to say. The "Status
   line" option in `/config` makes it `minimal` (windows, routed, to check) or `off`.
-- `/router` opens a pane with, top to bottom: the rate-limit windows as bars; one line on the
-  checkout; the window's spend as a daily sparkline; the families table (default model and effort,
-  a success bar with the evidence, cost per success, whether the family's regression sample can run
-  on this machine, the last check); the things to check; the suggestions, largest saving first, each
-  with its share of the window's spend as a bar; the Agent calls routed this session. The glance
-  shows three items per section and one line per item, cut to the pane's width; Details shows all
-  of it, and `/router check` prints the full text. While a job runs (Re-check, Ledger, Apply, Pull)
+- `/router` opens a pane whose glance is numbers that compare, one line each: the rate-limit
+  windows as bars; one line on the checkout; the window's spend as a daily sparkline with the
+  struggled and routed counts; the last change, with a before/after bar pair per class of Agent call
+  and for main sessions (cost per call, cost per message), against the stretch just before the
+  change and against the baseline before the first change; the suggestions, numbered, each with
+  its estimate and what the transcripts show since the change (not applied, too early, holding,
+  below estimate, wrong so far); one line on the families; the things to check. Details adds the
+  families table, the weekly slots (spend, calls, struggled, routed), the consumption, each
+  suggestion's basis and action, the earlier changes, what was learned on this machine, and the
+  calls routed this session. Lines are cut to the pane's width; `/router check` prints the full text. While a job runs (Re-check, Ledger, Apply, Pull)
   the pane shows only that job's output, and the summary returns when it ends. `Details` (`d`) adds the long sections: the
   agent files (applied or drifted), price freshness, ledger dates, the timer, what the last 30 days
   consumed (main sessions by model and effort, subagent calls by kind), and each suggestion's
@@ -75,6 +78,7 @@ Buttons and verbs (`/router <verb>`):
 | | `mark <note>` | records a change you made by hand (effort, model), so the saving is counted from now |
 | | `prefer <class> <model> <effort>` | sets an override for this project: calls of that class run on that model and effort, before the family default |
 | | `prefer clear <class>`, `prefer` | removes one, lists this project's |
+| | `dismiss <n or id>`, `undismiss <id>` | hides a suggestion you judge wrong (by its number in the pane); Details lists the dismissed ones |
 | Refresh | `check` | `tools/status.py` (also prints the table as text) |
 | Fetch origin | `fetch` | the same after `git fetch`, so behind/ahead are current |
 | Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
@@ -183,9 +187,17 @@ Details shows the per-class and main-session lines.
 A change is recorded in `~/.claude/model-router/changes.jsonl` (never in the repository) by Apply
 agents when it writes a file, by `/router routing auto` or "Always route this session", and by
 `/router mark <note>` for changes the widget does not make itself, such as `claude --effort low`
-or `claude --model opus` from today. Each change is measured in its own window: from it to the next change (or to now), against the
-stretch before it back to the previous change. The pane line shows the latest; Details lists the
-earlier ones with their own numbers. `python3 tools/changes.py list` prints the log.
+or `claude --model opus` from today. Each change is measured in its own window, from it to the next change (or to now), in two ways: against
+the stretch just before it (what that change did) and against the baseline before the first change
+(what all the changes did together). The pane shows the latest change with both; Details lists the
+earlier ones. The weekly slots under Details show the same window by time, regardless of changes.
+
+Each suggestion carries its estimate and, once a change is recorded, what the transcripts show for its
+scope since then, scaled to the window: `not applied` (the after side still runs what the suggestion
+wants changed), `too early` (under a day or too few units), `holding` (real at or above half the
+estimate), `below estimate`, `wrong so far` (dearer). You decide: `/router dismiss <n>` hides one you
+judge wrong, and it stays listed under Details until `/router undismiss <id>`.
+`python3 tools/changes.py list` prints the change log; `tools/routed_log.py list` what the router rewrote.
 
 ### Where it runs, and why it is not built in
 

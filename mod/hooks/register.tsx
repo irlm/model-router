@@ -110,8 +110,26 @@ const limitLines = (limits: RateLimit[]): Line[] =>
     line(`${windowName(l.kind).padEnd(4)}${bar(l.percentUsed / 100, 20)} ${String(Math.round(l.percentUsed)).padStart(3)}% used${l.resetsAt ? ', resets ' + clock(Date.parse(l.resetsAt)) : ''}`,
       { color: l.percentUsed >= 80 ? 'red' : l.percentUsed >= 50 ? 'yellow' : 'green', bold: true }))
 
+/** The suggestions in the order the pane shows them: largest saving first, a learned one by what its calls cost,
+ * unknown last; dismissed ones out unless asked. */
+const rank = (g: { saving: [number, number] | null; kind: string; stake: number }) => g.saving?.[1] ?? (g.kind === 'learned' ? g.stake : -1)
+const orderedSuggestions = (s: StatusJson, withDismissed = false) =>
+  [...(s.suggestions ?? [])].filter(g => withDismissed || !g.dismissed).sort((a, b) => rank(b) - rank(a))
+
+/** Two bars side by side: before and after, on the same scale. */
+const pair = (before: number | null, after: number | null, width = 8) => {
+  const top = Math.max(before ?? 0, after ?? 0)
+  return `${bar(top > 0 && before !== null ? before / top : 0, width)} -> ${bar(top > 0 && after !== null ? after / top : 0, width)}`
+}
+const realText = (g: { real?: { per_window: number | null; state: string } }, days: number) => {
+  const r = g.real
+  if (!r) return ''
+  if (r.per_window !== null) return `real ${r.per_window >= 0 ? '+' : '-'}${money(Math.abs(r.per_window))}/${days}d ${r.state}`
+  return r.state.replace(/:.*$/, '')
+}
+
 /** The pane's body and /router check's text. `full` (the text, or the pane with Details on) adds the long
- * sections; the pane's default is a glance: checkout, spend, families, to check, one line per suggestion. */
+ * sections; the pane's default is a glance: numbers that compare, one line each. */
 const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = '', full = true): Line[] => {
   const g = s.repo
   const sync = !g.is_repo
@@ -122,63 +140,98 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
         .filter(Boolean).join(', ')
   const reg = s.ledger.regress_last
   const u = s.usage
+  const days = u?.days ?? 30
   const total = u ? u.main_total + u.subagents_total : 0
   const lines: Line[] = full
     ? [line(`read ${clock(at)} · ${s.platform} · Claude Code ${s.claude ?? 'not found'} · routing v${s.routing.version}, decided ${s.routing.decided}`, { dim: true }),
        line(`repo ${g.head ?? '-'} · ${sync}${where ? ' · ' + where : ''}`, { dim: true })]
     : [line(`read ${clock(at)} · Claude Code ${s.claude ?? 'not found'} · routing v${s.routing.version} · repo ${g.head ?? '-'} ${sync}${where ? ' · ' + where : ''}`, { dim: true })]
+  const cells = s.learned?.cells ?? []
+  const struggled = cells.reduce((n, c) => n + c.struggled, 0)
+  const callsN = cells.reduce((n, c) => n + c.n, 0)
   if (u) {
     const prev = u.previous.main_total + u.previous.subagents_total
     const daily = u.daily ?? []
-    lines.push(line(`spend ${u.days}d ${daily.length ? spark(daily.map(d => d.cost)) + ' ' : ''}${money(total)} (main ${money(u.main_total)}, agents ${money(u.subagents_total)}) · prev ${money(prev)}`, { bold: true }))
+    lines.push(line(`spend ${days}d ${daily.length ? spark(daily.map(d => d.cost)) + ' ' : ''}${money(total)} (main ${money(u.main_total)}, agents ${money(u.subagents_total)}) · prev ${money(prev)} · struggled ${struggled}/${callsN} calls · routed ${s.routed_window?.n ?? 0}`, { bold: true }))
   }
   // The triple check after a change: projected (the benchmark), realized (your transcripts since), regress (the family here).
+  // Each change against the stretch before it (what it did) and against the baseline before the first change (what all did).
   const r = s.changes?.realized
   if (r) {
     const checks = r.classes.filter(c => c.family && c.check).map(c => `${c.family} ${c.check!.verdict}`)
-    const span = r.span ? `, ${r.span}${r.until ? ' until the next change' : ' so far'}` : r.days ? `, ${r.days} days` : ''
-    lines.push(line(`since ${when(r.since)} (${r.kind}: ${r.what})${span}: ${saidSaved(r.saved)}${caveats(r)}${r.projected != null ? ` · projected ${money(r.projected)} per ${u?.days ?? 30}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
+    const span = r.span ? `, ${r.span}${r.until ? ' until the next change' : ' so far'}` : ''
+    const base = r.vs_baseline !== undefined ? ` · vs baseline (before ${r.baseline_since ?? 'the first change'}): ${saidSaved(r.vs_baseline)}` : ''
+    lines.push(BLANK, line(`since ${when(r.since)} (${r.kind}: ${r.what})${span}: vs previous ${saidSaved(r.saved)}${base}${caveats(r)}${r.projected != null ? ` · projected ${money(r.projected)} per ${days}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
       { color: caveats(r) ? undefined : savedColor(r.saved), bold: true, wrap: true }))
+    const shown = full ? r.classes : r.classes.slice(0, 3)
+    for (const c of shown) {
+      lines.push(line(`  ${c.class.padEnd(19)}$/call ${fine(c.before.per_call ?? 0).padStart(8)} -> ${fine(c.after.per_call ?? 0).padEnd(8)} ${pair(c.before.per_call, c.after.per_call)}  ${saidSaved(c.saved).padEnd(14)} ${c.after.n} after${c.vs_baseline != null ? `, vs baseline ${saidSaved(c.vs_baseline)}` : ''}`, { color: savedColor(c.saved) }))
+    }
+    const m = r.main
+    lines.push(line(`  ${'main sessions'.padEnd(19)}$/msg  ${fine(m.before.per_msg ?? 0).padStart(8)} -> ${fine(m.after.per_msg ?? 0).padEnd(8)} ${pair(m.before.per_msg, m.after.per_msg)}  ${saidSaved(m.saved).padEnd(14)} ${m.after.msgs} msgs after${m.vs_baseline != null ? `, vs baseline ${saidSaved(m.vs_baseline)}` : ''}`, { color: savedColor(m.saved) }))
   } else if (full) {
-    lines.push(line('no change recorded yet: Apply agents (when it changes a file), /router routing auto and /router mark <note> start the before/after count', { dim: true }))
+    lines.push(BLANK, line('no change recorded yet: Apply agents (when it changes a file), /router routing auto, /router prefer and /router mark <note> start the before/after count', { dim: true }))
   }
-  lines.push(BLANK, line(`${'family'.padEnd(13)}${'default'.padEnd(19)}${'ok'.padEnd(11)}${'evidence'.padEnd(9)}${'$/ok'.padEnd(8)}${'here'.padEnd(5)}last check`, { bold: true }))
-  for (const f of s.families) {
-    const d = f.model ? `${f.model} ${f.effort}${f.variant ? ' +' + f.variant : ''}` : 'none'
-    const lc = f.last_check
-    const last = lc ? (lc.sample ? `${lc.verdict} ${lc.successes}/${lc.sample}` : lc.verdict) : '-'
-    const cost = f.cost_per_success === null ? '-' : f.cost_per_success.toFixed(4)
-    const fr = rateFrac(f.rate)
-    lines.push(line(`${f.name.padEnd(13)}${d.padEnd(19)}${fr === null ? '-'.padEnd(10) : bar(fr)} ${(f.rate ?? '-').padEnd(9)}${cost.padEnd(8)}${(f.can_run ? 'yes' : 'no').padEnd(5)}${last}`,
-      { color: rateColor(fr), dim: fr === null }))
-  }
-  const present = s.agents.routed.filter(r => r.state !== 'absent')
-  const applied = present.filter(r => r.state === 'applied').length
-  const absent = s.agents.routed.length - present.length
+  // Suggestions: estimate against real, one line each, numbered so /router dismiss <n> can hide one you judge wrong.
+  const sug = orderedSuggestions(s)
+  const gone = (s.suggestions ?? []).filter(x => x.dismissed).length
+  const upTo = savingsUpTo(s)
+  lines.push(BLANK, line(sug.length === 0 ? `suggestions: none${gone ? ` (${gone} dismissed)` : ''}`
+    : `suggestions (the last ${days} days could have consumed up to ${money(upTo)} less of ${money(total)}: ${savingsMix(s) || 'nothing measured'}${gone ? `; ${gone} dismissed` : ''}):`, { bold: true }))
+  const GLANCE = 4
+  const shownSug = full ? sug : sug.slice(0, GLANCE)
+  shownSug.forEach((g, i) => {
+    const est = g.saving === null ? 'est -' : `est ${money(g.saving[1])}/${days}d`
+    const head = `${String(i + 1).padStart(2)}. [${g.kind}]`.padEnd(19)
+    lines.push(line(`${head}${g.title.slice(0, 58).padEnd(59)} ${est.padEnd(16)} ${realText(g, days)}`, { color: KIND_COLOR[g.kind] }))
+    if (full) lines.push(line(`    basis: ${g.basis}`, { dim: true }), line(`    do: ${g.action}`, { dim: true }))
+  })
+  if (shownSug.length < sug.length) lines.push(line(`  … ${sug.length - shownSug.length} more (Details)`, { dim: true }))
+  // Families: one line in the glance, the table under Details.
+  const decided = s.families.filter(f => f.model)
+  const here = decided.filter(f => f.can_run)
+  const notOk = here.filter(f => f.last_check && f.last_check.verdict !== 'ok' && !f.last_check.verdict.startsWith('skipped'))
+  lines.push(BLANK, line(`families: ${decided.length} decided · ${here.length} checkable here${notOk.length ? ` · last check not ok: ${notOk.map(f => f.name).join(', ')}` : here.length ? ' · last checks ok' : ''}${full ? '' : ' (table in Details)'}`, { bold: true, color: notOk.length ? 'yellow' : undefined }))
   if (full) {
+    lines.push(line(`${'family'.padEnd(13)}${'default'.padEnd(19)}${'ok'.padEnd(11)}${'evidence'.padEnd(9)}${'$/ok'.padEnd(8)}${'here'.padEnd(5)}last check`, { bold: true }))
+    for (const f of s.families) {
+      const d = f.model ? `${f.model} ${f.effort}${f.variant ? ' +' + f.variant : ''}` : 'none'
+      const lc = f.last_check
+      const last = lc ? (lc.sample ? `${lc.verdict} ${lc.successes}/${lc.sample}` : lc.verdict) : '-'
+      const cost = f.cost_per_success === null ? '-' : f.cost_per_success.toFixed(4)
+      const fr = rateFrac(f.rate)
+      lines.push(line(`${f.name.padEnd(13)}${d.padEnd(19)}${fr === null ? '-'.padEnd(10) : bar(fr)} ${(f.rate ?? '-').padEnd(9)}${cost.padEnd(8)}${(f.can_run ? 'yes' : 'no').padEnd(5)}${last}`,
+        { color: rateColor(fr), dim: fr === null }))
+    }
+    const present = s.agents.routed.filter(x => x.state !== 'absent')
+    const applied = present.filter(x => x.state === 'applied').length
+    const absent = s.agents.routed.length - present.length
     lines.push(
-      BLANK,
       line(`agents: ${s.agents.files} files, ${s.agents.unused} unused; routed ${applied}/${present.length} applied${absent ? `, ${absent} not on this machine` : ''}`, { dim: true }),
       line(`prices verified ${s.catalog.verified_oldest ?? '?'} (${s.catalog.age_days ?? '?'} days) · ledger: usage ${s.ledger.usage_last ?? 'none'}, regress ${reg?.date ?? 'none'} on ${reg?.claude ?? '-'}`, { dim: true }),
       line(`timer: ${s.timer.next ? 'next ' + s.timer.next : s.timer.note ?? 'none'}`, { dim: true }),
     )
   }
   lines.push(BLANK)
-  const GLANCE = 3   // items a section shows before Details
   const more = (n: number) => line(`  … ${n} more (Details)`, { dim: true })
   if (s.advice.length === 0) lines.push(line('nothing to check', { color: 'green', bold: true }))
   else {
-    const shown = full ? s.advice : s.advice.slice(0, GLANCE)
+    const shown = full ? s.advice : s.advice.slice(0, 3)
     lines.push(line('to check:', { bold: true }), ...shown.map(a => line(`  - ${a}`, { color: 'yellow', wrap: true })))
     if (shown.length < s.advice.length) lines.push(more(s.advice.length - shown.length))
   }
+  if (full && s.slots?.length) {
+    const top = Math.max(0, ...s.slots.map(x => x.spend))
+    lines.push(BLANK, line(`by week (oldest first): ${'spend'.padStart(8)}  calls  struggled  routed`, { bold: true }))
+    for (const x of s.slots) lines.push(line(`  ${x.since.slice(5)} to ${x.until.slice(5)}  ${bar(top > 0 ? x.spend / top : 0, 12)} ${money(x.spend).padStart(6)}  ${String(x.calls).padStart(5)}  ${String(x.struggled).padStart(9)}  ${String(x.routed).padStart(6)}`))
+  }
   if (u && full) {
-    lines.push(BLANK, line(`consumption, last ${u.days} days since ${u.since} (catalog $ = headroom on a subscription): main ${money(u.main_total)} (output ${money(u.main_out_cost)}) · subagents ${money(u.subagents_total)} in ${u.subagent_calls} calls`, { bold: true }))
-    const top = Math.max(0, ...u.main_rows.map(r => r.cost), ...Object.values(u.by_class).map(b => b.cost))
-    for (const r of u.main_rows.slice(0, 6)) {
-      lines.push(line(`  ${r.model.padEnd(30)}${r.effort.padEnd(8)}${bar(top > 0 ? r.cost / top : 0, 20)} ${money(r.cost).padStart(5)}  ${String(r.msgs).padStart(5)} msgs`))
+    lines.push(BLANK, line(`consumption, last ${days} days since ${u.since} (catalog $ = headroom on a subscription): main ${money(u.main_total)} (output ${money(u.main_out_cost)}) · subagents ${money(u.subagents_total)} in ${u.subagent_calls} calls`, { bold: true }))
+    const top = Math.max(0, ...u.main_rows.map(x => x.cost), ...Object.values(u.by_class).map(b => b.cost))
+    for (const x of u.main_rows.slice(0, 6)) {
+      lines.push(line(`  ${x.model.padEnd(30)}${x.effort.padEnd(8)}${bar(top > 0 ? x.cost / top : 0, 20)} ${money(x.cost).padStart(5)}  ${String(x.msgs).padStart(5)} msgs`))
     }
-    if (u.main_rows.some(r => r.effort === '?')) lines.push(line('  effort ? = not recorded in the transcript: the default effort of the session at the time', { dim: true }))
+    if (u.main_rows.some(x => x.effort === '?')) lines.push(line('  effort ? = not recorded in the transcript: the default effort of the session at the time', { dim: true }))
     for (const [cls, b] of Object.entries(u.by_class).sort((a, b) => b[1].cost - a[1].cost)) {
       const types = Object.entries(b.types).sort((a, b) => b[1] - a[1])
       const shown = types.slice(0, 3).map(([t, n]) => `${t} x${n}`).join(', ') + (types.length > 3 ? ` +${types.length - 3} more` : '')
@@ -187,40 +240,16 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     }
   }
   if (r && full) {
-    lines.push(BLANK, line(`since the change: cost per unit of the same work before vs after, times the units after (the regress column: the family still passes here)`, { bold: true }))
-    const side = (x: RealizedSide) => `${x.n} calls${x.per_call === null ? '' : ` ${fine(x.per_call)}/call`} (${Object.entries(x.models).map(([m, n]) => `${m.replace(/^claude-/, '')} x${n}`).join(', ')})`
-    for (const c of r.classes) {
-      const check = c.family ? ` · ${c.family} regress ${c.check ? c.check.verdict + (c.check.sample ? ` ${c.check.successes}/${c.check.sample}` : '') : 'not checked here'}` : ' · no family measures this'
-      lines.push(line(`  ${c.class.padEnd(19)}before ${side(c.before)} · after ${side(c.after)} · ${saidSaved(c.saved)}${check}`, { color: savedColor(c.saved) }))
-    }
-    const ms = (x: RealizedMainSide | { msgs: number; per_msg: number }) => `${x.msgs} msgs${x.per_msg === null ? '' : ` ${fine(x.per_msg)}/msg`}`
-    lines.push(line(`  ${'main sessions'.padEnd(19)}before ${ms(r.main.before)} · after ${ms(r.main.after)} · ${saidSaved(r.main.saved)} (same unit, a message; the mix of work may differ)`, { color: savedColor(r.main.saved) }))
-    for (const row of r.main.rows.slice(0, 4)) {
-      lines.push(line(`    ${row.model.replace(/^claude-/, '')} ${row.effort}: ${row.before ? ms(row.before) : '-'} -> ${row.after ? ms(row.after) : '-'}`, { dim: true }))
-    }
     const earlier = (s.changes?.history ?? []).slice(1, 6)
     if (earlier.length) {
-      lines.push(line('  earlier changes, each measured in its own window (from the change to the next one):', { dim: true }))
+      lines.push(BLANK, line('  earlier changes, each in its own window (vs the stretch before it; vs the baseline):', { dim: true }))
       for (const h of earlier) {
-        lines.push(line(`    ${when(h.since)} (${h.kind}: ${h.what})${h.span ? ` · ${h.span}` : ''}: ${saidSaved(h.saved)}${caveats(h)}${h.projected != null ? ` · projected ${money(h.projected)}` : ''}`, { color: caveats(h) ? undefined : savedColor(h.saved), wrap: true }))
+        lines.push(line(`    ${when(h.since)} (${h.kind}: ${h.what})${h.span ? ` · ${h.span}` : ''}: ${saidSaved(h.saved)}${h.vs_baseline != null ? `; vs baseline ${saidSaved(h.vs_baseline)}` : ''}${caveats(h)}${h.projected != null ? ` · projected ${money(h.projected)}` : ''}`, { color: caveats(h) ? undefined : savedColor(h.saved), wrap: true }))
       }
     }
+    const dismissed = (s.suggestions ?? []).filter(x => x.dismissed)
+    if (dismissed.length) lines.push(line(`  dismissed by you: ${dismissed.map(x => x.id).join(', ')} (/router undismiss <id>)`, { dim: true }))
   }
-  // Suggestions: largest saving first, unknown last; each with its share of the window's spend.
-  // Largest saving first; a learned suggestion ranks by what the struggling calls cost; unknown last.
-  const rank = (g: { saving: [number, number] | null; kind: string; stake: number }) => g.saving?.[1] ?? (g.kind === 'learned' ? g.stake : -1)
-  const sug = [...(s.suggestions ?? [])].sort((a, b) => rank(b) - rank(a))
-  const upTo = savingsUpTo(s)
-  lines.push(BLANK, line(sug.length === 0 ? 'suggestions: none from the last window'
-    : `suggestions: the last ${u?.days ?? 30} days could have consumed up to ${money(upTo)} less of ${money(total)}${total > 0 ? ` (${Math.round((upTo / total) * 100)}%)` : ''}: ${savingsMix(s) || 'nothing measured'}`, { bold: true }))
-  const shownSug = full ? sug : sug.slice(0, GLANCE)
-  for (const g of shownSug) {
-    const sv = g.saving === null ? 'unknown' : g.saving[0] === g.saving[1] ? `saves ${money(g.saving[0])}` : `saves ${money(g.saving[0])}-${money(g.saving[1])}`
-    const share = g.saving && total > 0 ? g.saving[1] / total : 0
-    lines.push(line(`${sv.padEnd(16)}${bar(share)} ${String(Math.round(share * 100)).padStart(2)}%  [${g.kind}] ${g.title}`, { color: KIND_COLOR[g.kind] }))
-    if (full) lines.push(line(`    basis: ${g.basis}`, { dim: true }), line(`    do: ${g.action}`, { dim: true }))
-  }
-  if (shownSug.length < sug.length) lines.push(more(sug.length - shownSug.length))
   const learned = s.learned
   if (full && learned) {
     const hot = learned.cells.filter(c => c.hot || c.override)
@@ -237,9 +266,9 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     lines.push(line(mine.length ? `  this project's overrides: ${mine.map(([c, o]) => `${c} -> ${o.model} ${o.effort}`).join(', ')} (/router prefer clear <class>)` : '  this project: no override (/router prefer <class> <model> <effort> sets one)', { dim: true }))
   }
   if (seen.length > 0) {
-    const kept = seen.filter(r => r.decision === 'kept').length
+    const kept = seen.filter(x => x.decision === 'kept').length
     lines.push(BLANK, line(`routed this session: ${seen.length - kept} routed, ${kept} kept (mode ${routingMode}; /router routing ask|auto|off${full ? '' : '; Details lists them'})`, { bold: true }))
-    if (full) for (const r of seen.slice(-8)) lines.push(line(`  ${clock(r.at)}  ${r.agent}: ${r.from} -> ${r.to}  [${r.family}] ${r.decision}  ${r.description}`, { dim: r.decision === 'kept' }))
+    if (full) for (const x of seen.slice(-8)) lines.push(line(`  ${clock(x.at)}  ${x.agent}: ${x.from} -> ${x.to}  [${x.family}] ${x.decision}  ${x.description}`, { dim: x.decision === 'kept' }))
   }
   return lines
 }
@@ -340,6 +369,16 @@ async function recordChange($: Dollar, kind: string, detail: string, projected?:
     $.ui.toast(`router: could not record the change: ${err instanceof Error ? err.message : String(err)}`)
   }
   await refresh($)
+}
+
+/** One line in this machine's routed log (tools/routed_log.py), so the weekly slots can count what the router did. */
+async function logRouted($: Dollar, family: string, agent: string, from: string, to: string, decision: string) {
+  try {
+    const py = await findPython($)
+    await $.process.run([py, 'tools/routed_log.py', 'add', family, agent, from, to, decision, '--project', projectKey], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
+  } catch {
+    // the log is a convenience; a failure to write it changes nothing else
+  }
 }
 
 async function runJob($: Dollar, name: string) {
@@ -472,7 +511,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'router',
       description: 'Model router: where the routing stands, re-check it, ledger, apply, pull',
-      argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class>',
+      argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
     })
     void refresh($)
     if (refreshMinutes > 0) {
@@ -516,6 +555,16 @@ export const register: Register = (on, options) => {
       await recordChange($, 'override', `${cls} -> ${mdl} ${eff} in ${projectKey}`)
       return { text: `override set for this project: ${cls} calls run on ${mdl} ${eff} (ask or auto mode). The pane counts the saving from now; /router prefer clear ${cls} undoes it.` }
     }
+    if (verb === 'dismiss' || verb === 'undismiss') {
+      const s = await read($, status)
+      const list = s?.json ? orderedSuggestions(s.json, verb === 'undismiss') : []
+      const pick = /^\d+$/.test(arg) ? list[Number(arg) - 1]?.id : arg
+      if (!pick) return { text: `${verb} needs the suggestion's number from the pane or its id (e.g. /router dismiss 2, /router undismiss effort)` }
+      const py = await findPython($)
+      await $.process.run([py, 'tools/overrides.py', verb, pick], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
+      await refresh($)
+      return { text: verb === 'dismiss' ? `dismissed ${pick}: hidden from the glance, listed under Details; /router undismiss ${pick} brings it back.` : `${pick} is back in the list.` }
+    }
     if (verb === 'mark') {
       const note = e.args.trim().replace(/^mark\s*/, '')
       if (!note) return { text: 'mark needs a note of what you changed, e.g. /router mark effort low from today' }
@@ -558,6 +607,7 @@ export const register: Register = (on, options) => {
     }
     const at = await $.clock.now()
     await update($, routed, r => [...r, { at, agent, family: c.family, from: c.asked, to: `${c.model} ${c.effort}`, decision, description: e.description }].slice(-50))
+    await logRouted($, c.family, agent, c.asked, `${c.model} ${c.effort}`, decision)
     if (decision === 'kept') return next(e)
     $.ui.toast(`router: ${agent} on ${c.model} ${c.effort} (${c.family} ${c.rate})`)
     return next({

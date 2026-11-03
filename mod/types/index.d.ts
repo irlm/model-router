@@ -28,6 +28,10 @@ export type StatusJson = {
   suggestions?: Suggestion[]
   changes?: { events: Change[]; realized: Realized | null; history?: Realized[] }
   learned?: { cells: LearnedCell[]; sessions: LearnedSession[]; threshold: number }
+  /** the window in weekly slots, oldest first */
+  slots?: { since: string; until: string; spend: number; calls: number; struggled: number; routed: number }[]
+  /** what the router rewrote in the window, from its own log */
+  routed_window?: { n: number; kept: number }
   overrides?: Record<string, Record<string, Override>>
 }
 
@@ -56,6 +60,10 @@ export type Suggestion = {
   saving: [number, number] | null
   basis: string
   action: string
+  /** estimate against real, from the latest change window (tools/status.py verdicts) */
+  real?: { since: string; span?: string; est: number | null; saved: number | null; per_window: number | null; state: string }
+  /** the person judged it wrong: hidden from the glance, listed under Details */
+  dismissed?: boolean
 }
 
 export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
@@ -85,9 +93,12 @@ export type Realized = {
   what: string
   projected?: number | null
   days: number | null
-  classes: { class: string; family: string | null; before: RealizedSide; after: RealizedSide; saved: number | null; check: { sample: string; successes: string; verdict: string } | null }[]
-  main: { before: RealizedMainSide; after: RealizedMainSide; saved: number | null; rows: { model: string; effort: string; before: { msgs: number; per_msg: number } | null; after: { msgs: number; per_msg: number } | null }[] }
+  classes: { class: string; family: string | null; before: RealizedSide; after: RealizedSide; saved: number | null; vs_baseline?: number | null; baseline_per_call?: number | null; check: { sample: string; successes: string; verdict: string } | null }[]
+  main: { before: RealizedMainSide; after: RealizedMainSide; saved: number | null; vs_baseline?: number | null; baseline_per_msg?: number | null; rows: { model: string; effort: string; before: { msgs: number; per_msg: number } | null; after: { msgs: number; per_msg: number } | null }[] }
   saved: number
+  /** against the baseline before the first change: what all the changes did together */
+  vs_baseline?: number
+  baseline_since?: string
 }
 
 /** The last status read: the JSON when the script ran, else why not. */

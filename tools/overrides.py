@@ -41,6 +41,25 @@ def set_override(project, cls, model, effort, why=''):
     return data[project][cls]
 
 
+def dismissed():
+    """Suggestion ids the person judged wrong: hidden from the glance, listed under Details."""
+    return read().get('_dismissed') or {}
+
+
+def dismiss(sid, undo=False):
+    data = read()
+    d = data.setdefault('_dismissed', {})
+    if undo:
+        gone = d.pop(sid, None)
+    else:
+        d[sid] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%MZ')
+        gone = d[sid]
+    if not d:
+        data.pop('_dismissed', None)
+    write(data)
+    return gone
+
+
 def clear(project, cls):
     data = read()
     gone = (data.get(project) or {}).pop(cls, None)
@@ -52,12 +71,20 @@ def clear(project, cls):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('verb', choices=['set', 'clear', 'list'])
+    ap.add_argument('verb', choices=['set', 'clear', 'list', 'dismiss', 'undismiss'])
     ap.add_argument('words', nargs='*')
     ap.add_argument('--why', default='')
     a = ap.parse_args()
+    if a.verb in ('dismiss', 'undismiss'):
+        if len(a.words) != 1:
+            raise SystemExit('dismiss needs the suggestion id')
+        print(dismiss(a.words[0], undo=a.verb == 'undismiss') or 'nothing to undo')
+        return
     if a.verb == 'list':
         for proj, classes in read().items():
+            if proj == '_dismissed':
+                print('dismissed:', ', '.join(f'{k} ({v})' for k, v in classes.items()))
+                continue
             for cls, o in classes.items():
                 print(f"{proj}  {cls:20} {o['model']} {o['effort']}  since {o['since']}  {o.get('why', '')}")
     elif a.verb == 'set':

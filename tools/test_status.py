@@ -95,6 +95,42 @@ class Learned(unittest.TestCase):
         self.assertEqual((calls['a']['retry_of'], calls['b']['retry_of'], calls['c']['retry_of']), (None, 'a', None))
 
 
+class Verdicts(unittest.TestCase):
+    def latest(self, classes, main, span='3.0 days'):
+        return {'since': '2026-11-01T10:00Z', 'until': None, 'span': span, 'classes': classes, 'main': main}
+
+    def test_states(self):
+        side = lambda n, per, models: {'n': n, 'cost': n * per, 'per_call': per, 'models': models}
+        cls = [{'class': 'code-explore', 'family': 'find_feature', 'saved': 3.0, 'check': None,
+                'before': side(4, 1.5, {'claude-opus-5-5': 4}), 'after': side(6, 0.01, {'claude-haiku-5-5': 6})}]
+        main = {'before': {'msgs': 500, 'cost': 60.0, 'per_msg': 0.12}, 'after': {'msgs': 200, 'cost': 20.0, 'per_msg': 0.1}, 'saved': 4.0,
+                'rows': [{'model': 'claude-fable-5-1', 'effort': 'xhigh', 'before': {'msgs': 500, 'per_msg': 0.12}, 'after': {'msgs': 200, 'per_msg': 0.1}}]}
+        sugg = [{'id': 'explore', 'saving': [20.0, 20.0]}, {'id': 'effort', 'saving': [80.0, 80.0]}, {'id': 'tier', 'saving': [100.0, 120.0]}, {'id': 'synthesis', 'saving': None}]
+        import unittest.mock as um
+        with um.patch.object(status, 'span_days', return_value=3.0):
+            status.verdicts(sugg, self.latest(cls, main), 30)
+        self.assertEqual(sugg[0]['real']['state'], 'holding')            # 3.0 over 3 days -> 30/window vs est 20
+        self.assertAlmostEqual(sugg[0]['real']['per_window'], 30.0, 2)
+        self.assertTrue(sugg[1]['real']['state'].startswith('not applied'))   # still xhigh
+        self.assertTrue(sugg[2]['real']['state'].startswith('not applied'))   # still fable
+        self.assertEqual(sugg[3]['real']['state'], 'no calls since the change')
+
+    def test_too_early_and_wrong(self):
+        side = lambda n, per, models: {'n': n, 'cost': n * per, 'per_call': per, 'models': models}
+        cls = [{'class': 'code-explore', 'family': 'find_feature', 'saved': -0.5, 'check': None,
+                'before': side(4, 0.5, {'claude-haiku-5-5': 4}), 'after': side(6, 0.6, {'claude-haiku-5-5': 6})}]
+        main = {'before': {'msgs': 10, 'cost': 1, 'per_msg': 0.1}, 'after': {'msgs': 5, 'cost': 1, 'per_msg': 0.2}, 'saved': -0.5, 'rows': []}
+        import unittest.mock as um
+        sugg = [{'id': 'explore', 'saving': [20.0, 20.0]}]
+        with um.patch.object(status, 'span_days', return_value=0.2):
+            status.verdicts(sugg, self.latest(cls, main, '5 h'), 30)
+        self.assertTrue(sugg[0]['real']['state'].startswith('too early'))
+        sugg = [{'id': 'explore', 'saving': [20.0, 20.0]}]
+        with um.patch.object(status, 'span_days', return_value=2.0):
+            status.verdicts(sugg, self.latest(cls, main), 30)
+        self.assertEqual(sugg[0]['real']['state'], 'wrong so far')
+
+
 class Realized(unittest.TestCase):
     def test_each_change_in_its_own_window(self):
         events = [{'at': '2026-11-01T10:00Z', 'kind': 'mark', 'detail': 'effort low'},

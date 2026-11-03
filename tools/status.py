@@ -29,6 +29,7 @@ import decide  # noqa: E402
 import changes  # noqa: E402
 import consumption  # noqa: E402
 import overrides  # noqa: E402
+import routed_log  # noqa: E402
 import local  # noqa: E402
 
 ADVICE_PRICE_DAYS = 30     # prices verified longer ago than this: check the sources
@@ -299,6 +300,81 @@ def suggest(usage, agents, routing=None):
     return [g for g in out if g['saving'] is None or g['saving'][1] >= SUGGESTION_FLOOR]
 
 
+# Which part of a realized window answers each suggestion: a class of Agent call, or the main sessions.
+SUGG_SCOPE = {'explore': ('class', 'code-explore'), 'browser': ('class', 'browser-flow'), 'synthesis': ('class', 'research-synthesis'),
+              'lookups': ('class', 'fact-lookup'), 'effort': ('main', 'effort'), 'tier': ('main', 'model')}
+
+
+def span_days(a, b):
+    start = datetime.datetime.strptime(a[:16], '%Y-%m-%dT%H:%M').replace(tzinfo=datetime.timezone.utc)
+    end = datetime.datetime.strptime(b[:16], '%Y-%m-%dT%H:%M').replace(tzinfo=datetime.timezone.utc) if b else datetime.datetime.now(datetime.timezone.utc)
+    return max(0.0, (end - start).total_seconds() / 86400)
+
+
+def verdicts(suggestions, latest, days):
+    """Estimate against real, per suggestion, from the latest realized window: what the suggestion's class (or the
+    main sessions) saved since the change, scaled to the window's length. States: not applied (the after side
+    still runs what the suggestion wants changed), no calls yet, too early (under a day or too few units),
+    holding (real at or above half the estimate), below estimate, wrong so far (dearer). The person decides."""
+    for g in suggestions:
+        scope = SUGG_SCOPE.get(g['id'])
+        if not scope or not latest:
+            continue
+        est = g['saving'][1] if g['saving'] else None
+        sd = span_days(latest['since'], latest.get('until'))
+        real = {'since': latest['since'], 'span': latest.get('span'), 'est': est, 'saved': None, 'per_window': None, 'state': ''}
+        if scope[0] == 'class':
+            c = next((c for c in latest['classes'] if c['class'] == scope[1]), None)
+            if not c:
+                real['state'] = 'no calls since the change'
+            else:
+                dear = [m for m in c['after']['models'] if m != '?' and not m.startswith('claude-haiku')]
+                applied = scope[1] != 'research-synthesis' and not dear or scope[1] == 'research-synthesis' and not any(m.startswith('claude-fable') or m.startswith('claude-opus') for m in c['after']['models'])
+                real['saved'] = c['saved']
+                if not applied:
+                    real['state'] = 'not applied: the calls after the change still ran above the decided model'
+                elif c['after']['n'] < 5 or sd < 1:
+                    real['state'] = f"too early: {c['after']['n']} calls in {latest.get('span')}"
+                else:
+                    real['per_window'] = round(c['saved'] / sd * days, 2) if c['saved'] is not None else None
+        else:
+            m = latest['main']
+            rows = [r for r in m['rows'] if r['after']]
+            top = max(rows, key=lambda r: r['after']['msgs'])['after'] if rows else None
+            top_row = max(rows, key=lambda r: r['after']['msgs']) if rows else None
+            applied = bool(top_row) and (top_row['effort'] == 'low' if scope[1] == 'effort' else top_row['model'].startswith('claude-opus'))
+            real['saved'] = m['saved']
+            if not top:
+                real['state'] = 'no messages since the change'
+            elif not applied:
+                real['state'] = f"not applied: main sessions still on {top_row['model'].removeprefix('claude-')} {top_row['effort']}"
+            elif m['after']['msgs'] < 50 or sd < 1:
+                real['state'] = f"too early: {m['after']['msgs']} msgs in {latest.get('span')}"
+            else:
+                real['per_window'] = round(m['saved'] / sd * days, 2) if m['saved'] is not None else None
+        if real['per_window'] is not None and not real['state']:
+            pw = real['per_window']
+            real['state'] = 'wrong so far' if pw <= 0 else 'holding' if est is None or pw >= 0.5 * est else 'below estimate'
+        g['real'] = real
+    return suggestions
+
+
+def slots(usage, routed, days):
+    """The window in weekly slots, oldest first: spend, Agent calls, struggled calls, routed calls."""
+    now = datetime.datetime.now(datetime.timezone.utc).date()
+    starts = [now - datetime.timedelta(days=d) for d in range(days - 1, -1, -7)]
+    out = []
+    for i, start in enumerate(starts):
+        end = starts[i + 1] if i + 1 < len(starts) else now + datetime.timedelta(days=1)
+        a, b = start.isoformat(), end.isoformat()
+        calls = [c for c in usage['subagents']['calls'] if a <= c['ts'][:10] < b]
+        out.append({'since': a, 'until': (end - datetime.timedelta(days=1)).isoformat(),
+                    'spend': round(sum(d['cost'] for d in usage.get('daily', []) if a <= d['date'] < b), 2),
+                    'calls': len(calls), 'struggled': sum(1 for c in calls if c.get('retry_of') or c.get('errors', 0) >= consumption.ERROR_HEAVY or c.get('failed')),
+                    'routed': sum(1 for r in routed if a <= r['at'][:10] < b)})
+    return out
+
+
 def project_short(key):
     """A transcript project key without this machine's home prefix: -home-me-Projects-x -> Projects-x."""
     home = re.sub(r'[^A-Za-z0-9]', '-', str(Path.home()))
@@ -376,6 +452,11 @@ def realized_savings(usage, events, families):
         m = max(0, int((end - start).total_seconds() // 60))
         return f'{m} min' if m < 120 else f'{m / 60:.1f} h' if m < 48 * 60 else f'{m / 1440:.1f} days'
 
+    # The baseline: everything before the first change. Each window is also measured against it, so the latest
+    # window's baseline figures are what all the changes did together, while 'before' is the stretch just before.
+    first = events[0]['at'][:16]
+    base_calls = {cls: side([c for c in calls if c['class'] == cls and c['ts'] < first]) for cls in {c['class'] for c in calls}}
+    base_main = per_msg(segs[0])
     windows = []
     for i, ev in enumerate(events):
         at, prev = ev['at'][:16], events[i - 1]['at'][:16] if i else ''
@@ -387,8 +468,11 @@ def realized_savings(usage, events, families):
             if not after['n']:
                 continue
             saved = round((before['per_call'] - after['per_call']) * after['n'], 2) if before['per_call'] is not None and after['per_call'] is not None else None
+            bpc = base_calls.get(cls, {}).get('per_call')
+            vs_base = round((bpc - after['per_call']) * after['n'], 2) if bpc is not None and after['per_call'] is not None else None
             fam = CLASS_FAMILY.get(cls)
-            classes.append({'class': cls, 'family': fam, 'before': before, 'after': after, 'saved': saved, 'check': checks.get(fam) if fam else None})
+            classes.append({'class': cls, 'family': fam, 'before': before, 'after': after, 'saved': saved, 'vs_baseline': vs_base,
+                            'baseline_per_call': bpc, 'check': checks.get(fam) if fam else None})
         b, a = segs[i], segs[i + 1]
         pb, pa = per_msg(b), per_msg(a)
         rb = {(r['model'], r['effort']): r for r in b['main_rows']}
@@ -399,11 +483,14 @@ def realized_savings(usage, events, families):
                 for k in sorted(set(rb) | set(ra), key=lambda k: -((ra.get(k) or rb.get(k))['cost']))]
         main = {'before': {'msgs': b['main_msgs'], 'cost': b['main_total'], 'per_msg': pb},
                 'after': {'msgs': a['main_msgs'], 'cost': a['main_total'], 'per_msg': pa},
-                'saved': round((pb - pa) * a['main_msgs'], 2) if pb is not None and pa is not None else None, 'rows': rows}
+                'saved': round((pb - pa) * a['main_msgs'], 2) if pb is not None and pa is not None else None, 'rows': rows,
+                'baseline_per_msg': base_main,
+                'vs_baseline': round((base_main - pa) * a['main_msgs'], 2) if base_main is not None and pa is not None else None}
         saved = round(sum(c['saved'] or 0 for c in classes) + (main['saved'] or 0), 2)
+        vs_baseline = round(sum(c['vs_baseline'] or 0 for c in classes) + (main['vs_baseline'] or 0), 2)
         windows.append({'since': ev['at'], 'until': nxt, 'span': span(ev['at'], nxt), 'kind': ev['kind'], 'what': ev['detail'],
                         'projected': ev.get('projected'), 'days': days_since(ev['at'][:10], datetime.date.today()),
-                        'classes': classes, 'main': main, 'saved': saved})
+                        'classes': classes, 'main': main, 'saved': saved, 'vs_baseline': vs_baseline, 'baseline_since': usage.get('since')})
     windows.reverse()
     return {'latest': windows[0], 'history': windows}
 
@@ -445,6 +532,12 @@ def collect(fetch=False):
     learned, learned_sugg = learned_from(usage.get('struggle') or {}, routing, ovr, threshold)
     suggestions += learned_sugg
     realized = realized_savings(usage, events, families)
+    verdicts(suggestions, realized['latest'] if realized else None, USAGE_DAYS)
+    gone = overrides.dismissed()
+    for g in suggestions:
+        g['dismissed'] = g['id'] in gone
+    routed = routed_log.read(USAGE_DAYS)
+    week_slots = slots(usage, routed, USAGE_DAYS)
 
     advice = []
     if version and reg and reg.get('claude') and reg['claude'] != version:
@@ -494,7 +587,8 @@ def collect(fetch=False):
                       'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types'], 'models': v.get('models', {}), 'last': v.get('last', '')} for k, v in usage['subagents']['by_class'].items()},
                       'daily': usage.get('daily', []),
                       'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
-            'suggestions': suggestions, 'learned': learned, 'overrides': ovr,
+            'suggestions': suggestions, 'learned': learned, 'overrides': ovr, 'slots': week_slots,
+            'routed_window': {'n': len(routed), 'kept': sum(1 for r in routed if r.get('decision') == 'kept')},
             'changes': {'events': events[-5:], 'realized': realized['latest'] if realized else None, 'history': realized['history'] if realized else []},
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}
 

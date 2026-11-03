@@ -196,8 +196,9 @@ not. When that happens in a session already re-reading more than the "Context wa
 per turn and costs at the model's cache-read price, what a new window would, and the two over 50
 turns. The answers: compact now, keeping only the new task (the widget asks the session to compact
 with that instruction); send it here; or stop asking this session. The prompt is never dropped or
-rewritten. The status line shows `ctx 240k ($0.06/turn re-read)` from the warning size on, and the
-pane counts the switches seen and compacted. The same holds in the desktop app and VS Code: a new
+rewritten. The status line always shows the context size, `ctx 23k`, when the host reports it, and adds what
+re-reading it costs per turn from the warning size on: `ctx 240k ($0.06/turn re-read)`; the pane
+counts the switches seen and compacted. The same holds in the desktop app and VS Code: a new
 window or tab is a new session, and that is the cheap way.
 
 ### After a change: what was really saved

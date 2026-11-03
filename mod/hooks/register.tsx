@@ -52,7 +52,8 @@ const savingsMix = (s: StatusJson) => ['measured', 'extrapolated', 'unmeasured']
  * changes a decision; `minimal` keeps the windows, the routed count and the to-check count. */
 const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: StatusMode = 'full', ctx: number | null = null, model = '') => {
   const parts = [limitsText(limits)]
-  if (ctx !== null && ctx >= contextWarn) parts.push(`ctx ${kilo(ctx)} (${money((ctx / 1e6) * cacheRate(model))}/turn re-read)`)
+  // The context size always (when the host reports it); what re-reading it costs per turn, from the warning size on.
+  if (ctx !== null) parts.push(ctx >= contextWarn ? `ctx ${kilo(ctx)} (${money((ctx / 1e6) * cacheRate(model))}/turn re-read)` : `ctx ${kilo(ctx)}`)
   if (routedN > 0) parts.push(`routed ${routedN}`)
   const r = s.changes?.realized
   if (mode === 'full' && r && r.saved !== 0 && !caveats(r)) parts.push(`${r.saved > 0 ? 'saved' : 'cost up'} ${money(Math.abs(r.saved))} since ${r.since.slice(5, 10)}`)

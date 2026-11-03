@@ -41,7 +41,9 @@ const limitsText = (limits: RateLimit[]) => limits.map(l => `${windowName(l.kind
 
 /** The status line under the prompt: the rate-limit windows, then what is worth doing. */
 type StatusMode = 'full' | 'minimal' | 'off'
-const savingsUpTo = (s: StatusJson) => (s.suggestions ?? []).reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
+const savingsUpTo = (s: StatusJson, kind?: string) => (s.suggestions ?? []).filter(g => !kind || g.kind === kind).reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
+/** The suggestions' upper savings by evidence kind, for the window that was: what it would have consumed less, not what will. */
+const savingsMix = (s: StatusJson) => ['measured', 'extrapolated', 'unmeasured'].map(k => [k, savingsUpTo(s, k)] as const).filter(([, v]) => v >= 1).map(([k, v]) => `${money(v)} ${k}`).join(', ')
 
 /** The status line under the prompt (the host prefixes the plugin's name): the rate-limit windows, what the
  * router did this session, what a change saved, what the suggestions add up to, what to check. Only what
@@ -52,7 +54,7 @@ const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: Statu
   const r = s.changes?.realized
   if (mode === 'full' && r && r.saved !== 0 && !caveats(r)) parts.push(`${r.saved > 0 ? 'saved' : 'cost up'} ${money(Math.abs(r.saved))} since ${r.since.slice(5, 10)}`)
   const upTo = savingsUpTo(s)
-  if (mode === 'full' && upTo >= 1) parts.push(`${money(upTo)} to save`)
+  if (mode === 'full' && upTo >= 1) parts.push(`up to ${money(upTo)} less last ${s.usage?.days ?? 30}d (${money(savingsUpTo(s, 'measured'))} measured)`)
   if (s.advice.length > 0) parts.push(`${s.advice.length} to check`)
   if (parts.filter(Boolean).length === 0) parts.push('ok')
   return `${parts.filter(Boolean).join(' · ')} · /router`
@@ -210,7 +212,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   const sug = [...(s.suggestions ?? [])].sort((a, b) => rank(b) - rank(a))
   const upTo = savingsUpTo(s)
   lines.push(BLANK, line(sug.length === 0 ? 'suggestions: none from the last window'
-    : `suggestions: up to ${money(upTo)} of ${money(total)} in ${u?.days ?? 30} days${total > 0 ? ` (${Math.round((upTo / total) * 100)}%)` : ''}${full ? '; the kind says how far the evidence reaches' : ''}`, { bold: true }))
+    : `suggestions: the last ${u?.days ?? 30} days could have consumed up to ${money(upTo)} less of ${money(total)}${total > 0 ? ` (${Math.round((upTo / total) * 100)}%)` : ''}: ${savingsMix(s) || 'nothing measured'}`, { bold: true }))
   const shownSug = full ? sug : sug.slice(0, GLANCE)
   for (const g of shownSug) {
     const sv = g.saving === null ? 'unknown' : g.saving[0] === g.saving[1] ? `saves ${money(g.saving[0])}` : `saves ${money(g.saving[0])}-${money(g.saving[1])}`

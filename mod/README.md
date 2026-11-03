@@ -7,11 +7,12 @@ that routing is still applied and still true here, and lets you re-check it with
 What you see:
 
 - A status line under the prompt (the host prefixes the plugin's name):
-  `5h 37% · 7d 62% · routed 2 · saved $7 since 11-02 · $25 to save · 1 to check · /router`.
+  `5h 37% · 7d 62% · routed 2 · saved $7 since 11-02 · up to $25 less last 30d ($25 measured) · 1 to check · /router`.
   The percentages are the subscription's rate-limit windows as the last API response reported
   them; `routed` is what the router rewrote this session; `saved` is what the transcripts show
-  since the last recorded change; `to save` is what the suggestions add up to per window; `to
-  check` counts the advice. Each part appears only when it has something to say. The "Status
+  since the last recorded change (what happened); `up to $N less last 30d` is what the suggestions add
+  up to for the window that was, a look back and not a forecast, with the measured part named, since the
+  rest is extrapolated or unmeasured; `to check` counts the advice. Each part appears only when it has something to say. The "Status
   line" option in `/config` makes it `minimal` (windows, routed, to check) or `off`.
 - `/router` opens a pane with, top to bottom: the rate-limit windows as bars; one line on the
   checkout; the window's spend as a daily sparkline; the families table (default model and effort,

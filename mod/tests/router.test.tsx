@@ -31,8 +31,9 @@ const STATUS = {
         rows: [{ model: 'claude-fable-5-1', effort: 'xhigh', before: { msgs: 100, per_msg: 0.12 }, after: { msgs: 100, per_msg: 0.132 } }] }, saved: -1.2 }],
     realized: { since: '2026-10-30T10:00Z', until: null, span: '2.0 days', kind: 'apply', what: 'agents: web-researcher.md', projected: 25, days: 2,
       classes: [{ class: 'code-explore', family: 'find_feature', saved: 7.69, check: { sample: '6', successes: '6', verdict: 'ok' },
-        before: { n: 16, cost: 24.71, per_call: 1.544, models: { 'claude-opus-5-5': 16 } }, after: { n: 5, cost: 0.03, per_call: 0.006, models: { 'claude-haiku-5-5': 5 } } }],
-      main: { before: { msgs: 2000, cost: 234, per_msg: 0.117 }, after: { msgs: 140, cost: 11.48, per_msg: 0.082 }, saved: 4.9, rows: [] }, saved: 12.59 } },
+        same_work: true, ref_model: 'claude-opus-5-5',
+        before: { n: 16, cost: 24.71, per_call: 1.544, per_mtok: 13.08, tok_per_call: 118000, models: { 'claude-opus-5-5': 16 } }, after: { n: 5, cost: 0.03, per_call: 0.006, per_mtok: 0.063, tok_per_call: 95000, models: { 'claude-haiku-5-5': 5 } } }],
+      main: { before: { msgs: 2000, cost: 234, per_msg: 0.117, tok_per_msg: 12000 }, after: { msgs: 140, cost: 11.48, per_msg: 0.082, tok_per_msg: 15000 }, saved: 4.9, same_work: true, rows: [] }, saved: 12.59 } },
 }
 
 const PANE = {
@@ -67,8 +68,8 @@ test('/router check prints the table and the status line counts the advice', asy
   expect(text).toContain('agents: 6 files, 179 unused; routed 1/1 applied, 1 not on this machine')
   expect(text).toContain('(apply: agents: web-researcher.md), 2.0 days so far: vs previous saved $13 · projected $25 per 30d · regress find_feature ok')
   expect(text).toContain('(mark: effort low) · 2.0 days: cost up $1.20 (main sessions run on the same model and effort as before, so the change is not in effect)')
-  expect(text).toContain('code-explore       $/call    $1.54 -> $0.0060  ████████ -> ▏░░░░░░░  saved $7.69    5 after')
-  expect(text).toContain('main sessions      $/msg   $0.1170 -> $0.0820  ████████ -> ██████░░  saved $4.90    140 msgs after')
+  expect(text).toContain('code-explore       $/Mtok   13.08 -> 0.06    ████████ -> ▏░░░░░░░  saved $7.69    same work · 5 after · 118k -> 95k tok/call')
+  expect(text).toContain('main sessions      $/Mtok    9.75 -> 5.47    ████████ -> ████░░░░  saved $4.90    same work · 140 msgs after · 12k -> 15k tok/msg')
   expect((await $.command.run({ ...RUN, command: 'router', args: 'mark effort low from today' })).text).toContain('change recorded: effort low from today')
   expect(argvs.some(a => a.endsWith('tools/changes.py add mark effort low from today'))).toBe(true)
 

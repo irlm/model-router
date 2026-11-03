@@ -152,6 +152,15 @@ class Realized(unittest.TestCase):
         self.assertAlmostEqual(first['main']['saved'], (0.2 - 0.1) * 50, 2)    # per message, times the 50 after
         self.assertAlmostEqual(first['classes'][0]['saved'], (1.5 - 1.6) * 1, 2)
 
+    def test_same_work_prices_the_after_tokens_at_the_before_model(self):
+        tok = {'input_tokens': 20000, 'output_tokens': 1000, 'cache_read_input_tokens': 100000, 'cache_creation_input_tokens': 0}
+        after = [{'cost': 0.01, 'tok': tok, 'model': 'claude-haiku-5-5'}]
+        cf = status.price_tokens(tok, 'claude-opus-5-5')
+        self.assertGreater(cf, 0.01)
+        self.assertAlmostEqual(status.same_work(after, 'claude-opus-5-5'), round(cf - 0.01, 2), 2)
+        self.assertIsNone(status.same_work(after, None))
+        self.assertEqual(status.dominant({'claude-opus-5-5': 3, 'claude-haiku-5-5': 1, '?': 9}), 'claude-opus-5-5')
+
     def test_nothing_recorded(self):
         self.assertIsNone(status.realized_savings({'segments': None, 'subagents': {'calls': []}}, [], []))
 

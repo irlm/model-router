@@ -170,10 +170,13 @@ suggestion there is to split the work, since a model change does not move the bo
 A projected saving is the benchmark's number applied to your window. After a change, the pane
 shows what your own transcripts saved since it, per unit of the same work:
 
-- each class of Agent call (code searches, fact lookups, ...): cost per call before and after the
-  change, times the calls after it, with the models on each side;
-- main sessions: cost per message before and after (same unit; the mix of work can differ, so
-  read it as a trend, not a receipt), and the top model/effort rows.
+- each class of Agent call (code searches, fact lookups, ...): the same work. The calls after the
+  change are priced, token for token, at the rates of the model that did most of them before; that
+  counterfactual minus what they really cost is the saving from the model change alone. Task size
+  (a longer ask, more code to read) cancels out of it, and is shown beside it as tokens per call, with
+  the price per million tokens on each side. What a different model does with the same ask (reads
+  more, or less) does not cancel out; that is why the regression verdict stands next to it;
+- main sessions: the same, per message, against the model and effort most messages ran on before.
 
 A number that cannot mean anything yet says so on its line: too few messages and calls after the
 change, or, for a change marked by hand, main sessions still on the same model and effort as

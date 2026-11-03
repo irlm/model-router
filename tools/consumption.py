@@ -128,6 +128,8 @@ def collect(days=30, now=None, splits=None):
     agent_of = {}                                            # tool_use_id -> agentId
     agent_cost = collections.Counter(); agent_model = {}
     agent_errors = collections.Counter()                     # agentId -> tool errors inside its transcript
+    agent_tok = collections.defaultdict(collections.Counter)  # agentId -> tokens by kind: the size of its work
+    ptok = collections.defaultdict(collections.Counter)       # (segment, where, model, effort) -> tokens by kind
     sessions = collections.defaultdict(lambda: {'project': '', 'msgs': 0, 'errors': 0, 'compactions': 0})   # main transcript -> counts (current window)
     daily = collections.Counter()                            # day -> catalog $ (main and subagents)
     pmsgs = collections.Counter(); pcost = collections.Counter()   # (segment, where, model, effort) when splits are set
@@ -189,8 +191,12 @@ def collect(days=30, now=None, splits=None):
                             if splits:
                                 pk = (sum(1 for sp in splits if ts >= sp), 'sub' if is_sub else 'main', model, effort or '?')
                                 pmsgs[pk] += 1; pcost[pk] += c
+                                for k in TOKENS:
+                                    ptok[pk][k] += u.get(k, 0) or 0
                     if is_sub and r.get('agentId'):
                         agent_cost[r['agentId']] += c; agent_model[r['agentId']] = model
+                        for k in TOKENS:
+                            agent_tok[r['agentId']][k] += u.get(k, 0) or 0
                 for it in m['content']:
                     if isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') in ('Agent', 'Task') and window:
                         inp = it.get('input') or {}
@@ -214,6 +220,7 @@ def collect(days=30, now=None, splits=None):
         aid = agent_of.get(cid)
         c['agent'] = aid; c['cost'] = round(agent_cost.get(aid, 0.0), 4) if aid else None; c['model'] = agent_model.get(aid)
         c['errors'] = agent_errors.get(aid, 0) if aid else 0
+        c['tok'] = dict(agent_tok[aid]) if aid else None
         c.setdefault('failed', False)
     mark_retries(calls)
     struggle = struggle_of(calls, sessions)
@@ -242,7 +249,7 @@ def collect(days=30, now=None, splits=None):
         b['models'] = {m: {'n': v['n'], 'cost': round(v['cost'], 4)} for m, v in b['models'].items()}
     day_list = [(now - datetime.timedelta(days=i)).date().isoformat() for i in range(days - 1, -1, -1)]
     def segment(i):
-        prow = [{'model': m, 'effort': e, 'msgs': n, 'cost': round(pcost[(p, w, m, e)], 2)}
+        prow = [{'model': m, 'effort': e, 'msgs': n, 'cost': round(pcost[(p, w, m, e)], 2), 'tok': dict(ptok[(p, w, m, e)])}
                 for (p, w, m, e), n in sorted(pmsgs.items(), key=lambda kv: -pcost[kv[0]]) if p == i and w == 'main']
         return {'main_rows': prow, 'main_total': round(sum(v for k, v in pcost.items() if k[0] == i and k[1] == 'main'), 2),
                 'main_msgs': sum(v for k, v in pmsgs.items() if k[0] == i and k[1] == 'main')}

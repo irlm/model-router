@@ -80,8 +80,8 @@ export type Override = { model: string; effort: string; since: string; why?: str
 
 /** A routing change recorded on this machine (tools/changes.py): the point the saving is counted from. */
 export type Change = { at: string; kind: string; detail: string; projected?: number | null }
-export type RealizedSide = { n: number; cost: number; per_call: number | null; models: Record<string, number> }
-export type RealizedMainSide = { msgs: number; cost: number; per_msg: number | null }
+export type RealizedSide = { n: number; cost: number; per_call: number | null; tok_per_call?: number | null; per_mtok?: number | null; models: Record<string, number> }
+export type RealizedMainSide = { msgs: number; cost: number; per_msg: number | null; tok_per_msg?: number | null }
 /** What the transcripts saved since the last change: cost per unit of the same work before vs after, times the units after. */
 export type Realized = {
   since: string
@@ -93,8 +93,9 @@ export type Realized = {
   what: string
   projected?: number | null
   days: number | null
-  classes: { class: string; family: string | null; before: RealizedSide; after: RealizedSide; saved: number | null; vs_baseline?: number | null; baseline_per_call?: number | null; check: { sample: string; successes: string; verdict: string } | null }[]
-  main: { before: RealizedMainSide; after: RealizedMainSide; saved: number | null; vs_baseline?: number | null; baseline_per_msg?: number | null; rows: { model: string; effort: string; before: { msgs: number; per_msg: number } | null; after: { msgs: number; per_msg: number } | null }[] }
+  /** saved: the same-work figure when `same_work` (the after tokens priced at `ref_model`, minus actual), else per call */
+  classes: { class: string; family: string | null; before: RealizedSide; after: RealizedSide; saved: number | null; saved_per_call?: number | null; same_work?: boolean; ref_model?: string | null; vs_baseline?: number | null; baseline_per_call?: number | null; check: { sample: string; successes: string; verdict: string } | null }[]
+  main: { before: RealizedMainSide; after: RealizedMainSide; saved: number | null; saved_per_msg?: number | null; same_work?: boolean; ref?: [string, string] | null; vs_baseline?: number | null; baseline_per_msg?: number | null; rows: { model: string; effort: string; before: { msgs: number; per_msg: number } | null; after: { msgs: number; per_msg: number } | null }[] }
   saved: number
   /** against the baseline before the first change: what all the changes did together */
   vs_baseline?: number

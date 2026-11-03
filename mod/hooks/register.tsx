@@ -121,6 +121,8 @@ const pair = (before: number | null, after: number | null, width = 8) => {
   const top = Math.max(before ?? 0, after ?? 0)
   return `${bar(top > 0 && before !== null ? before / top : 0, width)} -> ${bar(top > 0 && after !== null ? after / top : 0, width)}`
 }
+const kilo = (n: number | null | undefined) => (n == null ? '-' : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
+const mtok = (x: { per_msg: number | null; tok_per_msg?: number | null }) => (x.per_msg != null && x.tok_per_msg ? (x.per_msg / x.tok_per_msg) * 1e6 : null)
 const realText = (g: { real?: { per_window: number | null; state: string } }, days: number) => {
   const r = g.real
   if (!r) return ''
@@ -164,11 +166,15 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     lines.push(BLANK, line(`since ${when(r.since)} (${r.kind}: ${r.what})${span}: vs previous ${saidSaved(r.saved)}${base}${caveats(r)}${r.projected != null ? ` · projected ${money(r.projected)} per ${days}d` : ''}${checks.length ? ` · regress ${checks.join(', ')}` : ''}`,
       { color: caveats(r) ? undefined : savedColor(r.saved), bold: true, wrap: true }))
     const shown = full ? r.classes : r.classes.slice(0, 3)
+    // Price per million tokens before and after: task size cancels out of this column. The saving is the same-work
+    // figure (the after tokens priced at the model used before, minus what they cost); the size change is shown as tokens per unit.
     for (const c of shown) {
-      lines.push(line(`  ${c.class.padEnd(19)}$/call ${fine(c.before.per_call ?? 0).padStart(8)} -> ${fine(c.after.per_call ?? 0).padEnd(8)} ${pair(c.before.per_call, c.after.per_call)}  ${saidSaved(c.saved).padEnd(14)} ${c.after.n} after${c.vs_baseline != null ? `, vs baseline ${saidSaved(c.vs_baseline)}` : ''}`, { color: savedColor(c.saved) }))
+      const pb = c.before.per_mtok ?? null, pa = c.after.per_mtok ?? null
+      lines.push(line(`  ${c.class.padEnd(19)}$/Mtok ${(pb ?? 0).toFixed(2).padStart(7)} -> ${(pa ?? 0).toFixed(2).padEnd(7)} ${pair(pb, pa)}  ${saidSaved(c.saved).padEnd(14)} ${c.same_work ? 'same work' : 'per call'} · ${c.after.n} after · ${kilo(c.before.tok_per_call)} -> ${kilo(c.after.tok_per_call)} tok/call${c.vs_baseline != null ? ` · vs baseline ${saidSaved(c.vs_baseline)}` : ''}`, { color: savedColor(c.saved) }))
     }
     const m = r.main
-    lines.push(line(`  ${'main sessions'.padEnd(19)}$/msg  ${fine(m.before.per_msg ?? 0).padStart(8)} -> ${fine(m.after.per_msg ?? 0).padEnd(8)} ${pair(m.before.per_msg, m.after.per_msg)}  ${saidSaved(m.saved).padEnd(14)} ${m.after.msgs} msgs after${m.vs_baseline != null ? `, vs baseline ${saidSaved(m.vs_baseline)}` : ''}`, { color: savedColor(m.saved) }))
+    const mb = mtok(m.before), ma = mtok(m.after)
+    lines.push(line(`  ${'main sessions'.padEnd(19)}$/Mtok ${(mb ?? 0).toFixed(2).padStart(7)} -> ${(ma ?? 0).toFixed(2).padEnd(7)} ${pair(mb, ma)}  ${saidSaved(m.saved).padEnd(14)} ${m.same_work ? 'same work' : 'per msg'} · ${m.after.msgs} msgs after · ${kilo(m.before.tok_per_msg)} -> ${kilo(m.after.tok_per_msg)} tok/msg${m.vs_baseline != null ? ` · vs baseline ${saidSaved(m.vs_baseline)}` : ''}`, { color: savedColor(m.saved) }))
   } else if (full) {
     lines.push(BLANK, line('no change recorded yet: Apply agents (when it changes a file), /router routing auto, /router prefer and /router mark <note> start the before/after count', { dim: true }))
   }

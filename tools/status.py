@@ -26,6 +26,8 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / 'tools'))
 sys.path.insert(0, str(HERE / 'bench/common'))
 import decide  # noqa: E402
+sys.path.insert(0, str(HERE / 'catalog'))
+import price  # noqa: E402
 import changes  # noqa: E402
 import consumption  # noqa: E402
 import overrides  # noqa: E402
@@ -424,6 +426,44 @@ def learned_from(struggle, routing, ovr, threshold):
     return {'cells': out_cells, 'sessions': out_sess[:8], 'threshold': threshold}, sugg
 
 
+TOKEN_KINDS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
+
+
+def tok_total(t):
+    return sum((t or {}).get(k, 0) or 0 for k in TOKEN_KINDS)
+
+
+def price_tokens(tok, model):
+    """What these tokens cost at MODEL's catalog rates; None when the model has no price."""
+    entry = price.model_entry(model) if model else None
+    if not entry or not tok:
+        return None
+    r = price.rates(entry)
+    return (tok.get('input_tokens', 0) * r['in'] + tok.get('output_tokens', 0) * r['out']
+            + tok.get('cache_read_input_tokens', 0) * r['cache_read'] + tok.get('cache_creation_input_tokens', 0) * r['write_5m'])
+
+
+def dominant(models):
+    """The model that did most of a side's calls (ties: the dearer), or None."""
+    named = {m: n for m, n in (models or {}).items() if m and m != '?'}
+    return max(named, key=lambda m: (named[m], m)) if named else None
+
+
+def same_work(after_calls, ref_model):
+    """The saving from the model change alone: the after side's own tokens priced at the reference model's rates,
+    minus what they really cost. Task size cancels out; what a different model does with the same ask does not."""
+    if not ref_model:
+        return None
+    cf = actual = 0.0
+    n = 0
+    for c in after_calls:
+        p = price_tokens(c.get('tok'), ref_model)
+        if p is None or c.get('cost') is None:
+            continue
+        cf += p; actual += c['cost']; n += 1
+    return round(cf - actual, 2) if n else None
+
+
 def realized_savings(usage, events, families):
     """What the transcripts show for each recorded change (tools/changes.py), in its own window: from the
     change to the next one (or now), against the stretch before it (back to the previous change, or the
@@ -439,12 +479,32 @@ def realized_savings(usage, events, families):
 
     def side(cs):
         priced = [c for c in cs if c['cost'] is not None]
+        toks = sum(tok_total(c.get('tok')) for c in cs)
         return {'n': len(cs), 'cost': round(sum(c['cost'] or 0 for c in cs), 2),
                 'per_call': round(sum(c['cost'] for c in priced) / len(priced), 4) if priced else None,
+                'tok_per_call': round(toks / len(cs)) if cs else None,
+                'per_mtok': round(sum(c['cost'] for c in priced) / toks * 1e6, 3) if priced and toks else None,
                 'models': dict(collections.Counter(c['model'] or '?' for c in cs))}
 
     def per_msg(p):
         return round(p['main_total'] / p['main_msgs'], 4) if p['main_msgs'] else None
+
+    def main_tok(p):
+        t = collections.Counter()
+        for r in p['main_rows']:
+            t.update(r.get('tok') or {})
+        return dict(t)
+
+    def main_same_work(after_seg, ref):
+        """The after segment's main-session tokens priced at the reference (model, effort)'s model rates, minus actual."""
+        if not ref:
+            return None
+        cf = price_tokens(main_tok(after_seg), ref[0])
+        return round(cf - after_seg['main_total'], 2) if cf is not None else None
+
+    def top_pair(p):
+        rows = p['main_rows']
+        return (max(rows, key=lambda r: r['msgs'])['model'], max(rows, key=lambda r: r['msgs'])['effort']) if rows else None
 
     def span(a, b):
         start = datetime.datetime.strptime(a[:16], '%Y-%m-%dT%H:%M').replace(tzinfo=datetime.timezone.utc)
@@ -457,21 +517,29 @@ def realized_savings(usage, events, families):
     first = events[0]['at'][:16]
     base_calls = {cls: side([c for c in calls if c['class'] == cls and c['ts'] < first]) for cls in {c['class'] for c in calls}}
     base_main = per_msg(segs[0])
+    base_top = top_pair(segs[0])
     windows = []
     for i, ev in enumerate(events):
         at, prev = ev['at'][:16], events[i - 1]['at'][:16] if i else ''
         nxt = events[i + 1]['at'] if i + 1 < len(events) else None
         classes = []
         for cls in sorted({c['class'] for c in calls}):
-            before = side([c for c in calls if c['class'] == cls and prev <= c['ts'] < at])
-            after = side([c for c in calls if c['class'] == cls and c['ts'] >= at and (nxt is None or c['ts'] < nxt[:16])])
+            before_calls = [c for c in calls if c['class'] == cls and prev <= c['ts'] < at]
+            after_calls = [c for c in calls if c['class'] == cls and c['ts'] >= at and (nxt is None or c['ts'] < nxt[:16])]
+            before, after = side(before_calls), side(after_calls)
             if not after['n']:
                 continue
-            saved = round((before['per_call'] - after['per_call']) * after['n'], 2) if before['per_call'] is not None and after['per_call'] is not None else None
+            per_call_saved = round((before['per_call'] - after['per_call']) * after['n'], 2) if before['per_call'] is not None and after['per_call'] is not None else None
+            # The same work: the after calls' own tokens at the before side's dominant model, minus what they cost.
+            sw = same_work(after_calls, dominant(before['models']))
+            saved = sw if sw is not None else per_call_saved
             bpc = base_calls.get(cls, {}).get('per_call')
-            vs_base = round((bpc - after['per_call']) * after['n'], 2) if bpc is not None and after['per_call'] is not None else None
+            vs_base = same_work(after_calls, dominant(base_calls.get(cls, {}).get('models')))
+            if vs_base is None:
+                vs_base = round((bpc - after['per_call']) * after['n'], 2) if bpc is not None and after['per_call'] is not None else None
             fam = CLASS_FAMILY.get(cls)
-            classes.append({'class': cls, 'family': fam, 'before': before, 'after': after, 'saved': saved, 'vs_baseline': vs_base,
+            classes.append({'class': cls, 'family': fam, 'before': before, 'after': after, 'saved': saved, 'saved_per_call': per_call_saved,
+                            'same_work': sw is not None, 'ref_model': dominant(before['models']), 'vs_baseline': vs_base,
                             'baseline_per_call': bpc, 'check': checks.get(fam) if fam else None})
         b, a = segs[i], segs[i + 1]
         pb, pa = per_msg(b), per_msg(a)
@@ -481,11 +549,16 @@ def realized_savings(usage, events, families):
                  'before': {'msgs': rb[k]['msgs'], 'per_msg': round(rb[k]['cost'] / rb[k]['msgs'], 4)} if k in rb else None,
                  'after': {'msgs': ra[k]['msgs'], 'per_msg': round(ra[k]['cost'] / ra[k]['msgs'], 4)} if k in ra else None}
                 for k in sorted(set(rb) | set(ra), key=lambda k: -((ra.get(k) or rb.get(k))['cost']))]
-        main = {'before': {'msgs': b['main_msgs'], 'cost': b['main_total'], 'per_msg': pb},
-                'after': {'msgs': a['main_msgs'], 'cost': a['main_total'], 'per_msg': pa},
-                'saved': round((pb - pa) * a['main_msgs'], 2) if pb is not None and pa is not None else None, 'rows': rows,
-                'baseline_per_msg': base_main,
-                'vs_baseline': round((base_main - pa) * a['main_msgs'], 2) if base_main is not None and pa is not None else None}
+        per_msg_saved = round((pb - pa) * a['main_msgs'], 2) if pb is not None and pa is not None else None
+        sw_main = main_same_work(a, top_pair(b))
+        vs_base_main = main_same_work(a, base_top)
+        if vs_base_main is None:
+            vs_base_main = round((base_main - pa) * a['main_msgs'], 2) if base_main is not None and pa is not None else None
+        bt, atk = tok_total(main_tok(b)), tok_total(main_tok(a))
+        main = {'before': {'msgs': b['main_msgs'], 'cost': b['main_total'], 'per_msg': pb, 'tok_per_msg': round(bt / b['main_msgs']) if b['main_msgs'] else None},
+                'after': {'msgs': a['main_msgs'], 'cost': a['main_total'], 'per_msg': pa, 'tok_per_msg': round(atk / a['main_msgs']) if a['main_msgs'] else None},
+                'saved': sw_main if sw_main is not None else per_msg_saved, 'saved_per_msg': per_msg_saved, 'same_work': sw_main is not None,
+                'ref': top_pair(b), 'rows': rows, 'baseline_per_msg': base_main, 'vs_baseline': vs_base_main}
         saved = round(sum(c['saved'] or 0 for c in classes) + (main['saved'] or 0), 2)
         vs_baseline = round(sum(c['vs_baseline'] or 0 for c in classes) + (main['vs_baseline'] or 0), 2)
         windows.append({'since': ev['at'], 'until': nxt, 'span': span(ev['at'], nxt), 'kind': ev['kind'], 'what': ev['detail'],

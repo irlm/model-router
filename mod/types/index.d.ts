@@ -74,7 +74,7 @@ export type LearnedCell = {
   n: number; retries: number; error_heavy: number; failed: number; struggled: number; cost: number; examples: string[]
   override: Override | null
 }
-export type LearnedSession = { project: string; project_key: string; sessions: number; msgs: number; errors: number; compactions: number; per_session: number }
+export type LearnedSession = { project: string; project_key: string; sessions: number; msgs: number; errors: number; compactions: number; per_session: number; ctx_per_msg?: number; read_cost?: number; write_cost?: number; idle_returns?: number; idle_cost?: number }
 /** A per-project routing override the person set (tools/overrides.py): applied before the family default. */
 export type Override = { model: string; effort: string; since: string; why?: string }
 

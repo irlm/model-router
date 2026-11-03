@@ -80,6 +80,14 @@ class Learned(unittest.TestCase):
         _, sugg2 = status.learned_from(struggle, routing, {'-home-me-Projects-x': {'research-synthesis': {'model': 'opus', 'effort': 'low'}}}, 0.25)
         self.assertEqual([g['id'].split(':')[0] for g in sugg2], ['boundary'])   # an override silences the cell
 
+    def test_context_size_suggestion(self):
+        struggle = {'cells': {}, 'sessions': {'-home-me-Projects-big': {'sessions': 1, 'msgs': 500, 'errors': 0, 'compactions': 0, 'ctx_per_msg': 300000,
+                                                                       'read_cost': 90.0, 'write_cost': 10.0, 'idle_returns': 3, 'idle_cost': 4.0}}}
+        _, sugg = status.learned_from(struggle, {}, {}, 0.25)
+        self.assertEqual([g['id'].split(':')[0] for g in sugg], ['context'])
+        self.assertAlmostEqual(sugg[0]['saving'][1], 90.0 * (300000 - 100000) / 300000, 2)
+        self.assertIn('3 returns after an idle hour', sugg[0]['basis'])
+
     def test_small_cells_never_hot(self):
         struggle = {'cells': {'p': {'code-explore': {'n': 5, 'retries': 5, 'error_heavy': 0, 'failed': 0, 'struggled': 5, 'cost': 1.0, 'examples': []}}}, 'sessions': {}}
         out, sugg = status.learned_from(struggle, {}, {}, 0.25)

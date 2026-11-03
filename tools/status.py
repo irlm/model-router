@@ -52,6 +52,9 @@ SUGGESTION_FLOOR = 0.5        # a known saving below this many dollars per windo
 CLASS_FAMILY = {'code-explore': 'find_feature', 'fact-lookup': 'web_research', 'browser-flow': 'browser_flow', 'code-change': 'repo_fix',
                 'research-synthesis': 'research_synthesis'}
 STRUGGLE_MIN_N = 8            # calls of one class in one project before its struggle rate means anything
+CONTEXT_MSGS = 200            # main-session messages in a project before its context size means anything
+CONTEXT_TOKENS = 150000       # mean tokens re-read per message above which a project gets the context suggestion
+CONTEXT_TARGET = 100000       # what one task's session tends to need: the re-reading above it is what splitting could save
 NEXT_TIER = {'haiku': 'sonnet', 'sonnet': 'opus', 'opus': 'fable', 'fable': 'fable'}
 CLASS_LABEL = {'code-explore': 'code searches', 'fact-lookup': 'fact lookups', 'browser-flow': 'browser flows',
                'research-synthesis': 'research notes', 'code-change': 'code changes', 'code-review': 'code reviews', 'other': 'other calls'}
@@ -417,6 +420,14 @@ def learned_from(struggle, routing, ovr, threshold):
     for p, s in (struggle.get('sessions') or {}).items():
         per = s['compactions'] / s['sessions'] if s['sessions'] else 0.0
         out_sess.append({'project': project_short(p), 'project_key': p, 'per_session': round(per, 1), **s})
+        ctx = s.get('ctx_per_msg') or 0
+        if s['msgs'] >= CONTEXT_MSGS and ctx >= CONTEXT_TOKENS and s.get('read_cost'):
+            above = round(s['read_cost'] * max(0.0, (ctx - CONTEXT_TARGET) / ctx), 2)
+            idle = f"; {s['idle_returns']} returns after an idle hour re-wrote the cache for ${s['idle_cost']:.0f}" if s.get('idle_returns') else ''
+            sugg.append({'id': f'context:{p}', 'kind': 'learned', 'stake': s['read_cost'], 'saving': [0.0, above],
+                         'title': f"{project_short(p)}: {ctx // 1000}k tokens re-read per message over {s['msgs']} msgs: ${s['read_cost']:.0f} of its cost is re-reading context",
+                         'basis': f"every turn re-reads the whole session from the server cache (cheap per token, not free); a session that holds several unrelated tasks re-reads all of them each turn{idle}. Learned from this machine's transcripts; the saving is the re-reading above {CONTEXT_TARGET // 1000}k tokens per message, an upper bound",
+                         'action': 'one session per task (another terminal, or claude --resume), /clear between unrelated tasks, and come back within the hour; the fixed prefix stays cached across your sessions either way'})
         if s['compactions'] >= 3 and per >= 2:
             sugg.append({'id': f'boundary:{p}', 'kind': 'learned', 'stake': 0.0, 'saving': None,
                          'title': f"{project_short(p)}: sessions hit the context boundary {per:.0f} times each ({s['compactions']} in {s['sessions']} session{'s' if s['sessions'] != 1 else ''})",

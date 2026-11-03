@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Model router widget: routes each Agent call to the model and effort the benchmark measured for that kind of task (auto, ask or off), rate-limit headroom, what the last 30 days consumed, and one key to re-check the routing.",
   "author": {
     "name": "irlm"

@@ -165,6 +165,26 @@ family default, in ask or auto mode, and the change is recorded so the pane coun
 Sessions that keep hitting the context boundary (compactions) are reported per project as well; the
 suggestion there is to split the work, since a model change does not move the boundary.
 
+### The cache, and switching between tasks
+
+The prompt cache is on Anthropic's side, keyed by the exact prefix of a request, with a time to live of
+five minutes by default and one hour where the session says so. Nothing in Claude Code or here creates
+it; every turn re-reads the session's context from it at the cache-read price (a tenth of input or less)
+and writes the new tail. Two things follow, both measured per project under Details:
+
+- The fixed prefix (system prompt, tools, CLAUDE.md, agent files: `results/prefix`) is shared by every
+  session and terminal on the account while the cache lives. `/clear` does not lose it; it drops only
+  the conversation, which you do not want any more.
+- A session that holds several unrelated tasks re-reads all of them on every turn. That is cheap per
+  token and large in total: on the author's machine cache reads were 45% of main-session cost in 30
+  days, and one session averaged 349k tokens per message. One session per task, in another terminal
+  or through `claude --resume`, re-reads only its own context. Coming back to a session after the
+  cache expired rewrites its whole context once (31 such returns in 30 days here, $38): come back within
+  the hour, or let a background task do the waiting.
+
+A project whose sessions re-read more than 150k tokens per message over 200 messages gets a `learned`
+suggestion with the re-reading above 100k per message as its upper saving.
+
 ### After a change: what was really saved
 
 A projected saving is the benchmark's number applied to your window. After a change, the pane

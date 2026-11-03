@@ -267,7 +267,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
       for (const ex of c.examples.slice(0, 3)) lines.push(line(`      ${ex}`, { dim: true }))
     }
     for (const sx of learned.sessions.filter(x => x.compactions > 0).slice(0, 4)) {
-      lines.push(line(`  ${sx.project}: ${sx.sessions} session${sx.sessions === 1 ? '' : 's'}, ${sx.msgs} msgs, ${sx.errors} tool errors, ${sx.compactions} context boundaries (${sx.per_session} per session)`, { dim: true }))
+      lines.push(line(`  ${sx.project}: ${sx.sessions} session${sx.sessions === 1 ? '' : 's'}, ${sx.msgs} msgs, ${sx.errors} tool errors, ${sx.compactions} context boundaries (${sx.per_session} per session)${sx.ctx_per_msg ? ` · ${kilo(sx.ctx_per_msg)} tokens re-read per msg, ${money(sx.read_cost ?? 0)} in cache reads` : ''}${sx.idle_returns ? ` · ${sx.idle_returns} idle returns re-cached ${money(sx.idle_cost ?? 0)}` : ''}`, { dim: true }))
     }
     lines.push(line(mine.length ? `  this project's overrides: ${mine.map(([c, o]) => `${c} -> ${o.model} ${o.effort}`).join(', ')} (/router prefer clear <class>)` : '  this project: no override (/router prefer <class> <model> <effort> sets one)', { dim: true }))
   }

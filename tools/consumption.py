@@ -106,12 +106,19 @@ def struggle_of(calls, sessions):
             x['cost'] = round(x['cost'], 2)
             x['struggled'] = min(x['n'], x['retries'] + x['error_heavy'] + x['failed'])
             x.setdefault('examples', [])
-    by_proj = collections.defaultdict(lambda: {'sessions': 0, 'msgs': 0, 'errors': 0, 'compactions': 0})
+    by_proj = collections.defaultdict(lambda: {'sessions': 0, 'msgs': 0, 'errors': 0, 'compactions': 0, 'ctx_tokens': 0, 'read_cost': 0.0, 'write_cost': 0.0, 'idle_returns': 0, 'idle_cost': 0.0})
     for s in sessions.values():
         if s['msgs'] == 0 and s['compactions'] == 0:
             continue
         p = by_proj[s['project']]
-        p['sessions'] += 1; p['msgs'] += s['msgs']; p['errors'] += s['errors']; p['compactions'] += s['compactions']
+        for k in ('sessions',):
+            p[k] += 1
+        for k in ('msgs', 'errors', 'compactions', 'ctx_tokens', 'read_cost', 'write_cost', 'idle_returns', 'idle_cost'):
+            p[k] += s[k]
+    for p in by_proj.values():
+        for k in ('read_cost', 'write_cost', 'idle_cost'):
+            p[k] = round(p[k], 2)
+        p['ctx_per_msg'] = round(p['ctx_tokens'] / p['msgs']) if p['msgs'] else 0
     return {'cells': {p: dict(v) for p, v in cells.items()}, 'sessions': dict(by_proj)}
 
 
@@ -130,7 +137,8 @@ def collect(days=30, now=None, splits=None):
     agent_errors = collections.Counter()                     # agentId -> tool errors inside its transcript
     agent_tok = collections.defaultdict(collections.Counter)  # agentId -> tokens by kind: the size of its work
     ptok = collections.defaultdict(collections.Counter)       # (segment, where, model, effort) -> tokens by kind
-    sessions = collections.defaultdict(lambda: {'project': '', 'msgs': 0, 'errors': 0, 'compactions': 0})   # main transcript -> counts (current window)
+    sessions = collections.defaultdict(lambda: {'project': '', 'msgs': 0, 'errors': 0, 'compactions': 0, 'ctx_tokens': 0, 'read_cost': 0.0,
+                                                'write_cost': 0.0, 'idle_returns': 0, 'idle_cost': 0.0, 'prev_ts': None})   # main transcript -> counts (current window)
     daily = collections.Counter()                            # day -> catalog $ (main and subagents)
     pmsgs = collections.Counter(); pcost = collections.Counter()   # (segment, where, model, effort) when splits are set
     seen = set()
@@ -180,7 +188,19 @@ def collect(days=30, now=None, splits=None):
                     c = (price.price_usage(u, entry) or 0) if entry else 0
                     oc = u.get('output_tokens', 0) * price.rates(entry)['out'] if entry else 0
                     if window == 'cur' and not is_sub:
-                        sessions[str(f)]['msgs'] += 1
+                        s = sessions[str(f)]
+                        s['msgs'] += 1
+                        # The cache: what this turn re-read, what it wrote, and whether it came back after an idle hour
+                        rt = price.rates(entry) if entry else None
+                        rd, wr = u.get('cache_read_input_tokens', 0) or 0, u.get('cache_creation_input_tokens', 0) or 0
+                        s['ctx_tokens'] += (u.get('input_tokens', 0) or 0) + rd + wr
+                        if rt:
+                            s['read_cost'] += rd * rt['cache_read']; s['write_cost'] += wr * rt['write_5m']
+                        gap = (datetime.datetime.fromisoformat(ts.replace('Z', '+00:00')) - s['prev_ts']).total_seconds() / 60 if s['prev_ts'] and ts else None
+                        if gap is not None and gap > 60 and wr > 50000:
+                            s['idle_returns'] += 1; s['idle_cost'] += wr * rt['write_5m'] if rt else 0.0
+                        if ts:
+                            s['prev_ts'] = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
                     if window:
                         key = (window, 'sub' if is_sub else 'main', model, effort or '?')
                         for k in TOKENS:

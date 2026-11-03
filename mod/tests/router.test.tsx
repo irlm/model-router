@@ -163,6 +163,33 @@ test('auto mode routes a research note to the decided family once it is measured
   expect([call?.model, call?.effort]).toEqual(['sonnet', 'low'])
 })
 
+test('an override for this project routes before the family default, and prefer sets one', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const argvs: string[] = []
+  const withOverride = { ...STATUS, overrides: { '-': { 'code-explore': { model: 'opus', effort: 'low', since: '2026-11-03T10:00Z' } } } }
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => {
+    argvs.push(e.argv.join(' '))
+    return { value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: e.argv[1] === 'tools/status.py' ? JSON.stringify(withOverride) : '{}' } }
+  })
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return { result: {} } })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  const call = seen.find(x => x.tool === 'Agent')
+  expect([call?.model, call?.effort]).toEqual(['opus', 'low'])   // the family says haiku low; the project's override wins
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer' })).text).toContain('code-explore -> opus low')
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer research-synthesis opus low' })).text).toContain('override set for this project')
+  expect(argvs.some(a => a.includes('tools/overrides.py set - research-synthesis opus low'))).toBe(true)
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer nope' })).text).toContain('prefer needs')
+})
+
 type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]
 const ROUTING_MOCKS = (on: On, seen: Record<string, unknown>[], ask: 'deny' | string) => {
   on('command.register', () => ({ value: { command: 'router' } }))

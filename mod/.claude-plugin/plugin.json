@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.7.5",
+  "version": "0.8.0",
   "description": "Model router widget: routes each Agent call to the model and effort the benchmark measured for that kind of task (auto, ask or off), rate-limit headroom, what the last 30 days consumed, and one key to re-check the routing.",
   "author": {
     "name": "irlm"
@@ -28,6 +28,12 @@
         "minimal",
         "off"
       ]
+    },
+    "struggle": {
+      "type": "number",
+      "title": "Struggle threshold (%)",
+      "description": "A project's class of Agent calls is flagged as struggling when at least this share of its calls (and twice the rest of this machine) were re-issued, hit 3+ tool errors inside, or failed. Learned from your own transcripts; the suggestion names the project.",
+      "default": 25
     },
     "repo": {
       "type": "string",

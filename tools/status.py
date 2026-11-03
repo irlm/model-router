@@ -28,6 +28,7 @@ sys.path.insert(0, str(HERE / 'bench/common'))
 import decide  # noqa: E402
 import changes  # noqa: E402
 import consumption  # noqa: E402
+import overrides  # noqa: E402
 import local  # noqa: E402
 
 ADVICE_PRICE_DAYS = 30     # prices verified longer ago than this: check the sources
@@ -47,6 +48,10 @@ SUGGESTION_FLOOR = 0.5        # a known saving below this many dollars per windo
 # Which measured family stands behind each class of Agent call the consumption scan sees.
 CLASS_FAMILY = {'code-explore': 'find_feature', 'fact-lookup': 'web_research', 'browser-flow': 'browser_flow', 'code-change': 'repo_fix',
                 'research-synthesis': 'research_synthesis'}
+STRUGGLE_MIN_N = 8            # calls of one class in one project before its struggle rate means anything
+NEXT_TIER = {'haiku': 'sonnet', 'sonnet': 'opus', 'opus': 'fable', 'fable': 'fable'}
+CLASS_LABEL = {'code-explore': 'code searches', 'fact-lookup': 'fact lookups', 'browser-flow': 'browser flows',
+               'research-synthesis': 'research notes', 'code-change': 'code changes', 'code-review': 'code reviews', 'other': 'other calls'}
 AGENTS_DIR = Path.home() / '.claude/agents'
 UNUSED_DIR = Path.home() / '.claude/agents.unused'
 
@@ -294,6 +299,55 @@ def suggest(usage, agents, routing=None):
     return [g for g in out if g['saving'] is None or g['saving'][1] >= SUGGESTION_FLOOR]
 
 
+def project_short(key):
+    """A transcript project key without this machine's home prefix: -home-me-Projects-x -> Projects-x."""
+    home = re.sub(r'[^A-Za-z0-9]', '-', str(Path.home()))
+    return key[len(home) + 1:] if key.startswith(home + '-') else key
+
+
+def learned_from(struggle, routing, ovr, threshold):
+    """What this machine's own transcripts say, per project and class of Agent call: how many calls struggled
+    (re-issued in the session, 3+ tool errors inside, or failed) against the rest of this machine, and how
+    often sessions hit the context boundary. A cell is hot with at least STRUGGLE_MIN_N calls and a rate at
+    or above the threshold and twice the rest of the machine: the threshold is the person's, the baseline is
+    theirs too, so a project that asks differently is judged against their own other work. Suggestions of
+    kind 'learned' never cite the benchmark; they say to read what failed first."""
+    cells = struggle.get('cells') or {}
+    flat = [(p, c, x) for p, cs in cells.items() for c, x in cs.items()]
+    tot_n = sum(x['n'] for _, _, x in flat)
+    tot_s = sum(x['struggled'] for _, _, x in flat)
+    out_cells, sugg = [], []
+    for p, c, x in sorted(flat, key=lambda t: -t[2]['n']):
+        on, os_ = tot_n - x['n'], tot_s - x['struggled']
+        base = os_ / on if on else 0.0
+        rate = x['struggled'] / x['n'] if x['n'] else 0.0
+        hot = x['n'] >= STRUGGLE_MIN_N and rate >= max(threshold, 2 * base)
+        ov = (ovr.get(p) or {}).get(c)
+        out_cells.append({'project': project_short(p), 'project_key': p, 'class': c, 'hot': hot, 'rate': round(rate, 3), 'baseline': round(base, 3),
+                          'override': ov, **{k: x[k] for k in ('n', 'retries', 'error_heavy', 'failed', 'struggled', 'cost', 'examples')}})
+        if hot and not ov:
+            fam = CLASS_FAMILY.get(c)
+            d = (((routing or {}).get('families') or {}).get(fam) or {}).get('default') or {} if fam else {}
+            step = NEXT_TIER.get(d.get('model'), 'the next tier')
+            what = [s for s, k in ((f"{x['error_heavy']} hit {consumption.ERROR_HEAVY}+ tool errors", x['error_heavy']),
+                                   (f"{x['retries']} were re-issued", x['retries']), (f"{x['failed']} failed", x['failed'])) if k]
+            sugg.append({'id': f'learned:{p}:{c}', 'kind': 'learned', 'stake': x['cost'], 'saving': None,
+                         'title': f"{project_short(p)}: {x['struggled']} of {x['n']} {CLASS_LABEL.get(c, c)} struggled ({rate:.0%}; the rest of this machine {base:.0%})",
+                         'basis': f"{'; '.join(what)}. Learned from this machine's transcripts, not from the benchmark; hot at {threshold:.0%} or twice the rest",
+                         'action': f"read what failed first (Details lists them); if it is the task and not the tools, step up in that project: /router prefer {c} {step} low; or give those calls more context in the prompt"})
+    out_sess = []
+    for p, s in (struggle.get('sessions') or {}).items():
+        per = s['compactions'] / s['sessions'] if s['sessions'] else 0.0
+        out_sess.append({'project': project_short(p), 'project_key': p, 'per_session': round(per, 1), **s})
+        if s['compactions'] >= 3 and per >= 2:
+            sugg.append({'id': f'boundary:{p}', 'kind': 'learned', 'stake': 0.0, 'saving': None,
+                         'title': f"{project_short(p)}: sessions hit the context boundary {per:.0f} times each ({s['compactions']} in {s['sessions']} session{'s' if s['sessions'] != 1 else ''})",
+                         'basis': "each boundary is a compaction: the model goes on from a summary and loses detail. Learned from this machine's transcripts",
+                         'action': 'split the work into smaller sessions or hand the bulk to subagents; a model change does not move the boundary'})
+    out_sess.sort(key=lambda s: -s['msgs'])
+    return {'cells': out_cells, 'sessions': out_sess[:8], 'threshold': threshold}, sugg
+
+
 def realized_savings(usage, events, families):
     """What the transcripts show for each recorded change (tools/changes.py), in its own window: from the
     change to the next one (or now), against the stretch before it (back to the previous change, or the
@@ -383,6 +437,13 @@ def collect(fetch=False):
     events = [e for e in changes.read() if e.get('at', '') >= cutoff]   # a change older than the window has no before side here
     usage = consumption.collect(USAGE_DAYS, splits=[e['at'] for e in events] or None)
     suggestions = suggest(usage, agents, routing)
+    ovr = overrides.read()
+    try:
+        threshold = max(0.05, min(0.95, float(os.environ.get('MODEL_ROUTER_STRUGGLE', '25')) / 100))
+    except ValueError:
+        threshold = 0.25
+    learned, learned_sugg = learned_from(usage.get('struggle') or {}, routing, ovr, threshold)
+    suggestions += learned_sugg
     realized = realized_savings(usage, events, families)
 
     advice = []
@@ -433,7 +494,7 @@ def collect(fetch=False):
                       'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types'], 'models': v.get('models', {}), 'last': v.get('last', '')} for k, v in usage['subagents']['by_class'].items()},
                       'daily': usage.get('daily', []),
                       'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
-            'suggestions': suggestions,
+            'suggestions': suggestions, 'learned': learned, 'overrides': ovr,
             'changes': {'events': events[-5:], 'realized': realized['latest'] if realized else None, 'history': realized['history'] if realized else []},
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}
 

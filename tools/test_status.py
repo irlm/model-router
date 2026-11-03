@@ -65,6 +65,36 @@ class Suggest(unittest.TestCase):
         self.assertEqual(out['tier']['saving'], [60.0, 63.0])
 
 
+class Learned(unittest.TestCase):
+    def test_hot_cell_boundary_and_override(self):
+        struggle = {'cells': {'-home-me-Projects-x': {'research-synthesis': {'n': 12, 'retries': 1, 'error_heavy': 4, 'failed': 0, 'struggled': 5, 'cost': 30.0, 'examples': ['a: 6 tool errors']}},
+                              '-home-me-Projects-y': {'research-synthesis': {'n': 20, 'retries': 0, 'error_heavy': 1, 'failed': 0, 'struggled': 1, 'cost': 40.0, 'examples': []}}},
+                    'sessions': {'-home-me-Projects-x': {'sessions': 2, 'msgs': 900, 'errors': 20, 'compactions': 6}}}
+        routing = {'families': {'research_synthesis': {'default': {'model': 'sonnet', 'effort': 'low'}}}}
+        out, sugg = status.learned_from(struggle, routing, {}, 0.25)
+        hot = [c for c in out['cells'] if c['hot']]
+        self.assertEqual([(c['class'], c['n']) for c in hot], [('research-synthesis', 12)])
+        self.assertAlmostEqual(hot[0]['baseline'], 1 / 20, 3)
+        self.assertEqual([(g['id'].split(':')[0], g['kind']) for g in sugg], [('learned', 'learned'), ('boundary', 'learned')])
+        self.assertIn('/router prefer research-synthesis opus low', sugg[0]['action'])
+        _, sugg2 = status.learned_from(struggle, routing, {'-home-me-Projects-x': {'research-synthesis': {'model': 'opus', 'effort': 'low'}}}, 0.25)
+        self.assertEqual([g['id'].split(':')[0] for g in sugg2], ['boundary'])   # an override silences the cell
+
+    def test_small_cells_never_hot(self):
+        struggle = {'cells': {'p': {'code-explore': {'n': 5, 'retries': 5, 'error_heavy': 0, 'failed': 0, 'struggled': 5, 'cost': 1.0, 'examples': []}}}, 'sessions': {}}
+        out, sugg = status.learned_from(struggle, {}, {}, 0.25)
+        self.assertFalse(out['cells'][0]['hot'])
+        self.assertEqual(sugg, [])
+
+    def test_reissued_call_is_marked(self):
+        base = 'please research the kubernetes operator pattern and compare three frameworks for building operators with examples'
+        calls = {'a': {'ts': '2026-11-01T10:00', 'session': 's', 'class': 'research-synthesis', 'prompt_text': base, 'description': ''},
+                 'b': {'ts': '2026-11-01T10:30', 'session': 's', 'class': 'research-synthesis', 'prompt_text': base + ' round two, deeper', 'description': ''},
+                 'c': {'ts': '2026-11-01T10:40', 'session': 's', 'class': 'code-explore', 'prompt_text': base, 'description': ''}}
+        consumption.mark_retries(calls)
+        self.assertEqual((calls['a']['retry_of'], calls['b']['retry_of'], calls['c']['retry_of']), (None, 'a', None))
+
+
 class Realized(unittest.TestCase):
     def test_each_change_in_its_own_window(self):
         events = [{'at': '2026-11-01T10:00Z', 'kind': 'mark', 'detail': 'effort low'},

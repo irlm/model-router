@@ -1,21 +1,58 @@
 # model-router
 
-Which model, at which effort, for which kind of agent work, measured on our own tasks.
-The output is a routing strategy per task family that agents read, with the numbers behind it,
-re-decided when a new model appears and repriced when a price changes.
+**The objective.** Pay for the model a task needs, not for the model the session happens to be on,
+and know what that saved. Agent work inside Claude Code (code searches, fact lookups, browser flows,
+bug fixes, research notes) runs by default on the session's model, usually the dearest one. Most of
+it does not need that model, but nobody should guess which: the downgrade has to be measured, routed
+automatically, and checked afterwards on the person's own work.
 
-Status 2026-11-02 (`results/cell9`): a research-notes family decided sonnet low (Haiku missed the bar on
-citations, 16/18); the find-feature families on a private tree, 100% for every tier (no contamination
-effect); a paraphrase check in the regression run; the prefix measured under five harness settings.
+**The method, in the order it runs.**
 
-Routing v1 decided 2026-10-30 from four families, all Haiku at effort low (two of them
-only with a test runner in the loop); see `ROUTING.md`. `results/` holds what has actually run.
-2026-11-01 (`results/cell8`): two families on what this machine actually does (`GAPS.md`): a bug fix in
-the user's own TypeScript repo with an effort sweep of the big models (every Claude tier fixes 24/24 at
-every effort; xhigh costs 1.3-1.5x low for nothing; Haiku low with the runner 72/72 at 1/70 of Fable),
-and web research with a citation checker (Haiku 76/78 at 1/17 of Fable xhigh); intervals and pass^k in
-the decision; a usage ledger and a regression check; the unused agent files out of every request's
-prefix (40k -> 23k tokens, `results/prefix`).
+1. A family per kind of work, each with a checker in code (a test suite, an answer pattern, a fetched
+   page), so success is never an opinion.
+2. Every model and effort runs the same tasks; each receipt is priced at list API prices from
+   `catalog/models.json`. On a subscription those dollars measure rate-limit headroom.
+3. The metric is cost per success, so failures are paid for. The rule (`decide.py`): the cheapest
+   candidate whose Wilson lower bound reaches the best one minus 0.02; thin evidence cannot win.
+4. No blind downgrade: work no family measures keeps the session's model.
+5. The widget (`mod/`) routes each Agent call to the decision (ask, auto or off), shows the rate-limit
+   windows, the 30-day consumption and the suggestions, each with the kind of evidence behind it:
+   measured, extrapolated, unmeasured, learned.
+6. After a change, the saving is measured on your own transcripts, per unit of the same work, next to
+   the projection and the regression check: projected, realized, regress. A thin window says so.
+7. Learned per machine and project: calls that struggle (re-issued, error-heavy, failed) against your
+   own baseline, with a threshold you set; an override per project steps up where that project needs it.
+8. Kept honest over time: a regression check on every Claude Code update, a monthly ledger, a
+   paraphrase check, a contamination control on a private tree, the prefix measured under the
+   harness settings.
+
+**Install, on any machine with Python 3, git and the `claude` CLI**, at the prompt of a session:
+
+```
+/plugin install model-router --marketplace irlm/model-router
+```
+
+then restart Claude Code. One user-scope install serves the terminal, the desktop app's local sessions
+and VS Code on that computer; cloud sessions on claude.ai/code do not load local plugins. To update:
+`claude plugin marketplace update model-router`, `claude plugin update model-router@model-router`,
+restart. `mod/README.md` has the pane, the commands, Windows, updating and the reasoning behind
+every number it shows.
+
+**Why this is not built in.** Claude Code's documentation (read 2026-11-03) describes only manual
+levers for a subagent's model: the agent file's `model` and `effort`, the Agent tool's `model`
+parameter, `CLAUDE_CODE_SUBAGENT_MODEL`, `/model`, `opusplan` (by plan mode, not by kind of work) and
+fallback chains on overload. No automatic per-task router, and the advice is "route tasks to
+lower-cost models like Haiku" without a rule for which tasks. This repository is the rule, with the
+numbers, and the check that it holds for you.
+
+**Where it stands (2026-11-03).** Six families decided from measurements (`ROUTING.md`): code
+searches, bug fixes with the runner, tests with the runner, browser flows, fact lookups, all Haiku at
+effort low; research notes Sonnet at low (`results/cell9`: Haiku missed the bar on citations, 16/18).
+The find-feature families on a private tree gave 100% for every tier, so the kernel being in the
+training data does not explain the result; a paraphrase moved nothing; the prefix of every request is
+22.7k tokens here, 1.9k of it the MCP connector. Cell 8 (`results/cell8`) found that xhigh effort
+costs 1.3-1.5x low for the same 24/24 fixes, and that the unused agent files cost 17k tokens on every
+request (`results/prefix`). `GAPS.md` lists what is still open.
 
 ## The loop
 

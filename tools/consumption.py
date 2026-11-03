@@ -63,6 +63,58 @@ def classify(subagent_type, prompt):
     return 'other'
 
 
+WORD = re.compile(r'[a-z]{4,}')
+ERROR_HEAVY = 3   # tool errors inside one subagent's transcript that count as a struggle
+
+
+def mark_retries(calls):
+    """A call re-issued in the same session: same class, within the five calls before it, sharing 60% of its
+    words (at least eight). Sets retry_of on the later call."""
+    by_session = collections.defaultdict(list)
+    for cid, c in calls.items():
+        c['retry_of'] = None
+        by_session[c.get('session')].append((c['ts'], cid))
+    words = {cid: set(WORD.findall((c.get('prompt_text') or c.get('description') or '').lower())) for cid, c in calls.items()}
+    for items in by_session.values():
+        items.sort()
+        for i, (_, cid) in enumerate(items):
+            c = calls[cid]
+            for _, pid in reversed(items[max(0, i - 5):i]):
+                p = calls[pid]
+                if p['class'] != c['class']:
+                    continue
+                a, b = words[pid], words[cid]
+                if a and b and len(a & b) >= 8 and len(a & b) / len(a | b) >= 0.6:
+                    c['retry_of'] = pid
+                    break
+
+
+def struggle_of(calls, sessions):
+    """Per project and class of call: how many struggled (re-issued, error-heavy or failed); per project: the
+    sessions' context boundaries and tool errors. Current window only."""
+    cells = collections.defaultdict(lambda: collections.defaultdict(lambda: {'n': 0, 'retries': 0, 'error_heavy': 0, 'failed': 0, 'cost': 0.0}))
+    for c in calls.values():
+        if c['window'] != 'cur':
+            continue
+        x = cells[c['project']][c['class']]
+        x['n'] += 1; x['cost'] += c['cost'] or 0.0
+        x['retries'] += bool(c.get('retry_of')); x['error_heavy'] += c.get('errors', 0) >= ERROR_HEAVY; x['failed'] += bool(c.get('failed'))
+        if (c.get('retry_of') or c.get('errors', 0) >= ERROR_HEAVY or c.get('failed')) and len(x.setdefault('examples', [])) < 3:
+            x['examples'].append(f"{c['ts'][:10]} {c['description'] or c['type']}: {c.get('errors', 0)} tool errors" + (', re-issued' if c.get('retry_of') else '') + (', failed' if c.get('failed') else ''))
+    for proj in cells:
+        for x in cells[proj].values():
+            x['cost'] = round(x['cost'], 2)
+            x['struggled'] = min(x['n'], x['retries'] + x['error_heavy'] + x['failed'])
+            x.setdefault('examples', [])
+    by_proj = collections.defaultdict(lambda: {'sessions': 0, 'msgs': 0, 'errors': 0, 'compactions': 0})
+    for s in sessions.values():
+        if s['msgs'] == 0 and s['compactions'] == 0:
+            continue
+        p = by_proj[s['project']]
+        p['sessions'] += 1; p['msgs'] += s['msgs']; p['errors'] += s['errors']; p['compactions'] += s['compactions']
+    return {'cells': {p: dict(v) for p, v in cells.items()}, 'sessions': dict(by_proj)}
+
+
 def collect(days=30, now=None, splits=None):
     """The window's consumption; with `splits` (sorted ISO UTC times, the recorded changes), the current
     window is also cut into segments between them, so each change can be measured in its own window
@@ -75,6 +127,8 @@ def collect(days=30, now=None, splits=None):
     calls = {}                                               # tool_use_id -> Agent call
     agent_of = {}                                            # tool_use_id -> agentId
     agent_cost = collections.Counter(); agent_model = {}
+    agent_errors = collections.Counter()                     # agentId -> tool errors inside its transcript
+    sessions = collections.defaultdict(lambda: {'project': '', 'msgs': 0, 'errors': 0, 'compactions': 0})   # main transcript -> counts (current window)
     daily = collections.Counter()                            # day -> catalog $ (main and subagents)
     pmsgs = collections.Counter(); pcost = collections.Counter()   # (segment, where, model, effort) when splits are set
     seen = set()
@@ -87,7 +141,8 @@ def collect(days=30, now=None, splits=None):
         is_sub = 'subagents' in f.parts
         effort = None
         for line in f.open(encoding='utf-8', errors='replace'):
-            if not ('"api-request"' in line or '"assistant"' in line or 'agentId' in line or '"tool_use"' in line):
+            if not ('"api-request"' in line or '"assistant"' in line or 'agentId' in line or '"tool_use"' in line
+                    or '"compact_boundary"' in line or '"is_error":true' in line):
                 continue
             try:
                 r = json.loads(line)
@@ -100,6 +155,18 @@ def collect(days=30, now=None, splits=None):
             ts = r.get('timestamp') or ''
             window = 'cur' if ts >= since_cur else 'prev' if ts >= since_prev else None
             m = r.get('message') or {}
+            if is_sub and r.get('agentId') and '"is_error":true' in line:
+                agent_errors[r['agentId']] += sum(1 for it in (m.get('content') or []) if isinstance(it, dict) and it.get('is_error'))
+            if not is_sub and window == 'cur':
+                s = sessions[str(f)]; s['project'] = proj
+                if t == 'system' and r.get('subtype') == 'compact_boundary':
+                    s['compactions'] += 1
+                elif t == 'user' and '"is_error":true' in line:
+                    for it in (m.get('content') or []):
+                        if isinstance(it, dict) and it.get('type') == 'tool_result' and it.get('is_error'):
+                            s['errors'] += 1
+                            if it.get('tool_use_id') in calls:
+                                calls[it['tool_use_id']]['failed'] = True
             if t == 'assistant' and isinstance(m.get('content'), list):
                 u, model, mid = m.get('usage') or {}, m.get('model') or '?', m.get('id')
                 if u and model != '<synthetic>' and (mid, u.get('output_tokens')) not in seen:
@@ -110,6 +177,8 @@ def collect(days=30, now=None, splits=None):
                         model = model + ' (no price)'
                     c = (price.price_usage(u, entry) or 0) if entry else 0
                     oc = u.get('output_tokens', 0) * price.rates(entry)['out'] if entry else 0
+                    if window == 'cur' and not is_sub:
+                        sessions[str(f)]['msgs'] += 1
                     if window:
                         key = (window, 'sub' if is_sub else 'main', model, effort or '?')
                         for k in TOKENS:
@@ -126,8 +195,9 @@ def collect(days=30, now=None, splits=None):
                     if isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') in ('Agent', 'Task') and window:
                         inp = it.get('input') or {}
                         st = inp.get('subagent_type') or 'general-purpose'
-                        calls[it.get('id')] = {'ts': ts[:16], 'window': window, 'project': proj, 'type': st, 'model_asked': inp.get('model'),
+                        calls[it.get('id')] = {'ts': ts[:16], 'session': str(f), 'window': window, 'project': proj, 'type': st, 'model_asked': inp.get('model'),
                                                'description': (inp.get('description') or '')[:60], 'prompt_chars': len(inp.get('prompt') or ''),
+                                               'prompt_text': (inp.get('prompt') or '')[:2000],
                                                'class': classify(st, inp.get('prompt'))}
             elif t == 'user' and 'agentId' in line and isinstance(m.get('content'), list):
                 # one user row can hold several tool_results (parallel Agent calls): match each by its own text
@@ -143,6 +213,10 @@ def collect(days=30, now=None, splits=None):
     for cid, c in calls.items():
         aid = agent_of.get(cid)
         c['agent'] = aid; c['cost'] = round(agent_cost.get(aid, 0.0), 4) if aid else None; c['model'] = agent_model.get(aid)
+        c['errors'] = agent_errors.get(aid, 0) if aid else 0
+        c.setdefault('failed', False)
+    mark_retries(calls)
+    struggle = struggle_of(calls, sessions)
 
     def rows(window):
         out = []
@@ -174,7 +248,7 @@ def collect(days=30, now=None, splits=None):
                 'main_msgs': sum(v for k, v in pmsgs.items() if k[0] == i and k[1] == 'main')}
     sub_total = {w: round(sum(v for k, v in cost.items() if k[0] == w and k[1] == 'sub'), 2) for w in ('cur', 'prev')}
     main_total = {w: round(sum(v for k, v in cost.items() if k[0] == w and k[1] == 'main'), 2) for w in ('cur', 'prev')}
-    return {'days': days, 'since': since_cur[:10], 'files': files, 'daily': [{'date': d, 'cost': round(daily[d], 2)} for d in day_list],
+    return {'days': days, 'since': since_cur[:10], 'files': files, 'daily': [{'date': d, 'cost': round(daily[d], 2)} for d in day_list], 'struggle': struggle,
             'splits': splits, 'segments': [segment(i) for i in range(len(splits) + 1)] if splits else None,
             'main': {'rows': rows('cur'), 'total': main_total['cur'], 'out_cost': round(sum(v for k, v in out_cost.items() if k[0] == 'cur' and k[1] == 'main'), 2)},
             'subagents': {'calls': sorted((c for c in calls.values() if c['window'] == 'cur'), key=lambda c: c['ts']),

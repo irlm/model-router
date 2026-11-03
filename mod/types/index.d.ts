@@ -27,6 +27,8 @@ export type StatusJson = {
   usage?: Usage
   suggestions?: Suggestion[]
   changes?: { events: Change[]; realized: Realized | null; history?: Realized[] }
+  learned?: { cells: LearnedCell[]; sessions: LearnedSession[]; threshold: number }
+  overrides?: Record<string, Record<string, Override>>
 }
 
 /** The last 30 days of interactive work, catalog-priced: headroom on a subscription. */
@@ -47,7 +49,8 @@ export type Usage = {
 /** One place the window could have consumed less for the same work, with its evidence. */
 export type Suggestion = {
   id: string
-  kind: 'measured' | 'extrapolated' | 'unmeasured'
+  /** learned: from this machine's own transcripts (struggle rates, context boundaries), not from the benchmark */
+  kind: 'measured' | 'extrapolated' | 'unmeasured' | 'learned'
   title: string
   stake: number
   saving: [number, number] | null
@@ -56,6 +59,16 @@ export type Suggestion = {
 }
 
 export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
+
+/** One project and class of Agent call on this machine: how many calls struggled against the rest of the machine. */
+export type LearnedCell = {
+  project: string; project_key: string; class: string; hot: boolean; rate: number; baseline: number
+  n: number; retries: number; error_heavy: number; failed: number; struggled: number; cost: number; examples: string[]
+  override: Override | null
+}
+export type LearnedSession = { project: string; project_key: string; sessions: number; msgs: number; errors: number; compactions: number; per_session: number }
+/** A per-project routing override the person set (tools/overrides.py): applied before the family default. */
+export type Override = { model: string; effort: string; since: string; why?: string }
 
 /** A routing change recorded on this machine (tools/changes.py): the point the saving is counted from. */
 export type Change = { at: string; kind: string; detail: string; projected?: number | null }

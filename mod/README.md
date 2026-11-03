@@ -72,6 +72,8 @@ Buttons and verbs (`/router <verb>`):
 | | `routing ask\|auto\|off` | sets how Agent calls are routed for this session |
 | Details / Less | | shows or hides the pane's long sections |
 | | `mark <note>` | records a change you made by hand (effort, model), so the saving is counted from now |
+| | `prefer <class> <model> <effort>` | sets an override for this project: calls of that class run on that model and effort, before the family default |
+| | `prefer clear <class>`, `prefer` | removes one, lists this project's |
 | Refresh | `check` | `tools/status.py` (also prints the table as text) |
 | Fetch origin | `fetch` | the same after `git fetch`, so behind/ahead are current |
 | Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
@@ -128,12 +130,35 @@ the marketplace's `mod/.claude-plugin/plugin.json` has the newest one. If the in
 stuck, `claude plugin uninstall model-router@model-router` and the install line again is a clean
 reset; the change log, the agent files and `/config` options are not in the plugin and survive it.
 
+- `learned`: from this machine's own transcripts, not the benchmark: a project whose calls of one
+  class struggle more than the rest of your work, or sessions that keep hitting the context boundary.
+
 Agent calls are classed by agent type first, then by the prompt: code searches (Explore, Plan,
 Codebase Onboarding Engineer), fact lookups (Web Researcher, or a short prompt asking for one
 thing), browser flows (an agent whose name says browser, Evidence Collector, or a prompt that
 reads as driving a page), code reviews, research reports, code changes, other. Code searches, fact
 lookups, browser flows and research reports map to measured families and can carry a measured
 suggestion; the others never get a downgrade suggested. A suggestion whose known saving is under $0.50 per window is not shown.
+
+### Learned from your own sessions
+
+The benchmark decides per kind of work. Your projects ask differently, and one of them may need more
+than the decided model. So the scan also reads, per project and class of Agent call on this machine,
+how many calls struggled: re-issued within the session (the same ask again, in other words), three or
+more tool errors inside the subagent's work, or a failed result. The threshold is yours ("Struggle
+threshold" in `/config`, default 25%) and the baseline is yours too: a cell is flagged only with at
+least eight calls, at or above the threshold, and at twice the rate of the rest of your work on this
+machine. So "too many" means more than your own other projects, on this computer, under this account.
+
+A flagged cell is a `learned` suggestion that names the project and lists under Details what struggled,
+because tool errors from the web are not the model's fault. If it is the task, step up for that project
+only: `/router prefer research-synthesis opus low`. That writes an override into
+`~/.claude/model-router/overrides.json` (never the repository), the router applies it before the
+family default, in ask or auto mode, and the change is recorded so the pane counts what it saved.
+`/router prefer clear <class>` undoes it.
+
+Sessions that keep hitting the context boundary (compactions) are reported per project as well; the
+suggestion there is to split the work, since a model change does not move the boundary.
 
 ### After a change: what was really saved
 
@@ -160,6 +185,22 @@ agents when it writes a file, by `/router routing auto` or "Always route this se
 or `claude --model opus` from today. Each change is measured in its own window: from it to the next change (or to now), against the
 stretch before it back to the previous change. The pane line shows the latest; Details lists the
 earlier ones with their own numbers. `python3 tools/changes.py list` prints the log.
+
+### Where it runs, and why it is not built in
+
+One user-scope install serves the terminal, the desktop app's local sessions and the VS Code
+extension on that computer (the docs: a plugin installed in one is available in the other two). The
+pane draws in the terminal, in the desktop app's Code tab (not under WSL) and in the VS Code chat
+panel from extension 2.1.299. Cloud sessions on claude.ai/code do not load the plugins installed on
+your machine, so the widget does not reach them; Remote Control sessions run on your machine and do.
+
+Claude Code itself offers only manual levers for a subagent's model (the docs read 2026-11-03):
+`model` and `effort` in the agent file, the Agent tool's `model` parameter, the
+`CLAUDE_CODE_SUBAGENT_MODEL` and `CLAUDE_CODE_SUBAGENT_EFFORT` variables, `/model`, `opusplan`
+(Opus in plan mode, Sonnet to execute: by mode, not by kind of work) and fallback chains when a model
+is overloaded. No page describes an automatic per-task router, and the advice is "route tasks to
+faster, lower-cost models like Haiku" without saying which tasks. This widget is that rule with
+numbers behind it, and the check that it holds on your own work.
 
 ### Windows
 

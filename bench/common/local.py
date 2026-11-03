@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / 'local/config.json'
 # Directories the benchmark itself creates: temp dirs of the web research and prefix runs, the browser
 # runs, and the evaluation clones of the user's repos (README: ~/Projects/Github/model-router-evaluation).
-OWN_MARKERS = ('model-router-runs', 'model-router-evaluation', 'tmp-prefix-', 'tmp-web-research-')
+OWN_MARKERS = ('model-router-runs', 'model-router-evaluation', 'tmp-prefix', 'tmp-web-research-', 'tmp-research-synthesis-',
+               'tmp-browser', 'scratchpad')
 _cfg = None
 
 

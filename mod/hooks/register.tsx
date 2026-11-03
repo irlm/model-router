@@ -28,7 +28,7 @@ const JOBS: Record<string, { title: string; argv: (python: string, clone: boolea
 // where its default is the console code page.
 const PY_ENV = { PYTHONUTF8: '1' }
 /** The scripts' environment; in the install's clone, MODEL_ROUTER_CLONE tells status.py its local results are uncommitted on purpose. */
-const pyEnv = () => ({ ...PY_ENV, ...(where ? { MODEL_ROUTER_CLONE: '1' } : {}) })
+const pyEnv = () => ({ ...PY_ENV, MODEL_ROUTER_STRUGGLE: String(struggleOption), ...(where ? { MODEL_ROUTER_CLONE: '1' } : {}) })
 
 const clock = (ms: number) => {
   const d = new Date(ms)
@@ -100,7 +100,7 @@ const rateFrac = (rate: string | null) => {
   return m && Number(m[2]) > 0 ? Number(m[1]) / Number(m[2]) : null
 }
 const rateColor = (f: number | null) => (f === null ? undefined : f >= 0.9 ? 'green' : f >= 0.7 ? 'yellow' : 'red')
-const KIND_COLOR: Record<string, string | undefined> = { measured: 'green', extrapolated: 'cyan' }
+const KIND_COLOR: Record<string, string | undefined> = { measured: 'green', extrapolated: 'cyan', learned: 'magenta' }
 
 /** The rate-limit windows as bars, one line each. */
 const limitLines = (limits: RateLimit[]): Line[] =>
@@ -205,7 +205,9 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     }
   }
   // Suggestions: largest saving first, unknown last; each with its share of the window's spend.
-  const sug = [...(s.suggestions ?? [])].sort((a, b) => (b.saving?.[1] ?? -1) - (a.saving?.[1] ?? -1))
+  // Largest saving first; a learned suggestion ranks by what the struggling calls cost; unknown last.
+  const rank = (g: { saving: [number, number] | null; kind: string; stake: number }) => g.saving?.[1] ?? (g.kind === 'learned' ? g.stake : -1)
+  const sug = [...(s.suggestions ?? [])].sort((a, b) => rank(b) - rank(a))
   const upTo = savingsUpTo(s)
   lines.push(BLANK, line(sug.length === 0 ? 'suggestions: none from the last window'
     : `suggestions: up to ${money(upTo)} of ${money(total)} in ${u?.days ?? 30} days${total > 0 ? ` (${Math.round((upTo / total) * 100)}%)` : ''}${full ? '; the kind says how far the evidence reaches' : ''}`, { bold: true }))
@@ -217,6 +219,21 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     if (full) lines.push(line(`    basis: ${g.basis}`, { dim: true }), line(`    do: ${g.action}`, { dim: true }))
   }
   if (shownSug.length < sug.length) lines.push(more(sug.length - shownSug.length))
+  const learned = s.learned
+  if (full && learned) {
+    const hot = learned.cells.filter(c => c.hot || c.override)
+    const mine = Object.entries(s.overrides?.[projectKey] ?? {})
+    lines.push(BLANK, line(`learned on this machine (hot at ${Math.round(learned.threshold * 100)}% struggled or twice the rest; struggled = re-issued, 3+ tool errors inside, or failed):`, { bold: true }))
+    if (hot.length === 0) lines.push(line('  no project and class of call struggles more than the rest of this machine', { dim: true }))
+    for (const c of hot) {
+      lines.push(line(`  ${c.project} · ${c.class}: ${c.struggled} of ${c.n} struggled (${Math.round(c.rate * 100)}%; rest ${Math.round(c.baseline * 100)}%)${c.override ? ` · override ${c.override.model} ${c.override.effort}` : ''}`, { color: c.override ? undefined : 'magenta' }))
+      for (const ex of c.examples.slice(0, 3)) lines.push(line(`      ${ex}`, { dim: true }))
+    }
+    for (const sx of learned.sessions.filter(x => x.compactions > 0).slice(0, 4)) {
+      lines.push(line(`  ${sx.project}: ${sx.sessions} session${sx.sessions === 1 ? '' : 's'}, ${sx.msgs} msgs, ${sx.errors} tool errors, ${sx.compactions} context boundaries (${sx.per_session} per session)`, { dim: true }))
+    }
+    lines.push(line(mine.length ? `  this project's overrides: ${mine.map(([c, o]) => `${c} -> ${o.model} ${o.effort}`).join(', ')} (/router prefer clear <class>)` : '  this project: no override (/router prefer <class> <model> <effort> sets one)', { dim: true }))
+  }
   if (seen.length > 0) {
     const kept = seen.filter(r => r.decision === 'kept').length
     lines.push(BLANK, line(`routed this session: ${seen.length - kept} routed, ${kept} kept (mode ${routingMode}; /router routing ask|auto|off${full ? '' : '; Details lists them'})`, { bold: true }))
@@ -235,6 +252,10 @@ let where = ''
 let python = ''
 let routingMode: RoutingMode = 'ask'
 let statusMode: StatusMode = 'full'
+let struggleOption = 25
+// The transcript project key of this session's working directory (what Claude Code names the transcript directory).
+let projectKey = ''
+const keyOf = (cwd: string) => cwd.replace(/[^A-Za-z0-9]/g, '-')
 
 /** The checkout the scripts run from: the configured path when the repository is there, else the full
  * clone the plugin install made (the marketplace; known_marketplaces.json says where it is), so the
@@ -316,7 +337,7 @@ async function recordChange($: Dollar, kind: string, detail: string, projected?:
   } catch (err) {
     $.ui.toast(`router: could not record the change: ${err instanceof Error ? err.message : String(err)}`)
   }
-  void refresh($)
+  await refresh($)
 }
 
 async function runJob($: Dollar, name: string) {
@@ -397,12 +418,22 @@ const matchFamily = (agent: string, prompt: string): Match | null => {
 
 type Candidate = { family: string; why: string; agent: string; asked: string; model: string; effort: string; rate: string; cost: string }
 /** What the evidence says this call should run on, or null when it already does or nothing measured covers it. */
+const FAMILY_CLASS: Record<string, string> = { find_feature: 'code-explore', web_research: 'fact-lookup', browser_flow: 'browser-flow', repo_fix: 'code-change', research_synthesis: 'research-synthesis' }
+/** The consumption scan's class of this call, for the per-project overrides. */
+const classOf = (agent: string, family: string | null) => family ? FAMILY_CLASS[family] ?? 'other' : agent.toLowerCase().includes('review') ? 'code-review' : 'other'
+
 const decideCall = (s: StatusJson, agent: string, prompt: string, model?: string, effort?: string): Candidate | null => {
   const m = matchFamily(agent, prompt)
+  const asked = model ? `${model} ${effort ?? '(default effort)'}` : (s.agents.routed.find(r => r.name === agent)?.have ?? 'inherit')
+  // The person's override for this project and class comes first: what they chose after a learned suggestion.
+  const ov = s.overrides?.[projectKey]?.[classOf(agent, m?.family ?? null)]
+  if (ov && MODELS.has(ov.model) && EFFORTS.has(ov.effort)) {
+    if (asked === `${ov.model} ${ov.effort}`) return null
+    return { family: m?.family ?? 'override', why: `${m?.why ?? agent}: your override for this project`, agent, asked, model: ov.model, effort: ov.effort, rate: 'your choice', cost: '-' }
+  }
   if (!m) return null
   const f = s.families.find(x => x.name === m.family)
   if (!f?.model || !f.effort || !MODELS.has(f.model) || !EFFORTS.has(f.effort)) return null
-  const asked = model ? `${model} ${effort ?? '(default effort)'}` : (s.agents.routed.find(r => r.name === agent)?.have ?? 'inherit')
   if (asked === `${f.model} ${f.effort}`) return null
   return { family: f.name, why: m.why, agent, asked, model: f.model, effort: f.effort, rate: f.rate ?? '?',
     cost: f.cost_per_success === null ? '?' : f.cost_per_success.toFixed(3) }
@@ -410,7 +441,7 @@ const decideCall = (s: StatusJson, agent: string, prompt: string, model?: string
 
 /** Asks the person; 'keep' when they keep what was asked, dismiss, or no one can be asked (a -p run, a background loop). */
 async function askRoute($: Dollar, c: Candidate): Promise<'route' | 'keep' | 'auto'> {
-  const route = `${c.model} ${c.effort} (measured ${c.rate}, $${c.cost}/success)`
+  const route = c.cost === '-' ? `${c.model} ${c.effort} (your override for this project)` : `${c.model} ${c.effort} (measured ${c.rate}, $${c.cost}/success)`
   const keep = `Keep ${c.asked}`
   const always = 'Always route this session'
   try {
@@ -430,14 +461,16 @@ export const register: Register = (on, options) => {
   routingMode = mode === 'auto' || mode === 'off' ? mode : 'ask'
   const sm = String(options.statusLine ?? 'full')
   statusMode = sm === 'minimal' || sm === 'off' ? sm : 'full'
+  struggleOption = Math.max(5, Math.min(95, Number(options.struggle ?? 25) || 25))
   repo = repoOption
   python = ''
 
   on('session.start', async ($, e, next) => {
+    projectKey = keyOf(e.cwd)
     await $.command.register({
       name: 'router',
       description: 'Model router: where the routing stands, re-check it, ledger, apply, pull',
-      argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off | mark <note>',
+      argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class>',
     })
     void refresh($)
     if (refreshMinutes > 0) {
@@ -460,6 +493,26 @@ export const register: Register = (on, options) => {
       await refresh($, verb === 'fetch')
       const s = await read($, status)
       return { text: s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where).map(l => l.text).join('\n') : (s?.error ?? 'no status') }
+    }
+    if (verb === 'prefer') {
+      const words = e.args.trim().split(/\s+/).slice(1)
+      const s = await read($, status)
+      if (words.length === 0) {
+        const mine = Object.entries(s?.json?.overrides?.[projectKey] ?? {})
+        return { text: mine.length ? `overrides for this project (${projectKey}): ${mine.map(([c, o]) => `${c} -> ${o.model} ${o.effort} since ${o.since}`).join('; ')}` : `no override for this project (${projectKey}); /router prefer <class> <model> <effort>` }
+      }
+      const py = await findPython($)
+      if (words[0] === 'clear' && words[1]) {
+        await $.process.run([py, 'tools/overrides.py', 'clear', projectKey, words[1]], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
+        await recordChange($, 'override', `cleared ${words[1]} in ${projectKey}`)
+        return { text: `override cleared: ${words[1]} in this project; the family default applies again.` }
+      }
+      const [cls, mdl, eff] = words
+      if (!cls || !mdl || !eff || !MODELS.has(mdl) || !EFFORTS.has(eff)) return { text: 'prefer needs <class> <model> <effort>, e.g. /router prefer research-synthesis opus low (models haiku|sonnet|opus|fable; efforts low|medium|high|xhigh|max)' }
+      const r = await $.process.run([py, 'tools/overrides.py', 'set', projectKey, cls, mdl, eff, '--why', 'set from the pane'], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
+      if (r.exitCode !== 0) return { text: `could not set the override: ${r.stderr.trim().split('\n').pop() ?? ''}` }
+      await recordChange($, 'override', `${cls} -> ${mdl} ${eff} in ${projectKey}`)
+      return { text: `override set for this project: ${cls} calls run on ${mdl} ${eff} (ask or auto mode). The pane counts the saving from now; /router prefer clear ${cls} undoes it.` }
     }
     if (verb === 'mark') {
       const note = e.args.trim().replace(/^mark\s*/, '')

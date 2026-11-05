@@ -1,11 +1,18 @@
 """Unit checks of the widget's data side, on synthetic data: the Agent-call classifier, the suggestions
 (measured classes, the floor, effort and tier), and the per-change realized savings.
 Run: python3 tools/test_status.py"""
+import contextlib
+import io
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import apply_agents  # noqa: E402
 import consumption  # noqa: E402
 import status  # noqa: E402
 
@@ -171,6 +178,50 @@ class Realized(unittest.TestCase):
 
     def test_nothing_recorded(self):
         self.assertIsNone(status.realized_savings({'segments': None, 'subagents': {'calls': []}}, [], []))
+
+
+class AgentFiles(unittest.TestCase):
+    """Claude Code reads the folders under ~/.claude/agents too (a collection checked out by category:
+    agents/testing/testing-api-tester.md), so a routed file there is on this machine."""
+    ROUTING = {'agents': {'testing-api-tester.md': {'family': 'write_tests', 'model': 'haiku', 'effort': 'low'},
+                          'nowhere.md': {'family': 'fix_bug', 'model': 'haiku', 'effort': 'low'}}}
+
+    def tree(self, d):
+        root = Path(d) / 'agents'
+        (root / 'testing').mkdir(parents=True)
+        (root / 'testing' / 'testing-api-tester.md').write_text('---\nname: API Tester\ndescription: x\n---\nbody\n', encoding='utf-8')
+        (root / 'top.md').write_text('---\nname: Top\ndescription: x\n---\nbody\n', encoding='utf-8')
+        (root / 'README.md').write_text('# a collection ships this; it is not an agent\n', encoding='utf-8')
+        return root
+
+    def states(self, root):
+        with mock.patch.object(status, 'AGENTS_DIR', root):
+            a = status.agents_state(self.ROUTING)
+        return a, {r['file']: r['state'] for r in a['routed']}
+
+    def test_a_routed_file_in_a_subfolder_is_on_this_machine(self):
+        with tempfile.TemporaryDirectory() as d:
+            a, states = self.states(self.tree(d))
+            self.assertEqual(states, {'testing-api-tester.md': 'drifted', 'nowhere.md': 'absent'})
+            self.assertEqual(next(r['name'] for r in a['routed'] if r['file'] == 'testing-api-tester.md'), 'API Tester')
+            self.assertEqual(a['files'], 2)   # the two agents, in whatever folder; not the README
+
+    def test_apply_writes_the_file_where_it_is(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self.tree(d)
+            routing = Path(d) / 'routing.json'
+            routing.write_text(json.dumps(self.ROUTING), encoding='utf-8')
+            argv = ['apply_agents.py', '--agents-dir', str(root), '--routing', str(routing)]
+            out = io.StringIO()
+            with mock.patch.object(sys, 'argv', argv), mock.patch.object(apply_agents.changes, 'add', return_value={'at': 'now'}) as add, \
+                    contextlib.redirect_stdout(out):
+                apply_agents.main()
+            text = (root / 'testing' / 'testing-api-tester.md').read_text(encoding='utf-8')
+            self.assertIn('model: haiku\neffort: low\n---', text)
+            self.assertFalse((root / 'testing-api-tester.md').exists())   # no second copy at the top
+            self.assertIn('skipped 1 agent file(s) not on this machine: nowhere.md', out.getvalue())
+            add.assert_called_once_with('apply', 'agents: testing-api-tester.md')
+            self.assertEqual(self.states(root)[1]['testing-api-tester.md'], 'applied')
 
 
 if __name__ == '__main__':

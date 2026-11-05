@@ -3,6 +3,8 @@
 For each file named in routing.json["agents"], set `model:` and `effort:` in
 the YAML frontmatter and, when the entry has an `instruction`, a marked
 paragraph right after the frontmatter. Nothing else in the file is touched.
+A file is found by its name at the top of the agents folder or in any folder
+under it (Claude Code reads those too), and written where it is.
 A file you do not have is absent and skipped, unless the repository ships it
 as a template in agents/ (web-researcher.md): then it is installed first.
 `--revert` removes the two keys and the paragraph (no agent file had either
@@ -17,6 +19,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / 'tools'))
+import agent_files  # noqa: E402
 import changes  # noqa: E402
 TEMPLATES = HERE / 'agents'   # agent files the repository ships, installed when missing
 KEYS = ('model:', 'effort:')
@@ -55,14 +58,15 @@ def main():
     done = []
     absent = []
     for name, route in agents.items():
-        path = args.agents_dir / name
+        path = agent_files.locate(args.agents_dir, name)   # at the top of the folder, or in a folder under it
         install = False
-        if path.exists():
+        if path is not None:
             before = path.read_text(encoding='utf-8')
         elif args.revert or not (TEMPLATES / name).exists():
             absent.append(name)
             continue
         else:
+            path = args.agents_dir / name
             before = (TEMPLATES / name).read_text(encoding='utf-8')
             install = True
         after = rewrite(before, route['model'], route['effort'], args.revert, route.get('instruction'))

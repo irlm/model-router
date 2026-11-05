@@ -28,6 +28,7 @@ sys.path.insert(0, str(HERE / 'bench/common'))
 import decide  # noqa: E402
 sys.path.insert(0, str(HERE / 'catalog'))
 import price  # noqa: E402
+import agent_files  # noqa: E402
 import changes  # noqa: E402
 import consumption  # noqa: E402
 import overrides  # noqa: E402
@@ -183,8 +184,8 @@ def agents_state(routing):
     routed = []
     for file, spec in (routing.get('agents') or {}).items():
         want = f"{spec['model']} {spec['effort']}"
-        p = AGENTS_DIR / file
-        if not p.exists():
+        p = agent_files.locate(AGENTS_DIR, file)   # at the top of the folder, or in a folder under it
+        if p is None:
             # missing: the repository ships it (agents/), apply installs it; absent: an agent file this machine does not have
             state = 'missing' if (HERE / 'agents' / file).exists() else 'absent'
             routed.append({'file': file, 'family': spec.get('family'), 'want': want, 'have': None, 'state': state})
@@ -193,7 +194,7 @@ def agents_state(routing):
         have = f"{fm.get('model', '-')} {fm.get('effort', '-')}"
         routed.append({'file': file, 'name': fm.get('name') or p.stem, 'family': spec.get('family'), 'want': want, 'have': have,
                        'state': 'applied' if have == want else 'drifted'})
-    files = len(list(AGENTS_DIR.glob('*.md'))) if AGENTS_DIR.exists() else 0
+    files = agent_files.count(AGENTS_DIR)
     unused = len(list(UNUSED_DIR.glob('*.md'))) if UNUSED_DIR.exists() else 0
     return {'dir': str(AGENTS_DIR), 'files': files, 'unused': unused, 'routed': routed}
 

@@ -1,0 +1,26 @@
+{
+ "claude-sonnet-5-5 / low / 1 / rs-01": {
+  "detail": "396 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-02": {
+  "detail": "231 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-03": {
+  "detail": "1: right, no cited page states it",
+  "outcome": "right-unsourced"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-04": {
+  "detail": "357 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-05": {
+  "detail": "332 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-06": {
+  "detail": "297 words, 3/3 sourced",
+  "outcome": "correct"
+ }
+}

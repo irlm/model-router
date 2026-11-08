@@ -26,6 +26,8 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / 'tools'))
 sys.path.insert(0, str(HERE / 'bench/common'))
 import decide  # noqa: E402
+import fixed_text  # noqa: E402,F401  (what consumption counts in usage['fixed'])
+import claude_home  # noqa: E402
 sys.path.insert(0, str(HERE / 'catalog'))
 import price  # noqa: E402
 import agent_files  # noqa: E402
@@ -56,11 +58,13 @@ STRUGGLE_MIN_N = 8            # calls of one class in one project before its str
 CONTEXT_MSGS = 200            # main-session messages in a project before its context size means anything
 CONTEXT_TOKENS = 150000       # mean tokens re-read per message above which a project gets the context suggestion
 CONTEXT_TARGET = 100000       # what one task's session tends to need: the re-reading above it is what splitting could save
+IDLE_COMPACT_TOKENS = 200000  # from here Claude Code (2.1.299+) compacts an idle session itself before the cache expires
+SKILL_COMMAND_SHARE = 0.3    # a skill body with this share of shell in fenced blocks reads as a procedure a script could hold
 NEXT_TIER = {'haiku': 'sonnet', 'sonnet': 'opus', 'opus': 'fable', 'fable': 'fable'}
 CLASS_LABEL = {'code-explore': 'code searches', 'fact-lookup': 'fact lookups', 'browser-flow': 'browser flows',
                'research-synthesis': 'research notes', 'code-change': 'code changes', 'code-review': 'code reviews', 'other': 'other calls'}
-AGENTS_DIR = Path.home() / '.claude/agents'
-UNUSED_DIR = Path.home() / '.claude/agents.unused'
+AGENTS_DIR = claude_home.agents_dir()     # CLAUDE_CONFIG_DIR moves these (tools/claude_home.py)
+UNUSED_DIR = claude_home.unused_dir()
 
 
 def sh(argv, cwd=None, timeout=30):
@@ -195,7 +199,7 @@ def agents_state(routing):
         routed.append({'file': file, 'name': fm.get('name') or p.stem, 'family': spec.get('family'), 'want': want, 'have': have,
                        'state': 'applied' if have == want else 'drifted'})
     files = agent_files.count(AGENTS_DIR)
-    unused = len(list(UNUSED_DIR.glob('*.md'))) if UNUSED_DIR.exists() else 0
+    unused = len(list(UNUSED_DIR.rglob('*.md'))) if UNUSED_DIR.exists() else 0
     return {'dir': str(AGENTS_DIR), 'files': files, 'unused': unused, 'routed': routed}
 
 
@@ -303,6 +307,67 @@ def suggest(usage, agents, routing=None):
                     'basis': 'on the measured families Opus 5.5 matched Fable (24/24 and 26/26) at 37-40% of the cost (results/cell8); '
                              'main-session work is not measured, so the saving is what it would be if that held',
                     'action': 'try `claude --model opus` for routine sessions and compare the next ledger; keep Fable where you see the difference'})
+    return [g for g in out if g['saving'] is None or g['saving'][1] >= SUGGESTION_FLOOR]
+
+
+def transcript_notes(usage):
+    """What the transcripts could not say. Claude Code writes the agent list, the skill list, the hook text and the MCP
+    instructions as rows of their own (2.1.28x on); a version without them, or one that renamed them, leaves usage['fixed']
+    empty while the main sessions cost money, and a zero there would read as cheap. One advice line says so instead."""
+    if ((usage.get('main') or {}).get('total') or 0) > 0 and not usage.get('fixed'):
+        return ['the transcripts carry no listing rows (agent_listing_delta, skill_listing...): this Claude Code version writes them differently, '
+                'so what every request carries is not measured; report the version at github.com/irlm/model-router/issues']
+    return []
+
+
+def suggest_fixed(fx, days=USAGE_DAYS):
+    """What the text every request carries cost in the window (tools/fixed_text.py), where something can be done:
+    the agent list and the skill list by the entries nothing here used, and each loaded skill by what re-reading
+    its body cost. Kind 'learned': this machine's transcripts, never the benchmark. A skill's line carries the
+    digest of its body, so a skill that changed is a new line, even after the old one was dismissed."""
+    if not fx:
+        return []
+    out = []
+    over = (f"over {fx['requests']} main-session requests in {fx['sessions']} session{'s' if fx['sessions'] != 1 else ''} (characters / 4, from this machine's "
+            "transcripts; a floor: the side requests Claude Code makes are not in them)")
+    how = 'written to the cache when a session starts and when it comes back after the cache expired, and re-read on every request'
+    a = (fx.get('parts') or {}).get('agents')
+    if a and a.get('unused_n') and a.get('tokens'):
+        save = round(a['cost'] * a['unused_tokens'] / a['tokens'], 2)
+        big = ', '.join(f"{x['name']} {x['tokens']}" for x in a['largest_unused'][:4])
+        out.append({'id': 'fixed:agents', 'kind': 'learned', 'stake': a['cost'], 'saving': [save, save],
+                    'title': f"agent list: {a['unused_n']} of {a['n']} never called, ${a['cost']:.2f} to carry (about {a['tokens'] // 1000}k tokens in every request)",
+                    'basis': f"the agent descriptions are {how}: ${a['cost']:.2f} {over}. No Agent call in the last {days} days named {a['unused_n']} of them "
+                             f"(about {a['unused_tokens'] // 1000}k tokens; largest: {big})",
+                    'action': 'python3 tools/prune_agents.py --dry-run lists them; without --dry-run it moves the agent files no transcript ever called to '
+                              '~/.claude/agents.unused, folders kept (--revert brings them back). Claude Code documents no setting that takes an agent out of the list'})
+    k = (fx.get('parts') or {}).get('skills')
+    if k and k.get('unused_n') and k.get('tokens'):
+        save = round(k['cost'] * k['unused_tokens'] / k['tokens'], 2)
+        src = ', '.join(f"{x['source'] or 'your own and the bundled ones'} {x['n']} (about {x['tokens']} tokens)" for x in (k.get('unused_by_source') or [])[:5])
+        out.append({'id': 'fixed:skills', 'kind': 'learned', 'stake': k['cost'], 'saving': [0.0, save],
+                    'title': f"skill list: {k['unused_n']} of {k['n']} never loaded, ${k['cost']:.2f} to carry (about {k['tokens'] // 1000}k tokens in every request)",
+                    'basis': f"the skill names and descriptions are {how}: ${k['cost']:.2f} {over}. Not loaded in the last {days} days, by where they come from: {src}. "
+                             "The saving is an upper bound: a plugin's skills leave the list only with the plugin",
+                    'action': "/skill-doctor (Claude Code 2.1.261+) lists the unused skills with what each costs; then /skills: Space takes a skill of your own to "
+                              "name-only or off (saved as skillOverrides in .claude/settings.local.json); a plugin's skills go with the plugin: claude plugin disable "
+                              '<plugin>@<marketplace> --scope project in the projects that do not use it; in a skill you wrote, disable-model-invocation: true keeps '
+                              '/name and drops the description'})
+    for b in fx.get('bodies') or []:
+        if b['cost'] < SUGGESTION_FLOOR:
+            continue
+        procedure = b['commands'] >= SKILL_COMMAND_SHARE
+        share = f"{b['commands']:.0%} of it is shell in fenced blocks"
+        out.append({'id': f"skill:{b['skill']}:{b['digest']}", 'kind': 'learned', 'stake': b['cost'],
+                    'saving': [0.0, round(b['cost'] * b['commands'], 2)] if procedure else None,
+                    'title': f"skill {b['skill']}: {b['loads']} load{'s' if b['loads'] != 1 else ''}, re-read on {b['requests']} requests, ${b['cost']:.2f}",
+                    'basis': f"its body (about {b['tokens']} tokens) stays in the session from the load to the next compaction: ${b['cost']:.2f} {over}; {share}"
+                             + ('. The saving is that share of the cost, an upper bound; the turns a single command saves are not counted' if procedure else ''),
+                    'action': (f"ask Claude to move the fixed command sequences of {b['skill']} into a script in the skill's folder and keep SKILL.md to when to use it and the one "
+                               "command (a script is run, not read: only its output enters the session); try the skill on a task before trusting the number; a plugin's skill is "
+                               'replaced by its next update, so do it in a copy under ~/.claude/skills. This line comes back by itself when the body changes') if procedure else
+                              ('its body is guidance, not a procedure: nothing can be run in its place; shorten it if it is yours, or /compact after the task it '
+                               'served; a script would not make it cheaper')})
     return [g for g in out if g['saving'] is None or g['saving'][1] >= SUGGESTION_FLOOR]
 
 
@@ -429,6 +494,19 @@ def learned_from(struggle, routing, ovr, threshold):
                          'title': f"{project_short(p)}: {ctx // 1000}k tokens re-read per message over {s['msgs']} msgs: ${s['read_cost']:.0f} of its cost is re-reading context",
                          'basis': f"every turn re-reads the whole session from the server cache (cheap per token, not free); a session that holds several unrelated tasks re-reads all of them each turn{idle}. Learned from this machine's transcripts; the saving is the re-reading above {CONTEXT_TARGET // 1000}k tokens per message, an upper bound",
                          'action': 'one session per task (another terminal, or claude --resume), /clear between unrelated tasks, and come back within the hour; the fixed prefix stays cached across your sessions either way'})
+        if (s.get('idle_cost') or 0) >= SUGGESTION_FLOOR:
+            big = ctx >= IDLE_COMPACT_TOKENS
+            native = (f"Claude Code 2.1.299+ compacts a session of {IDLE_COMPACT_TOKENS // 1000}k+ tokens by itself after ~54 idle minutes, before the hour (idleCompaction in "
+                      "settings.json; it needs the terminal open and the computer awake), so a return here should have been cheap: check that it is on and that the machine was awake"
+                      if big else
+                      f"Claude Code compacts idle sessions by itself only from {IDLE_COMPACT_TOKENS // 1000}k tokens (CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS lowers it to 100k); "
+                      f"below 200k nothing native helps, this machine's sessions here average {ctx // 1000}k per message")
+            sugg.append({'id': f'idle:{p}', 'kind': 'learned', 'stake': s['idle_cost'], 'saving': [0.0, round(s['idle_cost'], 2)],
+                         'title': f"{project_short(p)}: {s['idle_returns']} return{'s' if s['idle_returns'] != 1 else ''} after an idle hour re-wrote the cache for ${s['idle_cost']:.0f}",
+                         'basis': f"the server cache lives an hour on a subscription; a session resumed after that re-writes its whole context at the cache-write price. "
+                                  f"{native}. Learned from this machine's transcripts; the saving is the whole re-write, an upper bound",
+                         'action': 'before leaving a session for more than an hour: /compact (keeps the thread, re-writes a summary), or /clear and start fresh when '
+                                   'the task is done; coming back within the hour costs nothing extra'})
         if s['compactions'] >= 3 and per >= 2:
             sugg.append({'id': f'boundary:{p}', 'kind': 'learned', 'stake': 0.0, 'saving': None,
                          'title': f"{project_short(p)}: sessions hit the context boundary {per:.0f} times each ({s['compactions']} in {s['sessions']} session{'s' if s['sessions'] != 1 else ''})",
@@ -616,6 +694,7 @@ def collect(fetch=False):
         threshold = 0.25
     learned, learned_sugg = learned_from(usage.get('struggle') or {}, routing, ovr, threshold)
     suggestions += learned_sugg
+    suggestions += suggest_fixed(usage.get('fixed'))
     realized = realized_savings(usage, events, families)
     verdicts(suggestions, realized['latest'] if realized else None, USAGE_DAYS)
     gone = overrides.dismissed()
@@ -655,6 +734,7 @@ def collect(fetch=False):
         advice.append('ledger timer not installed: bash tools/install_ledger_timer.sh')
     if not version:
         advice.append('claude CLI not found on PATH: nothing can run here')
+    advice += transcript_notes(usage)
     unpriced = [r for r in usage['main']['rows'] if r['model'].endswith('(no price)')]
     if unpriced:
         advice.append(f"{sum(r['msgs'] for r in unpriced)} messages in {USAGE_DAYS} days on model ids without a catalog price "
@@ -672,7 +752,7 @@ def collect(fetch=False):
                       'by_class': {k: {'n': v['n'], 'cost': v['cost'], 'types': v['types'], 'models': v.get('models', {}), 'last': v.get('last', '')} for k, v in usage['subagents']['by_class'].items()},
                       'daily': usage.get('daily', []),
                       'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
-            'suggestions': suggestions, 'learned': learned, 'overrides': ovr, 'slots': week_slots,
+            'suggestions': suggestions, 'fixed': usage.get('fixed'), 'learned': learned, 'overrides': ovr, 'slots': week_slots,
             'routed_window': {'n': len(routed), 'kept': sum(1 for r in routed if r.get('decision') == 'kept')},
             'changes': {'events': events[-5:], 'realized': realized['latest'] if realized else None, 'history': realized['history'] if realized else []},
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}
@@ -708,6 +788,15 @@ def text(s):
         out.append(f"  {r['model']:<32}{r['effort']:<8}{r['msgs']:>6} msgs  ${r['cost']:>7.2f}")
     for cls, b in sorted(u['by_class'].items(), key=lambda kv: -kv[1]['cost']):
         out.append(f"  subagents {cls:<22}{b['n']:>4} calls ${b['cost']:>7.2f}  " + ', '.join(f'{t} x{n}' for t, n in b['types'].items()))
+    fx = s.get('fixed')
+    if fx:
+        out += ['', f"carried by every request, whatever the task ({fx['requests']} requests in {fx['sessions']} sessions; tokens are characters / 4):"]
+        for part, label in (('agents', 'agent list'), ('skills', 'skill list'), ('hooks', 'hook text at session start'), ('mcp', 'MCP server instructions')):
+            x = fx['parts'].get(part)
+            if x and x['tokens']:
+                out.append(f"  {label:<28}{x['tokens']:>7} tokens  ${x['cost']:>6.2f}" + (f"  {x['unused_n']} of {x['n']} not used in the window" if 'n' in x else ''))
+        for b in fx['bodies'][:5]:
+            out.append(f"  skill {b['skill'][:34]:<34} {b['tokens']:>6} tokens  ${b['cost']:>6.2f}  {b['loads']} loads, on {b['requests']} requests, {b['commands']:.0%} commands")
     out.append('')
     if not s['suggestions']:
         out.append('suggestions: none from the last window')

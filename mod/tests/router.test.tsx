@@ -45,6 +45,8 @@ const PANE = {
 
 const ok = { exitCode: 0, stderr: '', isStdoutTruncated: false, isStderrTruncated: false }
 const RUN = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as const
+/** Lets a job's detached loop (process.spawn, then the refresh) run to its end before the next command. */
+const settled = () => new Promise(r => setTimeout(r, 20))
 
 test('/router check prints the table and the status line counts the advice', async ($, on) => {
   on('command.register', () => ({ value: { command: 'router' } }))
@@ -77,8 +79,8 @@ test('/router check prints the table and the status line counts the advice', asy
   expect((await $.command.run({ ...RUN, command: 'router', args: '  ' })).text).toBe('Model router pane opened.')
   expect(text).toContain('fix_bug      haiku low +kunit   ████████░░ 16/21    0.0158  no   -')
   expect(text).toContain('  - prices verified 40 days ago')
-  expect(pinned.at(-1)).toBe('saved $13 since 10-30 · up to $72 less last 30d ($0.00 measured) · 1 to check · /router')
-  expect(text).toContain('suggestions (the last 30 days could have consumed up to $72 less of $592: $72 extrapolated):')
+  expect(pinned.at(-1)).toBe('saved $13 since 10-30 · up to $72 less last 30d (12%; $0.00 measured) · 1 to check · /router')
+  expect(text).toContain('suggestions (the last 30 days could have consumed up to $72 less of $592 (12%): $72 extrapolated):')
   expect(text).toContain(' 1. [extrapolated] main sessions at high/xhigh effort: $225 in 30 days')
   expect(text).toContain('est $72/30d')
   expect(text).toContain('families: 2 decided · 1 checkable here · last checks ok')
@@ -106,6 +108,43 @@ test('/router check prints the table and the status line counts the advice', asy
   expect(await ui.find({ type: 'Text', text: /consumption, last 30 days/ })).toBeTruthy()
   expect(await ui.find({ type: 'Button', text: /Less/ })).toBeTruthy()
   await ui.unmount()
+})
+
+test('/router setup installs the agents and says what the pane means; /router prune runs the dry run, move and revert', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify({ ...STATUS, agents: { ...STATUS.agents, files: 180 } }) } }))
+  const spawned: string[] = []
+  on('process.spawn', async function* (_, e) {
+    spawned.push(e.argv.slice(1).join(' '))
+    yield { stream: 'stdout', text: '2 files would move\n' }
+    return { value: { code: 0 } }
+  })
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.toast', () => ({ value: undefined }))
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  const setup = await $.command.run({ ...RUN, command: 'router', args: 'setup' })
+  expect(setup.text).toContain('apply agents started')
+  expect(setup.text).toContain('yellow "to check" lines are things to do, not failures')
+  expect(setup.text).toContain('180 agent files sit in ~/.claude/agents')
+  expect(spawned.at(-1)).toBe('apply_agents.py')
+  await settled()
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'prune' })).text).toContain('prune agents (dry run) started')
+  expect(spawned.at(-1)).toBe('tools/prune_agents.py --dry-run')
+  await settled()
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'prune move' })).text).toContain('/router prune revert undoes it')
+  expect(spawned.at(-1)).toBe('tools/prune_agents.py')
+  await settled()
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'prune revert' })).text).toContain('restore the pruned agents started')
+  expect(spawned.at(-1)).toBe('tools/prune_agents.py --revert')
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'prune everything' })).text).toContain('prune takes nothing (dry run), move or revert')
+  await settled()   // the last job's loop ends inside the test
 })
 
 test('a missing checkout is said in the pane, not thrown', async ($, on) => {

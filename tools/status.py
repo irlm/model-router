@@ -131,7 +131,8 @@ def install_state(version, git, agents, usage, wv, tagged, pins):
     items.append({'name': 'Python', 'ok': True, 'what': sys.version.split()[0], 'step': None})
     items.append({'name': 'git', 'ok': bool(shutil.which('git')), 'what': shutil.which('git') or 'not on PATH', 'step': None if shutil.which('git') else 'install git; the widget pulls and pins with it'})
     clone = bool(os.environ.get('MODEL_ROUTER_CLONE'))
-    where = f"{'the install\'s clone' if clone else 'your checkout'} at {git.get('path')}"
+    kind = "the install's clone" if clone else 'your checkout'   # outside the f-string: Python 3.10 refuses a backslash inside one
+    where = f"{kind} at {git.get('path')}"
     items.append({'name': 'checkout', 'ok': git.get('is_repo', False), 'what': where + (f", {git['behind']} commit(s) behind origin" if git.get('behind') else ''),
                   'step': '/router pull' if git.get('behind') else (None if git.get('is_repo') else 'the folder is not a git checkout: reinstall the plugin or set the path in /config')})
     items.append({'name': 'widget version', 'ok': tagged is not False, 'what': f"{wv or '?'}" + (' (tagged)' if tagged else ' (no v-tag yet)' if tagged is False else ''),

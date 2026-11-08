@@ -383,7 +383,7 @@ class ConfigDir(unittest.TestCase):
             self.assertEqual(claude_home.agents_dir(), Path(d) / 'agents')
             self.assertEqual(claude_home.unused_dir(), Path(d) / 'agents.unused')
             self.assertEqual(claude_home.projects_dir(), Path(d) / 'projects')
-        with mock.patch.dict(os.environ, {}, clear=True):
+        with mock.patch.dict(os.environ):   # the variable alone is removed: Path.home() needs USERPROFILE on Windows
             os.environ.pop('CLAUDE_CONFIG_DIR', None)
             self.assertEqual(claude_home.config_dir(), Path.home() / '.claude')
 

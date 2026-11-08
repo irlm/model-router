@@ -420,6 +420,13 @@ class FixedSuggestions(unittest.TestCase):
         self.assertIn('impeccable 21', out['fixed:skills']['basis'])
         self.assertTrue(out['fixed:skills']['action'].startswith('/skill-doctor'))          # Claude Code 2.1.261+ has the per-skill report itself
         self.assertIn('main-session', out['fixed:agents']['basis'])                        # the cost is a floor: side requests are not in the transcript
+        self.assertTrue(out['fixed:agents']['action'].startswith('/router prune'))
+        parked = {g['id']: g for g in status.suggest_fixed(self.FX, parked=168)}['fixed:agents']
+        self.assertIn('168 files parked', parked['title'])                                  # the move is done: the window still shows the old list
+        self.assertIn('170 never called', parked['title'])
+        self.assertTrue(parked['action'].startswith('done:'))
+        self.assertIn('prune revert', parked['action'])
+        self.assertEqual(parked['saving'], [9.0, 9.0])                                     # the same estimate until the window rolls
         self.assertEqual(out['skill:deploy:abc12345']['saving'], [0.0, 1.0])              # half of its body is commands a script could hold
         self.assertIn('script', out['skill:deploy:abc12345']['action'])
         self.assertIsNone(out['skill:superpowers:debugging:def67890']['saving'])          # guidance: no cheaper form is known

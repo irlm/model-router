@@ -320,11 +320,13 @@ def transcript_notes(usage):
     return []
 
 
-def suggest_fixed(fx, days=USAGE_DAYS):
+def suggest_fixed(fx, days=USAGE_DAYS, parked=0):
     """What the text every request carries cost in the window (tools/fixed_text.py), where something can be done:
     the agent list and the skill list by the entries nothing here used, and each loaded skill by what re-reading
     its body cost. Kind 'learned': this machine's transcripts, never the benchmark. A skill's line carries the
-    digest of its body, so a skill that changed is a new line, even after the old one was dismissed."""
+    digest of its body, so a skill that changed is a new line, even after the old one was dismissed. `parked`
+    is how many agent files prune_agents.py already moved out: the transcripts in the window still carry the old
+    list, so the line says the move is done and that the next sessions show it, instead of asking for it again."""
     if not fx:
         return []
     out = []
@@ -335,12 +337,19 @@ def suggest_fixed(fx, days=USAGE_DAYS):
     if a and a.get('unused_n') and a.get('tokens'):
         save = round(a['cost'] * a['unused_tokens'] / a['tokens'], 2)
         big = ', '.join(f"{x['name']} {x['tokens']}" for x in a['largest_unused'][:4])
-        out.append({'id': 'fixed:agents', 'kind': 'learned', 'stake': a['cost'], 'saving': [save, save],
-                    'title': f"agent list: {a['unused_n']} of {a['n']} never called, ${a['cost']:.2f} to carry (about {a['tokens'] // 1000}k tokens in every request)",
+        if parked:
+            title = (f"agent list: {parked} file{'s' if parked != 1 else ''} parked in ~/.claude/agents.unused; the sessions in the window still carried "
+                     f"{a['n']} agents, {a['unused_n']} never called, ${a['cost']:.2f}")
+            action = ('done: the next sessions carry the shorter list and this line shrinks as they enter the window (the pane line "agents" shows the '
+                      'parked count now). /router prune revert brings the files back; /router prune lists any new file nothing has called')
+        else:
+            title = f"agent list: {a['unused_n']} of {a['n']} never called, ${a['cost']:.2f} to carry (about {a['tokens'] // 1000}k tokens in every request)"
+            action = ('/router prune lists them (python3 tools/prune_agents.py --dry-run); /router prune move moves the agent files no transcript ever called to '
+                      '~/.claude/agents.unused, folders kept (/router prune revert brings them back). Claude Code documents no setting that takes an agent out of the list')
+        out.append({'id': 'fixed:agents', 'kind': 'learned', 'stake': a['cost'], 'saving': [save, save], 'title': title,
                     'basis': f"the agent descriptions are {how}: ${a['cost']:.2f} {over}. No Agent call in the last {days} days named {a['unused_n']} of them "
                              f"(about {a['unused_tokens'] // 1000}k tokens; largest: {big})",
-                    'action': 'python3 tools/prune_agents.py --dry-run lists them; without --dry-run it moves the agent files no transcript ever called to '
-                              '~/.claude/agents.unused, folders kept (--revert brings them back). Claude Code documents no setting that takes an agent out of the list'})
+                    'action': action})
     k = (fx.get('parts') or {}).get('skills')
     if k and k.get('unused_n') and k.get('tokens'):
         save = round(k['cost'] * k['unused_tokens'] / k['tokens'], 2)
@@ -694,7 +703,7 @@ def collect(fetch=False):
         threshold = 0.25
     learned, learned_sugg = learned_from(usage.get('struggle') or {}, routing, ovr, threshold)
     suggestions += learned_sugg
-    suggestions += suggest_fixed(usage.get('fixed'))
+    suggestions += suggest_fixed(usage.get('fixed'), parked=agents['unused'])
     realized = realized_savings(usage, events, families)
     verdicts(suggestions, realized['latest'] if realized else None, USAGE_DAYS)
     gone = overrides.dismissed()

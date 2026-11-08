@@ -105,6 +105,19 @@ clone nothing is committed: "Ledger now" prints the entry into the pane instead 
 A checkout of your own is for the benchmark, the ledger timer and changing the code: clone the
 repository to the default path, or anywhere and set the path in `/config`.
 
+**From a checkout, without a push** (developing the widget, or trying a commit before it is on
+GitHub): at a terminal,
+
+```
+claude plugin marketplace add ~/Projects/GitHub/model-router
+claude plugin install model-router@model-router --scope user
+```
+
+Claude Code then reads the widget from that folder's `mod/` directly (`claude plugin list` prints
+`Read from: .../model-router/mod`): a commit there shows at the next session start or after
+`/reload-plugins`, with no `plugin update`. `claude plugin marketplace remove model-router` takes the
+local marketplace out when you switch to the GitHub one.
+
 **First run on a machine: `/router setup`.** It installs the routed agent files the repository ships
 (`apply_agents.py`), then says what the pane shows: the yellow "to check" lines are things to do, not
 failures (a fresh machine has "agent web-researcher.md not installed yet" until apply runs); a

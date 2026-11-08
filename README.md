@@ -36,7 +36,9 @@ then restart Claude Code and run `/router setup` once. One user-scope install se
 and VS Code on that computer; cloud sessions on claude.ai/code do not load local plugins. To update:
 `claude plugin marketplace update model-router`, `claude plugin update model-router@model-router`,
 restart. `mod/README.md` has the pane, the commands, Windows, updating and the reasoning behind
-every number it shows.
+every number it shows. From a checkout, without a push: `claude plugin marketplace add <the checkout>` then
+`claude plugin install model-router@model-router`; Claude Code reads the widget from that folder, so a
+commit shows at the next start or `/reload-plugins`.
 
 **Why this is not built in.** Claude Code's documentation (read 2026-11-03) describes only manual
 levers for a subagent's model: the agent file's `model` and `effort`, the Agent tool's `model`

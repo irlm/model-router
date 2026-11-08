@@ -20,6 +20,8 @@ rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 - The saving is given as a share of the window's spend too; the consumption figures say they are a
   floor (side requests are not in the transcripts).
 - Without Python the pane names the install command for the OS.
+- Install from a checkout without a push (`claude plugin marketplace add <checkout>`): Claude Code
+  reads the widget from the folder; a commit shows after `/reload-plugins`. Documented in both READMEs.
 
 ## 0.10.1 — 2026-11-03
 

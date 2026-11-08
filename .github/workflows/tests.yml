@@ -23,3 +23,24 @@ jobs:
         run: python tools/test_status.py
       - name: Runner command lines
         run: python bench/common/test_harness.py
+
+  mod:
+    # The widget itself: `claude plugin validate` reads the manifest and hooks the way the engine will; `claude plugin test`
+    # runs mod/tests in the engine's own harness. Needs the Claude Code CLI; neither command signs in.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Validate the widget
+        run: claude plugin validate mod
+      - name: Widget tests
+        run: claude plugin test mod
+      - name: Release check (version = newest CHANGELOG entry)
+        run: python tools/release.py --check || test $? -eq 1

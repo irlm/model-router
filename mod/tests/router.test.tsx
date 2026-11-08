@@ -407,3 +407,103 @@ test('ask mode routes the call when the person picks the measured option', { opt
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('[find_feature] routed')
 })
+
+const LIVE_MOCKS = (on: On, seen: Record<string, unknown>[], steps: unknown[], failing: string | null) => {
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  // the status this machine would read: find_feature and fix_bug as the shared fixture, plus web_research decided at haiku low
+  const LIVE_STATUS = { ...STATUS, families: [...STATUS.families, { name: 'web_research', model: 'haiku', effort: 'low', variant: '', rate: '76/78', cost_per_success: 0.0197, can_run: true, why: '', last_check: null }] }
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(LIVE_STATUS) } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('session.model', () => ({ value: 'claude-fable-5-1' }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.step', async function* (_, e) { steps.push(e.effort); return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } })
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return failing && e.tool === failing ? { result: {}, isError: true } : { result: {} } })
+}
+/** A streaming event's hooks run as its stream is read: read it to the end. */
+const drain = async (st: AsyncIterable<unknown>) => { for await (const _ of st) { /* chunks */ } }
+const USAGE = { model: 'claude-fable-5-1', input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 100000, cache_creation_input_tokens: 0 }
+
+test('main-session effort auto: a lookup prompt runs at the measured low effort, goes back to the session effort after 3 tool errors, and the pane shows the live turn', { options: { mainEffort: 'auto', routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, 'Bash')
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'What is the default value of shared_buffers in PostgreSQL 17?', turnId: 't1' })
+  await drain($.turn.step({ turnId: 't1', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1 }))
+  expect(steps.at(-1)).toBe('low')                                   // web_research is measured at low: the request runs there
+  for (let i = 0; i < 3; i++) await $.tool.call({ tool: 'Bash', command: 'false' })
+  await drain($.turn.step({ turnId: 't1', index: 1, model: 'claude-fable-5-1', effort: 'high', messageCount: 7 }))
+  expect(steps.at(-1)).toBe('high')                                  // three tool errors: the session's own effort again
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer', usage: USAGE })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('this session · 1 turn · $0.14 · cache hit 99% · fable-5-1 high')   // 1000*10 + 2000*50 + 100000*0.25 per Mtok
+  expect(text).toContain('1 turn with 3+ tool errors')
+  expect(text).toContain('auto: 0 at the measured effort (est $0.00 less), 1 back up after errors')
+  // a prompt nothing measured covers runs as the session has it
+  await $.turn.start({ text: 'Refactor the billing module and write the release notes', turnId: 't2' })
+  await drain($.turn.step({ turnId: 't2', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 9 }))
+  expect(steps.at(-1)).toBe('high')
+  await settled()   // the detached work (log writes, the change record) ends inside the test
+})
+
+test('main-session effort advise (the default) changes nothing and says what it would have done; /router effort auto switches', async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, null)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'What is the default value of shared_buffers in PostgreSQL 17?', turnId: 't1' })
+  await drain($.turn.step({ turnId: 't1', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1 }))
+  expect(steps.at(-1)).toBe('high')
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer', usage: USAGE })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('advise: 1 turn read as a measured task and would run at low (est $0.01 less): /router effort auto')
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'effort auto' })).text).toContain('main-session effort auto for this session')
+  await $.turn.start({ text: 'What is the default value of shared_buffers in PostgreSQL 17?', turnId: 't2' })
+  await drain($.turn.step({ turnId: 't2', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 3 }))
+  expect(steps.at(-1)).toBe('low')
+  await settled()   // the detached work (log writes, the change record) ends inside the test
+})
+
+test('a routed Agent call that fails escalates its family: the next call runs as asked and the pane says why', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, 'Agent')
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'find where the config loader is', turnId: 't1' })
+  await $.tool.call(EXPLORE)
+  const first = seen.filter(x => x.tool === 'Agent').at(-1)
+  expect([first?.model, first?.effort]).toEqual(['haiku', 'low'])     // routed, then it failed
+  await $.tool.call({ ...EXPLORE, description: 'find the schema loader' })
+  const second = seen.filter(x => x.tool === 'Agent').at(-1)
+  expect([second?.model, second?.effort]).toEqual([undefined, undefined])   // as asked: the family is escalated this session
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer', usage: USAGE })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('agents   2 calls · 1 routed · escalated: find_feature (a call routed to haiku low failed)')
+  expect(text).toContain('[find_feature] escalated')
+  await settled()   // the detached work (log writes, the change record) ends inside the test
+})
+
+test('an Agent call re-issued within minutes of a routed one, with the same words, escalates its family', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, null)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  expect(seen.filter(x => x.tool === 'Agent').at(-1)?.model).toBe('haiku')
+  await $.tool.call({ ...EXPLORE, description: EXPLORE.description + ' again' })
+  const second = seen.filter(x => x.tool === 'Agent').at(-1)
+  expect(second?.model).toBe(undefined)
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('escalated: find_feature (re-issued within 10 min of a routed call)')
+  await settled()   // the detached work (log writes, the change record) ends inside the test
+})

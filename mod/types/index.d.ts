@@ -120,9 +120,37 @@ export type Routed = {
   from: string
   to: string
   /** auto: rewritten without asking; routed: the person chose it; kept: the person kept what was asked, or no one could be asked */
-  decision: 'auto' | 'routed' | 'kept'
+  decision: 'auto' | 'routed' | 'kept' | 'escalated'
   description: string
 }
+
+/** One main-loop turn as the engine reported it: its tokens, the model, what the effort gear did, and what the turn held. */
+export type Turn = {
+  at: number
+  turnId: string
+  model: string
+  /** the effort the requests ran at (the plan's when applied, else the session's) */
+  effort: string
+  /** the session's own effort, as the first request of the turn named it */
+  sessionEffort: string
+  in: number
+  out: number
+  cacheRead: number
+  cacheWrite: number
+  /** catalog $ of the turn (cache writes at the 1h multiplier) */
+  cost: number
+  errors: number
+  agentCalls: number
+  routed: number
+  /** the measured family the prompt read as, when any */
+  family: string | null
+  /** same: ran at the session's effort; down: at the family's measured effort; up: back to the session's after tool errors */
+  gear: 'same' | 'down' | 'up'
+  /** advise mode: the effort the turn would have run at */
+  advised: string | null
+}
+/** The session as it runs: the turns so far and the families escalated (the reason), kept until the session ends. */
+export type Live = { turns: Turn[]; escalated: Record<string, string> }
 
 /** A prompt that read as a different task in a session already re-reading a lot per turn, and what was done. */
 export type Switch = { at: number; ctx: number; why: string; action: 'compacted' | 'kept' | 'asked' }
@@ -132,6 +160,6 @@ export type Job = { name: string; lines: string[]; isRunning: boolean; exitCode:
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]> }
+    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live> }
   }
 }

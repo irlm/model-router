@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Model router widget: routes each Agent call to the model and effort the benchmark measured for that kind of task (auto, ask or off), rate-limit headroom, what the last 30 days consumed, and one key to re-check the routing.",
   "author": {
     "name": "irlm"
@@ -14,6 +14,17 @@
       "default": "ask",
       "options": [
         "ask",
+        "auto",
+        "off"
+      ]
+    },
+    "mainEffort": {
+      "type": "string",
+      "title": "Main-session effort",
+      "description": "A prompt that reads as a measured family (a fact lookup, a browser flow, a fix with the test runner) can run its requests at the family's measured effort instead of the session's. advise: the pane shows what it would have done and the estimate; auto: it does it, and goes back to the session's effort within the turn after 3 tool errors; off: nothing.",
+      "default": "advise",
+      "options": [
+        "advise",
         "auto",
         "off"
       ]

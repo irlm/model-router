@@ -3,6 +3,24 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.13.0 — 2026-11-08
+
+- The pane opens with the session live: turns and their cost as a sparkline, cache hit, the effort gear per
+  turn (`·` session, `↓` measured, `↑` back up after errors, `?` would have), the Agent calls routed and
+  the families escalated, and the plan gauge (saved of projected). Figures come from the engine's own
+  per-turn usage (`turn.complete`), priced from the catalog; no transcript read.
+- Main-session effort control (`/router effort advise|auto|off`, `mainEffort` in /config; default advise):
+  a prompt that reads as a measured family (a fact lookup, a browser flow, a fix with the test runner)
+  runs its requests at the family's measured effort in auto mode; after 3 tool errors in the turn the
+  requests go back to the session's own effort ("use the max when the task requires it"). Advise mode
+  shows what it would have done and the estimate (results/cell8 effort ratios on the output).
+- Escalation with evidence for Agent calls: a routed call that fails, or one re-issued within 10 minutes
+  with the same words, escalates its family for the session; the next calls run as asked, the pane and
+  the routed log say why (`escalated`).
+- The glance shows less: the families line and the long suggestions header moved under Details.
+- CI runs `claude plugin validate mod` and `claude plugin test mod`.
+- Regression check 2026-11-08 on Claude Code 2.1.319: web_research 6/6 on haiku low.
+
 ## 0.12.0 — 2026-11-08
 
 - `/router doctor`: the installation piece by piece (Claude Code, Python, git, checkout, widget version

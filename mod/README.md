@@ -124,6 +124,44 @@ failures (a fresh machine has "agent web-researcher.md not installed yet" until 
 suggestion line is an estimate with its basis under Details; in ask mode the router asks before it
 moves an Agent call. When many agent files sit in `~/.claude/agents`, it points to `/router prune`.
 
+### The session live, and the effort gear
+
+The first lines of the pane are the session as it runs, from the engine's own per-turn figures
+(`turn.complete` carries each turn's tokens and model; priced from the catalog, cache writes at the
+1h multiplier), so nothing is read from disk for them:
+
+```
+this session · 12 turns · $1.84 · cache hit 93% · ctx 148k · fable-5-1 high
+  $/turn   ▁▂▁▃▂▁▂▆▂▁▁▂  max $0.41 · 1 turn with 3+ tool errors
+  effort   ··↓↓··↑·····          auto: 2 at the measured effort (est $0.05 less), 1 back up after errors
+  agents   3 calls · 2 routed · escalated: find_feature (a call routed to haiku low failed)
+  plan     saved $13 of $72 projected ███░░░░░░░ 18% · since 10-30
+```
+
+The effort strip is one mark per turn: `·` ran at the session's effort, `↓` at a measured family's
+effort, `↑` went back up inside the turn after 3 tool errors, `?` would have gone down (advise mode).
+The plan gauge is what the transcripts show saved since the last change against what the suggestion
+projected: the same two numbers as "After a change", as a bar.
+
+**Main-session effort** (`/router effort advise|auto|off`; `mainEffort` in `/config`, default
+`advise`). The router rewrites Agent calls; the main session's requests it did not touch until now.
+Before each main-loop request the engine lets a plugin name another effort (`turn.step`); the model
+stays, since changing the model would re-write the cache. The rule: when the prompt reads as a
+measured family (the same matcher as for Agent calls: a short fact lookup, a browser flow, a fix with
+the test runner in the loop), the turn's requests run at that family's measured effort, `low` for every
+family measured so far. Up: once the turn has hit 3 tool errors, the requests go back to the session's
+own effort, the signal the transcripts' struggle measure is built on. Anything the matcher does not
+recognise runs as the session has it. Advise mode changes nothing and says, per turn, what auto would
+have done and the estimate: the cell8 effort ratios (high 1.06-1.16x of low, xhigh 1.30-1.52x) on the
+turn's output cost, which is the part effort moves. Main sessions were not measured in the benchmark;
+that is why the default is advise and the figure says `est`.
+
+**Escalation for Agent calls.** A call the router moved down that failed (a tool error), or that the
+main model re-issued within 10 minutes with mostly the same words, escalates its family for the rest of
+the session: the next calls run as the main model asked, the routed log records `escalated` with the
+reason, the pane shows it on the `agents` line. No call is re-run on its own: a second run doubles the
+cost and may repeat an edit; the main model's own re-issue is the signal, and it is then left alone.
+
 ### Requirements and what it reads
 
 Python 3 (3.10 or newer), git and the `claude` CLI on PATH; `CLAUDE_CONFIG_DIR` is honoured when

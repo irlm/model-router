@@ -32,7 +32,7 @@ automatically, and checked afterwards on the person's own work.
 /plugin install model-router --marketplace irlm/model-router
 ```
 
-then restart Claude Code and run `/router setup` once; `/router doctor` lists each piece of the installation as ok or to do. One user-scope install serves the terminal, the desktop app's local sessions
+then restart Claude Code and run `/router setup` once; `/router doctor` lists each piece of the installation as ok or to do. The pane opens with the session live (cost per turn, cache hit, the effort gear, escalations); `/router effort auto` lets a prompt that reads as a measured task run at its measured effort. One user-scope install serves the terminal, the desktop app's local sessions
 and VS Code on that computer; cloud sessions on claude.ai/code do not load local plugins. To update:
 `claude plugin marketplace update model-router`, `claude plugin update model-router@model-router`,
 restart. `mod/README.md` has the pane, the commands, Windows, updating and the reasoning behind

@@ -24,9 +24,11 @@ sys.path.insert(0, str(HERE / 'catalog'))
 sys.path.insert(0, str(HERE / 'bench/common'))
 import price  # noqa: E402
 import local  # noqa: E402
+import fixed_text  # noqa: E402
+import claude_home  # noqa: E402
 
 CAT = price.catalog(HERE / 'catalog/models.json')
-ROOT = Path.home() / '.claude/projects'
+ROOT = claude_home.projects_dir()   # CLAUDE_CONFIG_DIR moves it
 BENCH = local.skip_projects()   # benchmark sessions on this machine (local/config.json), not the user's own work
 AGENT_IDS = (re.compile(r'agentId\\?":\\?"([0-9a-f]{12,24})'), re.compile(r'\b([0-9a-f]{15,24}) \(internal ID'))
 TOKENS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
@@ -142,6 +144,7 @@ def collect(days=30, now=None, splits=None):
     daily = collections.Counter()                            # day -> catalog $ (main and subagents)
     pmsgs = collections.Counter(); pcost = collections.Counter()   # (segment, where, model, effort) when splits are set
     seen = set()
+    fixed = collections.defaultdict(fixed_text.Session)       # main transcript -> the lists and skill bodies it carries
     files = 0
     for f in ROOT.glob('**/*.jsonl'):
         proj = f.relative_to(ROOT).parts[0]
@@ -152,7 +155,7 @@ def collect(days=30, now=None, splits=None):
         effort = None
         for line in f.open(encoding='utf-8', errors='replace'):
             if not ('"api-request"' in line or '"assistant"' in line or 'agentId' in line or '"tool_use"' in line
-                    or '"compact_boundary"' in line or '"is_error":true' in line):
+                    or '"compact_boundary"' in line or '"is_error":true' in line or '"attachment"' in line or fixed_text.BODY_START in line):
                 continue
             try:
                 r = json.loads(line)
@@ -165,6 +168,18 @@ def collect(days=30, now=None, splits=None):
             ts = r.get('timestamp') or ''
             window = 'cur' if ts >= since_cur else 'prev' if ts >= since_prev else None
             m = r.get('message') or {}
+            if not is_sub:
+                # What the session carries whatever the task (tools/fixed_text.py): read in order, from its first row
+                if t == 'attachment':
+                    fixed[str(f)].attachment(r.get('attachment') or {})
+                    continue
+                if t == 'system' and r.get('subtype') == 'compact_boundary':
+                    fixed[str(f)].compact()
+                elif t == 'user' and fixed_text.BODY_START in line:
+                    c = m.get('content')
+                    body = c if isinstance(c, str) else ''.join(it.get('text', '') for it in c or [] if isinstance(it, dict) and it.get('type') == 'text')
+                    if body.startswith(fixed_text.BODY_START):
+                        fixed[str(f)].body(body, r.get('sourceToolUseID'), window == 'cur')
             if is_sub and r.get('agentId') and '"is_error":true' in line:
                 agent_errors[r['agentId']] += sum(1 for it in (m.get('content') or []) if isinstance(it, dict) and it.get('is_error'))
             if not is_sub and window == 'cur':
@@ -187,6 +202,8 @@ def collect(days=30, now=None, splits=None):
                         model = model + ' (no price)'
                     c = (price.price_usage(u, entry) or 0) if entry else 0
                     oc = u.get('output_tokens', 0) * price.rates(entry)['out'] if entry else 0
+                    if not is_sub:
+                        fixed[str(f)].request(u, price.rates(entry) if entry else None, ts, window == 'cur')
                     if window == 'cur' and not is_sub:
                         s = sessions[str(f)]
                         s['msgs'] += 1
@@ -218,6 +235,8 @@ def collect(days=30, now=None, splits=None):
                         for k in TOKENS:
                             agent_tok[r['agentId']][k] += u.get(k, 0) or 0
                 for it in m['content']:
+                    if not is_sub and isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') == 'Skill':
+                        fixed[str(f)].skill_call(it.get('id'), (it.get('input') or {}).get('skill'))
                     if isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') in ('Agent', 'Task') and window:
                         inp = it.get('input') or {}
                         st = inp.get('subagent_type') or 'general-purpose'
@@ -280,6 +299,7 @@ def collect(days=30, now=None, splits=None):
             'main': {'rows': rows('cur'), 'total': main_total['cur'], 'out_cost': round(sum(v for k, v in out_cost.items() if k[0] == 'cur' and k[1] == 'main'), 2)},
             'subagents': {'calls': sorted((c for c in calls.values() if c['window'] == 'cur'), key=lambda c: c['ts']),
                           'by_class': dict(by_class), 'total': sub_total['cur']},
+            'fixed': fixed_text.summary(fixed.values(), {c['type'] for c in calls.values() if c['window'] == 'cur'}),
             'previous': {'since': since_prev[:10], 'main_total': main_total['prev'], 'main_rows': rows('prev'), 'subagents_total': sub_total['prev']}}
 
 

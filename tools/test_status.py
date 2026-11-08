@@ -4,6 +4,8 @@ Run: python3 tools/test_status.py"""
 import contextlib
 import io
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -13,7 +15,10 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import apply_agents  # noqa: E402
+import claude_home  # noqa: E402
 import consumption  # noqa: E402
+import fixed_text  # noqa: E402
+import prune_agents  # noqa: E402
 import status  # noqa: E402
 
 
@@ -91,9 +96,28 @@ class Learned(unittest.TestCase):
         struggle = {'cells': {}, 'sessions': {'-home-me-Projects-big': {'sessions': 1, 'msgs': 500, 'errors': 0, 'compactions': 0, 'ctx_per_msg': 300000,
                                                                        'read_cost': 90.0, 'write_cost': 10.0, 'idle_returns': 3, 'idle_cost': 4.0}}}
         _, sugg = status.learned_from(struggle, {}, {}, 0.25)
-        self.assertEqual([g['id'].split(':')[0] for g in sugg], ['context'])
+        self.assertEqual([g['id'].split(':')[0] for g in sugg], ['context', 'idle'])
         self.assertAlmostEqual(sugg[0]['saving'][1], 90.0 * (300000 - 100000) / 300000, 2)
         self.assertIn('3 returns after an idle hour', sugg[0]['basis'])
+
+    def test_idle_returns_get_their_own_line_whatever_the_session_size(self):
+        # A small project (40 msgs, 120k per msg): the context line needs 200 msgs and 150k, the idle line needs only the cost.
+        struggle = {'cells': {}, 'sessions': {'-home-me-Projects-small': {'sessions': 4, 'msgs': 40, 'errors': 0, 'compactions': 0, 'ctx_per_msg': 120000,
+                                                                         'read_cost': 3.0, 'write_cost': 8.0, 'idle_returns': 2, 'idle_cost': 5.5}}}
+        _, sugg = status.learned_from(struggle, {}, {}, 0.25)
+        self.assertEqual([g['id'] for g in sugg], ['idle:-home-me-Projects-small'])
+        self.assertEqual(sugg[0]['saving'], [0.0, 5.5])
+        self.assertIn('2 returns', sugg[0]['title'])
+        self.assertIn('/compact', sugg[0]['action'])
+        self.assertIn('below 200k', sugg[0]['basis'])                    # Claude Code compacts idle sessions only from 200k tokens
+        big = json.loads(json.dumps(struggle))
+        big['sessions']['-home-me-Projects-small']['ctx_per_msg'] = 250000
+        _, sugg = status.learned_from(big, {}, {}, 0.25)
+        self.assertIn('idleCompaction', sugg[0]['basis'])                # at that size the native idle compaction should have run
+        small = json.loads(json.dumps(struggle))
+        small['sessions']['-home-me-Projects-small']['idle_cost'] = 0.3
+        _, sugg = status.learned_from(small, {}, {}, 0.25)
+        self.assertEqual(sugg, [])                                       # under the floor
 
     def test_small_cells_never_hot(self):
         struggle = {'cells': {'p': {'code-explore': {'n': 5, 'retries': 5, 'error_heavy': 0, 'failed': 0, 'struggled': 5, 'cost': 1.0, 'examples': []}}}, 'sessions': {}}
@@ -222,6 +246,223 @@ class AgentFiles(unittest.TestCase):
             self.assertIn('skipped 1 agent file(s) not on this machine: nowhere.md', out.getvalue())
             add.assert_called_once_with('apply', 'agents: testing-api-tester.md')
             self.assertEqual(self.states(root)[1]['testing-api-tester.md'], 'applied')
+
+
+RATES = {'cache_read': 1.0, 'write_5m': 10.0, 'write_1h': 20.0}   # per token, round numbers: a read is 1, a write 20
+
+
+def agent_rows(n=2):
+    lines = [f'- Agent {i}: ' + 'x' * (400 - len(f'- Agent {i}: ') - 1) for i in range(n)]   # 400 characters with the newline: 100 tokens each
+    return {'type': 'agent_listing_delta', 'isInitial': True, 'addedTypes': [f'Agent {i}' for i in range(n)], 'addedLines': lines, 'builtInTypes': ['Explore']}
+
+
+class FixedText(unittest.TestCase):
+    def test_a_list_is_written_once_then_read_and_written_again_when_the_cache_is_cold(self):
+        s = fixed_text.Session()
+        s.attachment(agent_rows(2))                                                     # 200 tokens
+        s.request({'cache_read_input_tokens': 0, 'cache_creation_input_tokens': 5000}, RATES, '2026-11-01T10:00')
+        self.assertEqual(s.cost['agents'], 200 * 20)                                    # the first request writes it
+        s.request({'cache_read_input_tokens': 5000}, RATES, '2026-11-01T10:01')
+        self.assertEqual(s.cost['agents'], 200 * 20 + 200 * 1)                          # then it is read
+        s.request({'cache_read_input_tokens': 100, 'cache_creation_input_tokens': 6000}, RATES, '2026-11-01T12:00')
+        self.assertEqual(s.cost['agents'], 200 * 20 + 200 * 1 + 200 * 20)               # an expired cache: written again
+        self.assertEqual(s.requests, 3)
+
+    def test_a_skill_body_rides_from_its_load_to_the_compaction(self):
+        s = fixed_text.Session()
+        s.attachment({'type': 'skill_listing', 'isInitial': True, 'content': '- deploy: ships it\n- superpowers:debugging: finds the cause'})
+        s.request({'cache_creation_input_tokens': 1000}, RATES)
+        s.skill_call('toolu_1', 'superpowers:debugging')
+        body = 'Base directory for this skill: /x/skills/debugging\n\n' + 'y' * 348     # 400 characters: 100 tokens
+        s.body(body, 'toolu_1')
+        s.request({'cache_read_input_tokens': 1000}, RATES)                             # written with the turn that loaded it
+        s.request({'cache_read_input_tokens': 1100}, RATES)                             # read
+        s.compact()
+        s.request({'cache_read_input_tokens': 1000}, RATES)                             # gone
+        b = s.bodies[0]
+        self.assertEqual((b['skill'], b['requests'], b['cost']), ('superpowers:debugging', 2, 100 * 20 + 100 * 1))
+        s.body('Base directory for this skill: /x/skills/deploy\n\nrun it', None)       # typed as /deploy: named by its folder
+        self.assertEqual(s.bodies[1]['skill'], 'deploy')
+        self.assertEqual(dict(s.used), {'superpowers:debugging': 1, 'deploy': 1})
+
+    def test_outside_the_window_the_state_moves_and_nothing_is_counted(self):
+        s = fixed_text.Session()
+        s.attachment(agent_rows(1))
+        s.request({'cache_creation_input_tokens': 900}, RATES, counted=False)
+        self.assertEqual((s.cost['agents'], s.requests, s.first_total), (0.0, 0, 900))
+        s.request({'cache_read_input_tokens': 900}, RATES)
+        self.assertEqual(s.cost['agents'], 100 * 1)                                     # already written before the window
+
+    def test_command_share(self):
+        self.assertEqual(fixed_text.command_share(''), 0.0)
+        self.assertEqual(fixed_text.command_share('think first, then decide'), 0.0)
+        body = 'Run:\n```bash\n' + 'a' * 60 + '\n```\n' + 'b' * 20
+        self.assertAlmostEqual(fixed_text.command_share(body), 61 / len(body), 2)
+
+    def test_summary_names_what_nothing_here_used(self):
+        s = fixed_text.Session()
+        s.attachment(agent_rows(3))
+        s.attachment({'type': 'skill_listing', 'isInitial': True, 'content': '- deploy: ships it\n- lint: checks it'})
+        s.request({'cache_creation_input_tokens': 2000}, RATES, '2026-11-01T10:00')
+        s.body('Base directory for this skill: /x/skills/deploy\n\nrun it', None)
+        s.request({'cache_read_input_tokens': 2000}, RATES, '2026-11-01T10:01')
+        out = fixed_text.summary([s, fixed_text.Session()], called_agents={'Agent 1', 'Explore'})
+        a, k = out['parts']['agents'], out['parts']['skills']
+        self.assertEqual((a['n'], a['tokens'], a['unused_n'], a['unused_tokens']), (3, 300, 2, 200))
+        self.assertEqual((k['n'], k['unused_n'], [x['name'] for x in k['largest_unused']]), (2, 1, ['lint']))
+        self.assertEqual((out['requests'], out['sessions'], out['bodies'][0]['skill'], out['bodies'][0]['requests']), (2, 1, 'deploy', 1))
+        self.assertIsNone(fixed_text.summary([fixed_text.Session()]))                   # no rows in the transcripts: nothing to say
+
+
+class FixedTextInTheTranscripts(unittest.TestCase):
+    def test_collect_reads_the_rows_of_a_main_transcript(self):
+        ts = '2026-11-04T10:0%d:00.000Z'
+        def asst(i, mid, usage, content=None):
+            return {'type': 'assistant', 'timestamp': ts % i, 'message': {'id': mid, 'model': 'claude-haiku-5-5', 'usage': usage, 'content': content or [{'type': 'text', 'text': 'ok'}]}}
+        rows = [{'type': 'attachment', 'timestamp': ts % 0, 'attachment': agent_rows(300)},
+                {'type': 'attachment', 'timestamp': ts % 0, 'attachment': {'type': 'skill_listing', 'isInitial': True, 'content': '- deploy: ships it\n- lint: checks it'}},
+                asst(1, 'm1', {'input_tokens': 2, 'output_tokens': 5, 'cache_creation_input_tokens': 33000},
+                     [{'type': 'tool_use', 'id': 'toolu_1', 'name': 'Skill', 'input': {'skill': 'deploy'}}]),
+                {'type': 'user', 'timestamp': ts % 2, 'sourceToolUseID': 'toolu_1', 'isMeta': True,
+                 'message': {'role': 'user', 'content': [{'type': 'text', 'text': 'Base directory for this skill: /x/skills/deploy\n\n```bash\nmake ship\n```'}]}},
+                asst(3, 'm2', {'input_tokens': 2, 'output_tokens': 5, 'cache_read_input_tokens': 33000, 'cache_creation_input_tokens': 40}),
+                asst(4, 'm3', {'input_tokens': 2, 'output_tokens': 5, 'cache_read_input_tokens': 33040})]
+        with tempfile.TemporaryDirectory() as d:
+            proj = Path(d) / '-home-me-proj'
+            proj.mkdir()
+            (proj / 'aaaa.jsonl').write_text('\n'.join(json.dumps(r) for r in rows) + '\n', encoding='utf-8')
+            with mock.patch.object(consumption, 'ROOT', Path(d)):
+                u = consumption.collect(30, now=consumption.datetime.datetime(2026, 11, 5, tzinfo=consumption.datetime.timezone.utc))
+        fx = u['fixed']
+        self.assertEqual((fx['requests'], fx['parts']['agents']['n'], fx['parts']['agents']['tokens'], fx['parts']['agents']['unused_n']), (3, 300, 30000, 300))
+        self.assertGreater(fx['parts']['agents']['cost'], 0)
+        self.assertEqual((fx['parts']['skills']['unused_n'], fx['skills_used']), (1, {'deploy': 1}))
+        self.assertEqual((fx['bodies'][0]['skill'], fx['bodies'][0]['loads'], fx['bodies'][0]['requests']), ('deploy', 1, 2))
+        self.assertGreater(fx['bodies'][0]['commands'], 0)
+
+
+class TranscriptFormat(unittest.TestCase):
+    """The rows as Claude Code writes them, one fixture per version seen (tools/fixtures/transcript-<version>.jsonl,
+    content replaced, shape kept). A version that changes the rows breaks here, not silently on a user's machine."""
+    FIXTURES = sorted(Path(__file__).resolve().parent.glob('fixtures/transcript-*.jsonl'))
+
+    def test_each_fixture_yields_the_fixed_text(self):
+        self.assertTrue(self.FIXTURES)
+        for fx_file in self.FIXTURES:
+            with self.subTest(fixture=fx_file.name), tempfile.TemporaryDirectory() as d:
+                proj = Path(d) / '-home-someone-project'
+                proj.mkdir()
+                (proj / 'fixture-session.jsonl').write_bytes(fx_file.read_bytes())
+                with mock.patch.object(consumption, 'ROOT', Path(d)):
+                    u = consumption.collect(30, now=consumption.datetime.datetime(2026, 11, 6, tzinfo=consumption.datetime.timezone.utc))
+                fx = u['fixed']
+                self.assertIsNotNone(fx, 'the listing rows were not recognised')
+                self.assertEqual(fx['requests'], 3)
+                for part in fixed_text.PARTS:
+                    self.assertGreater(fx['parts'][part]['tokens'], 0, part)
+                self.assertEqual((fx['parts']['agents']['n'], fx['parts']['agents']['unused_n']), (3, 3))
+                self.assertEqual((fx['parts']['skills']['n'], fx['skills_used']), (3, {'plug:alpha': 1}))
+                self.assertEqual((fx['bodies'][0]['skill'], fx['bodies'][0]['requests']), ('plug:alpha', 1))   # loaded, one request, then compacted away
+                self.assertEqual(status.transcript_notes(u), [])
+
+    def test_transcripts_without_the_rows_are_said_so(self):
+        # A Claude Code version that writes no listing rows: the fixed-text figures would be zero, which is not the same as cheap.
+        self.assertEqual(status.transcript_notes({'main': {'total': 0.0}, 'fixed': None}), [])
+        notes = status.transcript_notes({'main': {'total': 12.0}, 'fixed': None})
+        self.assertEqual(len(notes), 1)
+        self.assertIn('listing rows', notes[0])
+
+
+class ConfigDir(unittest.TestCase):
+    def test_claude_config_dir_moves_every_path(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': d}):
+            self.assertEqual(claude_home.config_dir(), Path(d))
+            self.assertEqual(claude_home.agents_dir(), Path(d) / 'agents')
+            self.assertEqual(claude_home.unused_dir(), Path(d) / 'agents.unused')
+            self.assertEqual(claude_home.projects_dir(), Path(d) / 'projects')
+        with mock.patch.dict(os.environ, {}, clear=True):
+            os.environ.pop('CLAUDE_CONFIG_DIR', None)
+            self.assertEqual(claude_home.config_dir(), Path.home() / '.claude')
+
+    def test_status_reads_the_agents_where_the_variable_says(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'agents').mkdir()
+            (Path(d) / 'agents' / 'web-researcher.md').write_text('---\nname: Web Researcher\nmodel: haiku\n---\n', encoding='utf-8')
+            env = {**os.environ, 'CLAUDE_CONFIG_DIR': d, 'PYTHONUTF8': '1'}
+            r = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / 'status.py'), '--json'], capture_output=True, text=True, env=env,
+                               cwd=str(Path(__file__).resolve().parent.parent), timeout=120)
+            self.assertEqual(r.returncode, 0, r.stderr[-800:])
+            s = json.loads(r.stdout)
+            self.assertEqual(s['agents']['dir'], str(Path(d) / 'agents'))
+            self.assertEqual(s['agents']['files'], 1)
+            self.assertEqual(s['usage']['main_total'], 0)   # no transcripts under that directory
+
+
+class FixedSuggestions(unittest.TestCase):
+    FX = {'requests': 400, 'sessions': 20, 'skills_used': {'deploy': 9},
+          'parts': {'agents': {'tokens': 14000, 'cost': 10.0, 'n': 178, 'unused_n': 170, 'unused_tokens': 12600,
+                               'largest_unused': [{'name': 'threat-detection-engineer', 'tokens': 677}]},
+                    'skills': {'tokens': 7000, 'cost': 4.0, 'n': 78, 'unused_n': 70, 'unused_tokens': 3500,
+                               'largest_unused': [{'name': 'dataviz', 'tokens': 362}],
+                               'unused_by_source': [{'source': 'impeccable', 'n': 21, 'tokens': 900}, {'source': '', 'n': 10, 'tokens': 1500}]},
+                    'hooks': {'tokens': 850, 'cost': 0.3}, 'mcp': {'tokens': 700, 'cost': 0.2}},
+          'bodies': [{'skill': 'deploy', 'loads': 9, 'requests': 300, 'cost': 2.0, 'tokens': 4000, 'digest': 'abc12345', 'commands': 0.5},
+                     {'skill': 'superpowers:debugging', 'loads': 6, 'requests': 200, 'cost': 1.0, 'tokens': 2400, 'digest': 'def67890', 'commands': 0.05},
+                     {'skill': 'lint', 'loads': 1, 'requests': 3, 'cost': 0.02, 'tokens': 300, 'digest': '00000000', 'commands': 0.9}]}
+
+    def test_the_lists_and_the_loaded_skills_each_get_a_line(self):
+        out = {g['id']: g for g in status.suggest_fixed(self.FX)}
+        self.assertEqual(set(out), {'fixed:agents', 'fixed:skills', 'skill:deploy:abc12345', 'skill:superpowers:debugging:def67890'})
+        self.assertTrue(all(g['kind'] == 'learned' for g in out.values()))
+        self.assertEqual(out['fixed:agents']['saving'], [9.0, 9.0])                       # $10 times the 12.6k of 14k nothing called
+        self.assertIn('170 of 178', out['fixed:agents']['title'])
+        self.assertEqual(out['fixed:skills']['saving'], [0.0, 2.0])                       # an upper bound: a plugin's skills go only with the plugin
+        self.assertIn('impeccable 21', out['fixed:skills']['basis'])
+        self.assertTrue(out['fixed:skills']['action'].startswith('/skill-doctor'))          # Claude Code 2.1.261+ has the per-skill report itself
+        self.assertIn('main-session', out['fixed:agents']['basis'])                        # the cost is a floor: side requests are not in the transcript
+        self.assertEqual(out['skill:deploy:abc12345']['saving'], [0.0, 1.0])              # half of its body is commands a script could hold
+        self.assertIn('script', out['skill:deploy:abc12345']['action'])
+        self.assertIsNone(out['skill:superpowers:debugging:def67890']['saving'])          # guidance: no cheaper form is known
+        self.assertNotIn('script', out['skill:superpowers:debugging:def67890']['action'].split(';')[0])
+
+    def test_a_changed_skill_is_a_new_suggestion(self):
+        fx = json.loads(json.dumps(self.FX))
+        fx['bodies'][0]['digest'] = 'changed1'
+        self.assertIn('skill:deploy:changed1', {g['id'] for g in status.suggest_fixed(fx)})   # a dismissal of the old body does not hide it
+
+    def test_nothing_measured_nothing_said(self):
+        self.assertEqual(status.suggest_fixed(None), [])
+        small = {'requests': 3, 'sessions': 1, 'skills_used': {}, 'bodies': [],
+                 'parts': {'agents': {'tokens': 100, 'cost': 0.1, 'n': 2, 'unused_n': 2, 'unused_tokens': 100, 'largest_unused': []}}}
+        self.assertEqual(status.suggest_fixed(small), [])                                 # under the floor
+
+
+class PruneAgents(unittest.TestCase):
+    def test_the_files_in_folders_move_and_come_back(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / 'agents'
+            (root / 'testing').mkdir(parents=True)
+            agent = '---\nname: %s\ndescription: x\n---\nbody\n'
+            (root / 'testing' / 'testing-api-tester.md').write_text(agent % 'API Tester', encoding='utf-8')
+            (root / 'testing' / 'testing-other.md').write_text(agent % 'Other', encoding='utf-8')
+            (root / 'used.md').write_text(agent % 'Used', encoding='utf-8')
+            (root / 'README.md').write_text('# the collection\n', encoding='utf-8')
+            routing = Path(d) / 'routing.json'
+            routing.write_text(json.dumps({'agents': {'testing-api-tester.md': {}}}), encoding='utf-8')
+            base = ['prune_agents.py', '--agents-dir', str(root), '--routing', str(routing)]
+            def run(*more):
+                with mock.patch.object(sys, 'argv', base + list(more)), mock.patch.object(prune_agents, 'called_agents', return_value={'Used': 3}), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    prune_agents.main()
+            def tree(folder):
+                return sorted(str(p.relative_to(folder)).replace('\\', '/') for p in folder.rglob('*.md'))
+            run('--dry-run')
+            self.assertFalse((Path(d) / 'agents.unused').exists())
+            run()
+            self.assertEqual(tree(root), ['README.md', 'testing/testing-api-tester.md', 'used.md'])   # routed, called, and not an agent: kept
+            self.assertEqual(tree(Path(d) / 'agents.unused'), ['testing/testing-other.md'])
+            run('--revert')
+            self.assertEqual(tree(root), ['README.md', 'testing/testing-api-tester.md', 'testing/testing-other.md', 'used.md'])
 
 
 if __name__ == '__main__':

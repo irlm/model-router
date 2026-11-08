@@ -24,7 +24,13 @@ const JOBS: Record<string, { title: string; argv: (python: string, clone: boolea
   ledger: { title: 'usage ledger', argv: (py, clone) => [py, 'tools/ledger.py', clone ? '--stdout' : '--commit'] },
   apply: { title: 'apply agents', argv: py => [py, 'apply_agents.py'] },
   pull: { title: 'git pull', argv: () => ['git', 'pull', '--ff-only'] },
+  // The agent files nothing called: a dry run lists them; `move` parks them in agents.unused (folders kept); `revert` brings them back.
+  prune: { title: 'prune agents (dry run)', argv: py => [py, 'tools/prune_agents.py', '--dry-run'] },
+  'prune-move': { title: 'prune agents', argv: py => [py, 'tools/prune_agents.py'] },
+  'prune-revert': { title: 'restore the pruned agents', argv: py => [py, 'tools/prune_agents.py', '--revert'] },
 }
+/** What /router prune <arg> runs: nothing or dry-run lists, move moves, revert restores; anything else is not a job. */
+const pruneJob = (arg: string) => (arg === '' || arg === 'dry-run' ? 'prune' : arg === 'move' ? 'prune-move' : arg === 'revert' ? 'prune-revert' : null)
 
 // Python reads and writes UTF-8 everywhere (transcripts, ledger, git output), also on Windows,
 // where its default is the console code page.
@@ -46,6 +52,10 @@ type StatusMode = 'full' | 'minimal' | 'off'
 const savingsUpTo = (s: StatusJson, kind?: string) => (s.suggestions ?? []).filter(g => !kind || g.kind === kind).reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
 /** The suggestions' upper savings by evidence kind, for the window that was: what it would have consumed less, not what will. */
 const savingsMix = (s: StatusJson) => ['measured', 'extrapolated', 'unmeasured'].map(k => [k, savingsUpTo(s, k)] as const).filter(([, v]) => v >= 1).map(([k, v]) => `${money(v)} ${k}`).join(', ')
+/** What the window consumed, main sessions and subagents. */
+const spent = (s: StatusJson) => (s.usage ? s.usage.main_total + s.usage.subagents_total : 0)
+/** `n` as a share of `of`, as "12%; " for a status line, or '' when there is nothing to divide by. */
+const share = (n: number, of: number) => (of > 0 && n > 0 ? `${Math.round((100 * n) / of)}%; ` : '')
 
 /** The status line under the prompt (the host prefixes the plugin's name): the rate-limit windows, what the
  * router did this session, what a change saved, what the suggestions add up to, what to check. Only what
@@ -58,7 +68,8 @@ const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: Statu
   const r = s.changes?.realized
   if (mode === 'full' && r && r.saved !== 0 && !caveats(r)) parts.push(`${r.saved > 0 ? 'saved' : 'cost up'} ${money(Math.abs(r.saved))} since ${r.since.slice(5, 10)}`)
   const upTo = savingsUpTo(s)
-  if (mode === 'full' && upTo >= 1) parts.push(`up to ${money(upTo)} less last ${s.usage?.days ?? 30}d (${money(savingsUpTo(s, 'measured'))} measured)`)
+  // The share of the window's spend says the same on a subscription, where the dollars are headroom, not a bill.
+  if (mode === 'full' && upTo >= 1) parts.push(`up to ${money(upTo)} less last ${s.usage?.days ?? 30}d (${share(upTo, spent(s))}${money(savingsUpTo(s, 'measured'))} measured)`)
   if (s.advice.length > 0) parts.push(`${s.advice.length} to check`)
   if (parts.filter(Boolean).length === 0) parts.push('ok')
   return `${parts.filter(Boolean).join(' · ')} · /router`
@@ -187,7 +198,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   const gone = (s.suggestions ?? []).filter(x => x.dismissed).length
   const upTo = savingsUpTo(s)
   lines.push(BLANK, line(sug.length === 0 ? `suggestions: none${gone ? ` (${gone} dismissed)` : ''}`
-    : `suggestions (the last ${days} days could have consumed up to ${money(upTo)} less of ${money(total)}: ${savingsMix(s) || 'nothing measured'}${gone ? `; ${gone} dismissed` : ''}):`, { bold: true }))
+    : `suggestions (the last ${days} days could have consumed up to ${money(upTo)} less of ${money(total)}${total > 0 && upTo > 0 ? ` (${Math.round((100 * upTo) / total)}%)` : ''}: ${savingsMix(s) || 'nothing measured'}${gone ? `; ${gone} dismissed` : ''}):`, { bold: true }))
   const GLANCE = 4
   const shownSug = full ? sug : sug.slice(0, GLANCE)
   shownSug.forEach((g, i) => {
@@ -236,7 +247,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     for (const x of s.slots) lines.push(line(`  ${x.since.slice(5)} to ${x.until.slice(5)}  ${bar(top > 0 ? x.spend / top : 0, 12)} ${money(x.spend).padStart(6)}  ${String(x.calls).padStart(5)}  ${String(x.struggled).padStart(9)}  ${String(x.routed).padStart(6)}`))
   }
   if (u && full) {
-    lines.push(BLANK, line(`consumption, last ${days} days since ${u.since} (catalog $ = headroom on a subscription): main ${money(u.main_total)} (output ${money(u.main_out_cost)}) · subagents ${money(u.subagents_total)} in ${u.subagent_calls} calls`, { bold: true }))
+    lines.push(BLANK, line(`consumption, last ${days} days since ${u.since} (catalog $ = headroom on a subscription; a floor: the side requests Claude Code makes are not in the transcripts): main ${money(u.main_total)} (output ${money(u.main_out_cost)}) · subagents ${money(u.subagents_total)} in ${u.subagent_calls} calls`, { bold: true }))
     const top = Math.max(0, ...u.main_rows.map(x => x.cost), ...Object.values(u.by_class).map(b => b.cost))
     for (const x of u.main_rows.slice(0, 6)) {
       lines.push(line(`  ${x.model.padEnd(30)}${x.effort.padEnd(8)}${bar(top > 0 ? x.cost / top : 0, 20)} ${money(x.cost).padStart(5)}  ${String(x.msgs).padStart(5)} msgs`))
@@ -382,7 +393,10 @@ async function findPython($: Dollar) {
       // not on PATH; try the next name
     }
   }
-  throw new Error('no Python 3 on PATH: set "Python command" in /config (model-router)')
+  const platform = (await $.env.get('OS')) === 'Windows_NT' ? 'winget install Python.Python.3.13 (or python.org), then open a new terminal'
+    : (await $.env.get('HOME'))?.startsWith('/Users/') ? 'xcode-select --install or brew install python3'
+    : 'apt install python3 (or your distribution\'s package)'
+  throw new Error(`no Python 3 on PATH: the widget reads your transcripts with it. Install: ${platform}; or set "Python command" in /config (model-router)`)
 }
 
 /** The rate-limit windows the last API response reported; none when the host does not say. */
@@ -573,8 +587,8 @@ export const register: Register = (on, options) => {
     projectKey = keyOf(e.cwd)
     await $.command.register({
       name: 'router',
-      description: 'Model router: where the routing stands, re-check it, ledger, apply, pull',
-      argumentHint: 'open | check | fetch | update | ledger | apply | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
+      description: 'Model router: where the routing stands, first-run setup, re-check it, ledger, apply, prune, pull',
+      argumentHint: 'open | setup | check | fetch | update | ledger | apply | prune [move|revert] | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
     })
     void refresh($)
     if (refreshMinutes > 0) {
@@ -710,13 +724,33 @@ export const register: Register = (on, options) => {
       }
       return { text: `routing ${routingMode} for this session${arg ? '' : ' (routing ask|auto|off sets it)'}; /config makes it permanent.` }
     }
+    // First run on a machine: install the routed agents, then say what the pane's yellow lines mean and what comes next.
+    if (verb === 'setup') {
+      await $.ui.open({ id: PANE, title: 'Model router' })
+      const started = await runJob($, 'apply')
+      const s = await read($, status)
+      const a = s?.json?.agents
+      return { text: [
+        started ? 'apply agents started: the routed agent files this repository ships are installed or updated in ~/.claude/agents (the pane shows the output).' : 'apply agents did not start (see the toast); the rest still applies.',
+        'What the pane shows: the yellow "to check" lines are things to do, not failures; a suggestion line is an estimate from your own transcripts or the benchmark, with its basis under Details.',
+        'Routing: in ask mode (the default) the router asks before moving an Agent call to the measured model; /router routing auto moves them without asking; /config makes it permanent.',
+        a && a.files > 20 ? `Then: ${a.files} agent files sit in ~/.claude/agents and every one adds its description to every request; /router prune lists the ones nothing here has called, /router prune move parks them (reversible: /router prune revert).` : 'Then: /router check any time for the text of the pane; /router prune lists the agent files nothing here has called.',
+      ].join('\n') }
+    }
+    if (verb === 'prune') {
+      const name = pruneJob(arg)
+      if (!name) return { text: 'prune takes nothing (dry run), move or revert: /router prune | /router prune move | /router prune revert' }
+      await $.ui.open({ id: PANE, title: 'Model router' })
+      const started = await runJob($, name)
+      return { text: started ? `${JOBS[name].title} started; the pane shows its output${name === 'prune' ? '; /router prune move does it, /router prune revert undoes it' : name === 'prune-move' ? '; /router prune revert undoes it' : ''}.` : 'Not started.' }
+    }
     const spec = JOBS[verb]
     if (spec) {
       await $.ui.open({ id: PANE, title: 'Model router' })
       const started = await runJob($, verb)
       return { text: started ? `${spec.title} started; the pane shows its output.` : 'Not started.' }
     }
-    return { text: 'Usage: /router [open | check | fetch | update | ledger | apply | pull | routing ask|auto|off]' }
+    return { text: 'Usage: /router [open | setup | check | fetch | update | ledger | apply | prune [move|revert] | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>]' }
   })
 
   // Every Agent call: when a measured family covers the task and the call asks for something dearer than

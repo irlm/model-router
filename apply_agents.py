@@ -20,6 +20,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / 'tools'))
 import agent_files  # noqa: E402
+import claude_home  # noqa: E402
 import changes  # noqa: E402
 TEMPLATES = HERE / 'agents'   # agent files the repository ships, installed when missing
 KEYS = ('model:', 'effort:')
@@ -49,7 +50,7 @@ def rewrite(text, model, effort, revert, instruction=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--agents-dir', type=Path, default=Path.home() / '.claude/agents')
+    ap.add_argument('--agents-dir', type=Path, default=claude_home.agents_dir())
     ap.add_argument('--routing', type=Path, default=HERE / 'routing.json')
     ap.add_argument('--revert', action='store_true')
     ap.add_argument('--dry-run', action='store_true')

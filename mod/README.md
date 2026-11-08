@@ -105,6 +105,30 @@ clone nothing is committed: "Ledger now" prints the entry into the pane instead 
 A checkout of your own is for the benchmark, the ledger timer and changing the code: clone the
 repository to the default path, or anywhere and set the path in `/config`.
 
+**First run on a machine: `/router setup`.** It installs the routed agent files the repository ships
+(`apply_agents.py`), then says what the pane shows: the yellow "to check" lines are things to do, not
+failures (a fresh machine has "agent web-researcher.md not installed yet" until apply runs); a
+suggestion line is an estimate with its basis under Details; in ask mode the router asks before it
+moves an Agent call. When many agent files sit in `~/.claude/agents`, it points to `/router prune`.
+
+### Requirements and what it reads
+
+Python 3 (3.10 or newer), git and the `claude` CLI on PATH; `CLAUDE_CONFIG_DIR` is honoured when
+Claude Code runs with one. Without Python the pane says so, with the install command for your OS, and
+nothing else runs: the data side (`tools/*.py`) reads your transcripts with it.
+
+Everything stays on your machine. The widget reads `~/.claude/projects` (the transcripts: usage
+numbers, Agent calls, the listing rows), `~/.claude/agents` and `~/.claude/plugins`; it writes the
+routed agent files under `~/.claude/agents`, its own files under `~/.claude/model-router`
+(overrides, dismissals, the change log, the routed log), and the ledger into the checkout when you
+have one. Nothing is sent anywhere: no telemetry, no network call but `git fetch`/`pull` against the
+repository and, in the benchmark, the model calls you start yourself.
+
+The dollar figures are catalog prices for the tokens the transcripts record. They are a floor: the
+side requests Claude Code makes (titles, summaries, the compaction itself) are not written there, as
+cccost's author showed. On a subscription they are headroom, not a bill, so the status line and the
+suggestions header give the saving as a share of the window's spend too.
+
 ### Updating
 
 The widget has two parts that update separately: the mod (the pane, the status line, the router
@@ -185,6 +209,54 @@ and writes the new tail. Two things follow, both measured per project under Deta
 A project whose sessions re-read more than 150k tokens per message over 200 messages gets a `learned`
 suggestion with the re-reading above 100k per message as its upper saving.
 
+### What every request carries
+
+Before any task, each request carries the list of agent descriptions, the list of skill names and
+descriptions, the text hooks add at session start and the instructions of the MCP servers. They are
+written to the cache when a session starts and again when it comes back after the cache expired, and
+re-read on every request in between. The transcripts record each list, so `tools/fixed_text.py`
+counts their size (characters / 4, an estimate) and what carrying them cost in the window, and which
+entries nothing on this machine used. Three `learned` suggestions come from it:
+
+- **agent list**: the agents no Agent call named in the window, and their share of the cost.
+  `tools/prune_agents.py` moves the agent files no transcript ever called to `~/.claude/agents.unused`,
+  folders kept; Claude Code documents no setting that takes an agent out of the list.
+- **skill list**: the skills never loaded, by the plugin they come with. A skill of your own leaves
+  the list in `/skills` (`skillOverrides`) or with `disable-model-invocation: true`; a plugin's skills
+  leave it only with the plugin, so the saving is an upper bound.
+- **a loaded skill**: a skill's body stays in the session from its load to the next compaction. When
+  re-reading it cost more than the floor, the line says how often it was loaded and how much of the
+  body is shell in fenced blocks. From 30% it reads as a procedure a script could hold (a script is
+  run, not read), and that share of the cost is the upper saving; under it the body is guidance and
+  no saving is claimed. The line carries the digest of the body: a skill that changed is a new line,
+  also after you dismissed the old one. Nothing rewrites a skill for you: no check here can say the
+  rewritten skill still does its job.
+
+`python3 tools/status.py` prints the four sizes and the loaded skills under "carried by every request".
+Claude Code has part of this itself since 2.1.261: `/skill-doctor` lists the unused skills with what
+each costs in context, in the `/plugin` manager's Stats tab. The skill-list suggestion sends you there
+first; what it adds is the grouping by plugin, and the agent list, the hook text and the MCP
+instructions, which `/skill-doctor` does not cover. Pruning agents: `/router prune` lists the files
+nothing on this machine has called, `/router prune move` parks them in `~/.claude/agents.unused`
+(folders kept), `/router prune revert` brings them back.
+
+When the transcripts carry none of the listing rows (a Claude Code version that writes them
+differently), the pane says so under "to check" instead of showing zeros. The rows as each version
+writes them are kept as fixtures (`tools/fixtures/transcript-<version>.jsonl`, content replaced), so a
+change breaks the tests here, not the numbers on a user's machine.
+
+### Coming back after the cache expired
+
+The server cache lives an hour on a subscription (five minutes on an API key). A session resumed
+after that re-writes its whole context at the cache-write price: on this machine four returns cost
+$10 in a month, more than the lists above. From 200k tokens Claude Code 2.1.299+ compacts an idle
+session by itself after about 54 minutes (`idleCompaction` in settings.json;
+`CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` lowers the bar to 100k; it needs the terminal open and the
+machine awake), and 2.1.304+ warns on resume when the re-write would take a noticeable share of the
+5-hour window. Below 200k nothing native helps, so a `learned` line per project counts the returns
+after an idle hour and what they re-wrote; the move is `/compact` before leaving, or `/clear` when the
+task is done. Above 200k the line says the native compaction should have run, and to check it is on.
+
 ### A different task in a big session
 
 The widget watches each prompt you type. It keeps the words of the session's earlier prompts (seeded
@@ -253,6 +325,13 @@ Claude Code itself offers only manual levers for a subagent's model (the docs re
 is overloaded. No page describes an automatic per-task router, and the advice is "route tasks to
 faster, lower-cost models like Haiku" without saying which tasks. This widget is that rule with
 numbers behind it, and the check that it holds on your own work.
+
+What else exists (checked 2026-11-08): ccusage and its forks read the same transcripts for cost
+tables; claude-usage-analyzer (ccwhy) and cclint add suggestions and a lint of CLAUDE.md, hooks and
+skills, with no saving estimated and nothing measured afterwards; Microsoft's TokenEconomizer prunes
+unused tools into deny lists and learns repository facts; llm-router and AutoRouter route by
+heuristics. None routes from a measured benchmark per kind of task, and none checks what a change
+saved in the transcripts since; that is what this one does.
 
 ### Windows
 

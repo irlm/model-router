@@ -32,7 +32,7 @@ automatically, and checked afterwards on the person's own work.
 /plugin install model-router --marketplace irlm/model-router
 ```
 
-then restart Claude Code. One user-scope install serves the terminal, the desktop app's local sessions
+then restart Claude Code and run `/router setup` once. One user-scope install serves the terminal, the desktop app's local sessions
 and VS Code on that computer; cloud sessions on claude.ai/code do not load local plugins. To update:
 `claude plugin marketplace update model-router`, `claude plugin update model-router@model-router`,
 restart. `mod/README.md` has the pane, the commands, Windows, updating and the reasoning behind
@@ -66,7 +66,10 @@ decide.py                the rule: cheapest candidate whose Wilson lower bound i
 apply_agents.py          writes the decision into the agent files you have in ~/.claude/agents/ (--revert undoes); installs agents/web-researcher.md when missing
 regress.py               after a Claude Code update or monthly: each default on a small sample, binomial check
 tools/ledger.py          monthly: what this machine actually ran (subagent calls, tokens, cost), from the transcripts
-tools/prune_agents.py    moves the agent files no transcript ever called out of the prefix (reversible)
+tools/prune_agents.py    moves the agent files no transcript ever called out of the prefix, in whatever folder they sit (reversible)
+tools/fixed_text.py      what every request carries whatever the task (agent list, skill list, hook text, loaded skill bodies) and what it cost, from the transcripts
+tools/claude_home.py     where Claude Code keeps its files (~/.claude, or CLAUDE_CONFIG_DIR)
+tools/fixtures/          transcript rows as each Claude Code version writes them, content replaced: the format test
 tools/status.py          where the routing stands on this machine, what is worth doing, and the suggestions (text or --json)
 tools/consumption.py     the last 30 days of interactive work by model and effort, every Agent call priced and classified
 tools/update.py          re-check: regress.py on every family whose fixtures exist here, then commit and push

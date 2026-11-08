@@ -32,7 +32,7 @@ automatically, and checked afterwards on the person's own work.
 /plugin install model-router --marketplace irlm/model-router
 ```
 
-then restart Claude Code and run `/router setup` once. One user-scope install serves the terminal, the desktop app's local sessions
+then restart Claude Code and run `/router setup` once; `/router doctor` lists each piece of the installation as ok or to do. One user-scope install serves the terminal, the desktop app's local sessions
 and VS Code on that computer; cloud sessions on claude.ai/code do not load local plugins. To update:
 `claude plugin marketplace update model-router`, `claude plugin update model-router@model-router`,
 restart. `mod/README.md` has the pane, the commands, Windows, updating and the reasoning behind
@@ -70,7 +70,9 @@ regress.py               after a Claude Code update or monthly: each default on 
 tools/ledger.py          monthly: what this machine actually ran (subagent calls, tokens, cost), from the transcripts
 tools/prune_agents.py    moves the agent files no transcript ever called out of the prefix, in whatever folder they sit (reversible)
 tools/fixed_text.py      what every request carries whatever the task (agent list, skill list, hook text, loaded skill bodies) and what it cost, from the transcripts
-tools/claude_home.py     where Claude Code keeps its files (~/.claude, or CLAUDE_CONFIG_DIR)
+tools/agent_sources.py pinned third-party agent files: diff with flags before an update lands
+tools/release.py       tag a version (v<plugin.json version>) after the CHANGELOG and tree checks
+tools/claude_home.py   where Claude Code keeps its files (~/.claude, or CLAUDE_CONFIG_DIR)
 tools/fixtures/          transcript rows as each Claude Code version writes them, content replaced: the format test
 tools/status.py          where the routing stands on this machine, what is worth doing, and the suggestions (text or --json)
 tools/consumption.py     the last 30 days of interactive work by model and effort, every Agent call priced and classified

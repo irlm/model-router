@@ -28,9 +28,24 @@ const JOBS: Record<string, { title: string; argv: (python: string, clone: boolea
   prune: { title: 'prune agents (dry run)', argv: py => [py, 'tools/prune_agents.py', '--dry-run'] },
   'prune-move': { title: 'prune agents', argv: py => [py, 'tools/prune_agents.py'] },
   'prune-revert': { title: 'restore the pruned agents', argv: py => [py, 'tools/prune_agents.py', '--revert'] },
+  // Agent files from outside this repository: pinned to their source commit; a change there is shown with flags and taken only by name.
+  'agents-pin': { title: 'pin the agent sources', argv: py => [py, 'tools/agent_sources.py', 'pin', '--repo'] },
+  'agents-check': { title: 'check the agent sources', argv: py => [py, 'tools/agent_sources.py', 'check'] },
+  'agents-update': { title: 'update the pinned agents', argv: py => [py, 'tools/agent_sources.py', 'update'] },
+  'agents-list': { title: 'pinned agent sources', argv: py => [py, 'tools/agent_sources.py', 'list'] },
+  doctor: { title: 'installation check', argv: py => [py, 'tools/status.py', '--doctor'] },
 }
 /** What /router prune <arg> runs: nothing or dry-run lists, move moves, revert restores; anything else is not a job. */
 const pruneJob = (arg: string) => (arg === '' || arg === 'dry-run' ? 'prune' : arg === 'move' ? 'prune-move' : arg === 'revert' ? 'prune-revert' : null)
+/** What /router agents <args> runs: pin <url>, check, update [file...] [--accept-flags], list; null when it is none of them. */
+const agentsJob = (arg: string): { name: string; extra: string[] } | null => {
+  const [sub, ...rest] = arg.split(/\s+/).filter(Boolean)
+  if (sub === 'pin' && rest.length === 1 && /^(https?:\/\/|git@|\/|~|[A-Za-z]:\\)/.test(rest[0])) return { name: 'agents-pin', extra: rest }
+  if (sub === 'check' && rest.length === 0) return { name: 'agents-check', extra: [] }
+  if (sub === 'update' && rest.every(r => r === '--accept-flags' || /^[\w.-]+\.md$/.test(r))) return { name: 'agents-update', extra: rest }
+  if ((sub === 'list' || sub === undefined) && rest.length === 0) return { name: 'agents-list', extra: [] }
+  return null
+}
 
 // Python reads and writes UTF-8 everywhere (transcripts, ledger, git output), also on Windows,
 // where its default is the console code page.
@@ -456,7 +471,7 @@ async function logRouted($: Dollar, family: string, agent: string, from: string,
   }
 }
 
-async function runJob($: Dollar, name: string) {
+async function runJob($: Dollar, name: string, extra: string[] = []) {
   const spec = JOBS[name]
   if (!spec) return false
   const current = await read($, job)
@@ -466,7 +481,7 @@ async function runJob($: Dollar, name: string) {
   }
   let argv: string[]
   try {
-    argv = spec.argv(await findPython($), where !== '')
+    argv = [...spec.argv(await findPython($), where !== ''), ...extra]
   } catch (err) {
     $.ui.toast(err instanceof Error ? err.message : String(err))
     return false
@@ -587,8 +602,8 @@ export const register: Register = (on, options) => {
     projectKey = keyOf(e.cwd)
     await $.command.register({
       name: 'router',
-      description: 'Model router: where the routing stands, first-run setup, re-check it, ledger, apply, prune, pull',
-      argumentHint: 'open | setup | check | fetch | update | ledger | apply | prune [move|revert] | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
+      description: 'Model router: where the routing stands, first-run setup, installation check, re-check it, ledger, apply, prune, pinned agent sources, pull',
+      argumentHint: 'open | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file]|list | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
     })
     void refresh($)
     if (refreshMinutes > 0) {
@@ -669,6 +684,7 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'router' }, async ($, e) => {
     // No argument is 'open': an empty string splits to [''], which would miss the default.
     const [verb = 'open', arg = ''] = e.args.trim().split(/\s+/).filter(Boolean)
+    const tail = e.args.trim().split(/\s+/).filter(Boolean).slice(1).join(' ')   // every word after the verb: agents pin <url>, agents update <file...>
     if (verb === 'open') {
       const opened = await $.ui.open({ id: PANE, title: 'Model router' })
       void refresh($)
@@ -737,6 +753,19 @@ export const register: Register = (on, options) => {
         a && a.files > 20 ? `Then: ${a.files} agent files sit in ~/.claude/agents and every one adds its description to every request; /router prune lists the ones nothing here has called, /router prune move parks them (reversible: /router prune revert).` : 'Then: /router check any time for the text of the pane; /router prune lists the agent files nothing here has called.',
       ].join('\n') }
     }
+    // The installation piece by piece, as a job in the pane: what is there, what is missing and the step for it.
+    if (verb === 'doctor') {
+      await $.ui.open({ id: PANE, title: 'Model router' })
+      const started = await runJob($, 'doctor')
+      return { text: started ? 'installation check started; the pane lists each piece as ok or the step to take (python3 tools/status.py --doctor prints the same at a terminal).' : 'Not started.' }
+    }
+    if (verb === 'agents') {
+      const j = agentsJob(tail)
+      if (!j) return { text: 'agents takes: pin <repository url> | check | update [file.md ...] [--accept-flags] | list. A flagged change is taken only by name with --accept-flags.' }
+      await $.ui.open({ id: PANE, title: 'Model router' })
+      const started = await runJob($, j.name, j.extra)
+      return { text: started ? `${JOBS[j.name].title} started; the pane shows its output${j.name === 'agents-check' ? '; /router agents update takes the unflagged changes, /router agents update <file> --accept-flags a flagged one you have read' : j.name === 'agents-update' ? '; /router apply then puts the routed model and effort back' : ''}.` : 'Not started.' }
+    }
     if (verb === 'prune') {
       const name = pruneJob(arg)
       if (!name) return { text: 'prune takes nothing (dry run), move or revert: /router prune | /router prune move | /router prune revert' }
@@ -750,7 +779,7 @@ export const register: Register = (on, options) => {
       const started = await runJob($, verb)
       return { text: started ? `${spec.title} started; the pane shows its output.` : 'Not started.' }
     }
-    return { text: 'Usage: /router [open | setup | check | fetch | update | ledger | apply | prune [move|revert] | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>]' }
+    return { text: 'Usage: /router [open | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file] [--accept-flags]|list | pull | routing ask|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>]' }
   })
 
   // Every Agent call: when a measured family covers the task and the call asks for something dearer than

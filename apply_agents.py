@@ -20,6 +20,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / 'tools'))
 import agent_files  # noqa: E402
+import agent_sources  # noqa: E402
 import claude_home  # noqa: E402
 import changes  # noqa: E402
 TEMPLATES = HERE / 'agents'   # agent files the repository ships, installed when missing
@@ -78,6 +79,7 @@ def main():
         if not args.dry_run and (install or after != before):
             args.agents_dir.mkdir(parents=True, exist_ok=True)
             path.write_text(after, encoding='utf-8')
+            agent_sources.note_written(path)   # a pinned file: this write is ours, not a change to flag
             done.append(name)
         print(f"{state:13} {name}: {'removed' if args.revert else route['model'] + ' / ' + route['effort']} ({route['family']})")
     if absent:

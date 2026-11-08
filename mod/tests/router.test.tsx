@@ -147,6 +147,44 @@ test('/router setup installs the agents and says what the pane means; /router pr
   await settled()   // the last job's loop ends inside the test
 })
 
+test('/router doctor runs the installation check; /router agents pins, checks and updates by name, a flagged change needs --accept-flags', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(STATUS) } }))
+  const spawned: string[] = []
+  on('process.spawn', async function* (_, e) {
+    spawned.push(e.argv.slice(1).join(' '))
+    yield { stream: 'stdout', text: 'ok\n' }
+    return { value: { code: 0 } }
+  })
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.toast', () => ({ value: undefined }))
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'doctor' })).text).toContain('installation check started')
+  expect(spawned.at(-1)).toBe('tools/status.py --doctor')
+  await settled()
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'agents pin https://github.com/someone/agents' })).text).toContain('pin the agent sources started')
+  expect(spawned.at(-1)).toBe('tools/agent_sources.py pin --repo https://github.com/someone/agents')
+  await settled()
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'agents check' })).text).toContain('--accept-flags a flagged one you have read')
+  expect(spawned.at(-1)).toBe('tools/agent_sources.py check')
+  await settled()
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'agents update testing-api-tester.md --accept-flags' })).text).toContain('/router apply then puts the routed model and effort back')
+  expect(spawned.at(-1)).toBe('tools/agent_sources.py update testing-api-tester.md --accept-flags')
+  await settled()
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'agents' })).text).toContain('pinned agent sources started')
+  expect(spawned.at(-1)).toBe('tools/agent_sources.py list')
+  await settled()
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'agents pin not-a-url' })).text).toContain('agents takes: pin <repository url>')
+  expect((await $.command.run({ ...RUN, command: 'router', args: 'agents update ../../etc/passwd' })).text).toContain('agents takes:')
+  expect(spawned.at(-1)).toBe('tools/agent_sources.py list')   // neither bad argument reached a process
+})
+
 test('a missing checkout is said in the pane, not thrown', async ($, on) => {
   on('command.register', () => ({ value: { command: 'router' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))

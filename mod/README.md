@@ -118,7 +118,7 @@ Claude Code then reads the widget from that folder's `mod/` directly (`claude pl
 `/reload-plugins`, with no `plugin update`. `claude plugin marketplace remove model-router` takes the
 local marketplace out when you switch to the GitHub one.
 
-**First run on a machine: `/router setup`.** It installs the routed agent files the repository ships
+**First run on a machine: `/router setup`, then `/router doctor` to see each piece as ok or to do.** It installs the routed agent files the repository ships
 (`apply_agents.py`), then says what the pane shows: the yellow "to check" lines are things to do, not
 failures (a fresh machine has "agent web-researcher.md not installed yet" until apply runs); a
 suggestion line is an estimate with its basis under Details; in ask mode the router asks before it
@@ -257,6 +257,52 @@ When the transcripts carry none of the listing rows (a Claude Code version that 
 differently), the pane says so under "to check" instead of showing zeros. The rows as each version
 writes them are kept as fixtures (`tools/fixtures/transcript-<version>.jsonl`, content replaced), so a
 change breaks the tests here, not the numbers on a user's machine.
+
+### Agent files from outside this repository
+
+An agent file is instructions the model follows with your permissions, Bash included, so a change to
+one is treated like a code change: nothing here pulls an agent file on its own. The files this
+repository ships (`agents/`) are versioned with it. The others on your machine (a collection such as
+`agency-agents`) are pinned: `/router agents pin <repository url>` clones the source shallowly, finds
+each of your agent files by name in it and records the commit and a digest per file, with a copy of
+the file as it came, under `~/.claude/model-router/`. From then on:
+
+- `/router agents check` clones the source again and shows, per pinned file, the diff since the pin
+  with flags on the added lines that deserve a second look: a URL, a shell download or exec (`curl`,
+  `wget`, `base64`, `eval`, `sudo`, `rm -rf`), a secret's path or name (`~/.ssh`, `.env`, token,
+  password, key), an instruction to hide something or to ignore earlier instructions, invisible
+  Unicode, a `tools:` line that grants Bash or writing. A flag cannot clear or convict a change; a
+  human reading the diff does that. The pane's "to check" says how many pinned files changed and how
+  many are flagged; status never touches the network, only `check` and `update` do.
+- `/router agents update` takes the unflagged changes and re-pins; a flagged file is taken only by
+  name, `/router agents update <file.md> --accept-flags`, once you have read its diff. Then
+  `/router apply` puts the routed model and effort back into the routed ones.
+- A pinned file edited on disk by anything but `apply` or `update` gets a "to check" line (the digest
+  of the last write this repository made is kept); a pin not checked in 30 days gets one too.
+
+Forking the source gives no more safety than this: the merge is the same diff read by the same eyes,
+and your own edits (model, effort, the test-running instruction) live in `routing.json` and are
+re-applied, so no fork is needed to keep them. `python3 tools/agent_sources.py {pin,check,update,list}`
+at a terminal does the same.
+
+### Installation status
+
+`/router doctor` lists the installation piece by piece, each `ok` or `to do` with the step: Claude Code
+and its version, Python, git, the checkout (yours or the install's clone, behind origin or not), the
+widget version and whether it is tagged, the config dir in use, the routed agent files (applied,
+drifted, not installed yet, or not on this machine because nothing ships them), the agent files loaded
+and parked, the agent sources pinned or not, and whether the transcripts in the window were read and
+carried the listing rows. On a machine where `/router setup` was never run it says
+`to do routed agents ... -> /router setup (runs apply)`. `python3 tools/status.py --doctor` prints the
+same at a terminal.
+
+### Versions
+
+A version is a git tag `v<version>`, `<version>` being `mod/.claude-plugin/plugin.json`; the directory
+publishes a version when the number rises. `python3 tools/release.py` checks that the version is the
+newest `CHANGELOG.md` entry and the tree is clean, then tags HEAD; `git push --tags` publishes the tag.
+A machine that wants to stay on a version checks it out in its clone (`git checkout v0.12.0`) and
+skips "Pull". A committed version without its tag is a "to check" line in the pane.
 
 ### Coming back after the cache expired
 

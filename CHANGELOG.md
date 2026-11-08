@@ -3,6 +3,26 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.12.0 — 2026-11-08
+
+- `/router doctor`: the installation piece by piece (Claude Code, Python, git, checkout, widget version
+  and tag, config dir, routed agents applied or missing, agent files loaded and parked, pinned sources,
+  transcripts), each `ok` or `to do` with the step; `python3 tools/status.py --doctor` at a terminal.
+- Agent files from outside this repository are pinned to their source commit (`/router agents pin <url>`);
+  `/router agents check` shows what changed upstream as a diff with flags (a URL, a shell download, a
+  secret's name or path, an instruction to hide or to ignore earlier ones, invisible Unicode, a `tools:`
+  grant); `/router agents update` takes the unflagged changes, a flagged one only by name with
+  `--accept-flags`. Nothing pulls an agent file on its own. A hand edit to a pinned file gets a "to check"
+  line; `apply_agents.py` writing one does not.
+- Versions are git tags `v<version>`: `python3 tools/release.py` checks the CHANGELOG entry and the clean
+  tree, then tags; a version without its tag is a "to check" line; the tests keep plugin.json and the
+  newest CHANGELOG entry equal.
+- `/router agents` arguments are validated before anything runs (a URL or path for pin, `name.md` for update).
+- After `/router prune move`, the agent-list line says the files are parked and that the next sessions
+  show the shorter list, instead of asking for the move again.
+- Install from a checkout without a push (`claude plugin marketplace add <checkout>`): Claude Code
+  reads the widget from the folder; a commit shows after `/reload-plugins`. Documented in both READMEs.
+
 ## 0.11.0 — 2026-11-08
 
 - `/router setup`: first run on a machine installs the routed agents and says what the pane shows.
@@ -20,10 +40,6 @@ rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 - The saving is given as a share of the window's spend too; the consumption figures say they are a
   floor (side requests are not in the transcripts).
 - Without Python the pane names the install command for the OS.
-- After `/router prune move`, the agent-list line says the files are parked and that the next sessions
-  show the shorter list, instead of asking for the move again.
-- Install from a checkout without a push (`claude plugin marketplace add <checkout>`): Claude Code
-  reads the widget from the folder; a commit shows after `/reload-plugins`. Documented in both READMEs.
 
 ## 0.10.1 — 2026-11-03
 

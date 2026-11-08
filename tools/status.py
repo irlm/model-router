@@ -31,6 +31,7 @@ import claude_home  # noqa: E402
 sys.path.insert(0, str(HERE / 'catalog'))
 import price  # noqa: E402
 import agent_files  # noqa: E402
+import agent_sources  # noqa: E402
 import changes  # noqa: E402
 import consumption  # noqa: E402
 import overrides  # noqa: E402
@@ -94,6 +95,7 @@ def git_state(fetch):
         rc, _, _ = sh([git, 'fetch', '-q'], cwd=HERE, timeout=90)
         fetched = rc == 0
     _, head, _ = sh([git, 'rev-parse', '--short', 'HEAD'], cwd=HERE)
+    _, tag, _ = sh([git, 'tag', '--points-at', 'HEAD', '--list', 'v*'], cwd=HERE)
     _, branch, _ = sh([git, 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=HERE)
     _, dirty, _ = sh([git, 'status', '--porcelain'], cwd=HERE)
     rc, lr, _ = sh([git, 'rev-list', '--left-right', '--count', 'HEAD...@{u}'], cwd=HERE)
@@ -101,7 +103,63 @@ def git_state(fetch):
     if rc == 0 and lr:
         ahead, behind = [int(x) for x in lr.split()]
     return {'path': str(HERE), 'is_repo': True, 'head': head, 'branch': branch, 'dirty': len(dirty.splitlines()),
-            'ahead': ahead, 'behind': behind, 'fetched': fetched}
+            'ahead': ahead, 'behind': behind, 'fetched': fetched, 'tag': (tag.split() or [None])[0]}
+
+
+def widget_version():
+    """The version in mod/.claude-plugin/plugin.json: what the directory publishes and the tag a release gets."""
+    try:
+        return json.loads((HERE / 'mod' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8')).get('version')
+    except (OSError, ValueError):
+        return None
+
+
+def version_tagged(version):
+    """Whether tag v<version> exists in the checkout (a release is a tag; a version without one is not released yet)."""
+    git = shutil.which('git')
+    if not git or not version or not (HERE / '.git').exists():
+        return None
+    rc, out, _ = sh([git, 'tag', '--list', f'v{version}'], cwd=HERE)
+    return bool(out.strip()) if rc == 0 else None
+
+
+def install_state(version, git, agents, usage, wv, tagged, pins):
+    """The installation, piece by piece: what the widget needs on this machine and whether it is there.
+    Each item: name, ok (True / False / None when it cannot be known here), what, and the step when not ok."""
+    items = []
+    items.append({'name': 'Claude Code', 'ok': bool(version), 'what': version or 'claude CLI not on PATH', 'step': None if version else 'install Claude Code (claude.com/claude-code) or add claude to PATH'})
+    items.append({'name': 'Python', 'ok': True, 'what': sys.version.split()[0], 'step': None})
+    items.append({'name': 'git', 'ok': bool(shutil.which('git')), 'what': shutil.which('git') or 'not on PATH', 'step': None if shutil.which('git') else 'install git; the widget pulls and pins with it'})
+    clone = bool(os.environ.get('MODEL_ROUTER_CLONE'))
+    where = f"{'the install\'s clone' if clone else 'your checkout'} at {git.get('path')}"
+    items.append({'name': 'checkout', 'ok': git.get('is_repo', False), 'what': where + (f", {git['behind']} commit(s) behind origin" if git.get('behind') else ''),
+                  'step': '/router pull' if git.get('behind') else (None if git.get('is_repo') else 'the folder is not a git checkout: reinstall the plugin or set the path in /config')})
+    items.append({'name': 'widget version', 'ok': tagged is not False, 'what': f"{wv or '?'}" + (' (tagged)' if tagged else ' (no v-tag yet)' if tagged is False else ''),
+                  'step': None if tagged is not False else 'python3 tools/release.py tags the version once committed'})
+    items.append({'name': 'config dir', 'ok': True, 'what': str(claude_home.config_dir()) + (' (CLAUDE_CONFIG_DIR)' if os.environ.get('CLAUDE_CONFIG_DIR') else ''), 'step': None})
+    routed = agents.get('routed') or []
+    applied = [a for a in routed if a['state'] == 'applied']
+    missing = [a['file'] for a in routed if a['state'] == 'missing']
+    drifted = [a['file'] for a in routed if a['state'] == 'drifted']
+    absent = [a['file'] for a in routed if a['state'] == 'absent']
+    what = f"{len(applied)}/{len(routed)} routed agent files applied in {agents.get('dir')}"
+    if missing:
+        what += f"; not installed: {', '.join(missing)}"
+    if drifted:
+        what += f"; drifted: {', '.join(drifted)}"
+    if absent:
+        what += f"; not on this machine (not shipped here, nothing to install): {', '.join(absent)}"
+    items.append({'name': 'routed agents', 'ok': not (missing or drifted), 'what': what, 'step': '/router setup (runs apply)' if (missing or drifted) else None})
+    items.append({'name': 'agent files', 'ok': True, 'what': f"{agents.get('files', 0)} loaded, {agents.get('unused', 0)} parked in agents.unused", 'step': None if agents.get('files', 0) <= 20 or agents.get('unused') else '/router prune lists the ones nothing here has called'})
+    outside = [p.name for p in agent_sources.outside_files(AGENTS_DIR)]
+    unpinned = [f for f in outside if f not in pins]
+    items.append({'name': 'agent sources', 'ok': not unpinned, 'what': f"{len(outside)} agent file(s) from outside this repository, {len(pins)} pinned" + (f"; unpinned: {', '.join(unpinned[:4])}" if unpinned else ''),
+                  'step': f"/router agents pin {agent_sources.source_hint(AGENTS_DIR) or '<repository url>'}" if unpinned else None})
+    sessions = (usage.get('fixed') or {}).get('sessions') or 0
+    measured = bool(usage.get('fixed'))
+    items.append({'name': 'transcripts', 'ok': usage['main']['total'] > 0, 'what': f"${usage['main']['total']:.2f} in {usage['days']} days" + (f", what every request carries measured over {sessions} session(s)" if measured else ', listing rows not found' if usage['main']['total'] > 0 else ' (none in the window yet)'),
+                  'step': None if usage['main']['total'] > 0 else f"use Claude Code on this machine; the transcripts under {claude_home.projects_dir()} feed the pane"})
+    return items
 
 
 def variant_of(requires):
@@ -744,6 +802,13 @@ def collect(fetch=False):
     if not version:
         advice.append('claude CLI not found on PATH: nothing can run here')
     advice += transcript_notes(usage)
+    advice += agent_sources.notes(AGENTS_DIR)
+    wv = widget_version()
+    tagged = version_tagged(wv)
+    if tagged is False and not os.environ.get('MODEL_ROUTER_CLONE'):
+        advice.append(f"widget {wv} has no tag v{wv} yet: python3 tools/release.py tags the committed version")
+    pins = agent_sources.pinned_files(agent_sources.read())
+    install = install_state(version, git, agents, usage, wv, tagged, pins)
     unpriced = [r for r in usage['main']['rows'] if r['model'].endswith('(no price)')]
     if unpriced:
         advice.append(f"{sum(r['msgs'] for r in unpriced)} messages in {USAGE_DAYS} days on model ids without a catalog price "
@@ -752,7 +817,7 @@ def collect(fetch=False):
     return {'at': datetime.datetime.now().isoformat(timespec='minutes'), 'platform': platform.system(), 'host': platform.node(),
             'python': sys.version.split()[0], 'claude': version, 'repo': git,
             'routing': {'version': routing.get('version'), 'decided': routing.get('decided')},
-            'families': families, 'agents': agents,
+            'families': families, 'agents': agents, 'widget': {'version': wv, 'tagged': tagged}, 'install': install,
             'catalog': {'verified_oldest': oldest, 'age_days': age, 'models': models, 'fees_verified': (catalog.get('fees') or {}).get('verified')},
             'ledger': {'usage_last': last_usage(), 'regress_last': reg}, 'timer': timer, 'advice': advice,
             'usage': {'days': usage['days'], 'since': usage['since'], 'main_total': usage['main']['total'], 'main_out_cost': usage['main']['out_cost'],
@@ -766,6 +831,17 @@ def collect(fetch=False):
             'changes': {'events': events[-5:], 'realized': realized['latest'] if realized else None, 'history': realized['history'] if realized else []},
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}
 
+
+def doctor_text(s):
+    """The installation as a checklist: one line per piece, `ok` or `to do` with the step."""
+    out = [f"model-router installation on {s['host']} ({s['platform']}), widget {(s.get('widget') or {}).get('version') or '?'}"]
+    todo = 0
+    for it in s.get('install') or []:
+        mark = 'ok   ' if it['ok'] else 'to do' if it['ok'] is False else '?    '
+        todo += it['ok'] is False
+        out.append(f"  {mark} {it['name']:<15} {it['what']}" + (f"\n        -> {it['step']}" if it['step'] and not it['ok'] else ''))
+    out.append(f"{todo} step(s) to take" if todo else 'nothing missing')
+    return '\n'.join(out)
 
 def text(s):
     g = s['repo']
@@ -825,9 +901,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--json', action='store_true')
     ap.add_argument('--fetch', action='store_true', help='git fetch first, so behind/ahead are current')
+    ap.add_argument('--doctor', action='store_true', help='the installation, piece by piece: ok or the step to take')
     args = ap.parse_args()
     s = collect(fetch=args.fetch)
-    print(json.dumps(s) if args.json else text(s))
+    print(json.dumps(s) if args.json else doctor_text(s) if args.doctor else text(s))
 
 
 if __name__ == '__main__':

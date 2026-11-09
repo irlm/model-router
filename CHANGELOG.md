@@ -3,6 +3,16 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.16.0 — 2026-11-08
+
+- The run monitor, a second pane (`/router monitor`): the session's agents as a graph, the main session at the
+  root and each agent a box under the one that spawned it, the arrow weighted by the context it was sent
+  (estimated from the prompt at 4 characters a token: heavy from 16k, medium from 4k, light below), the box
+  carrying its state (RUNNING, QUIET after a minute without a request, DONE with its cost, FAILED), model and
+  effort, elapsed and request count; under it the live tail of the agents at work (their last tool calls,
+  an error in red) and the run's event log (spawned by whom, done in how long for how much, failed why).
+  The same second tick as the agents block redraws it while any agent runs; the command prints the text too.
+
 ## 0.15.1 — 2026-11-08
 
 - The pane says which widget version is loaded, and in yellow when the checkout already has another

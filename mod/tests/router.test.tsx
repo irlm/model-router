@@ -560,6 +560,40 @@ test('the pane names the loaded widget version, and warns when the checkout has 
   await settled()
 })
 
+test('the run monitor: the main session at the root, each agent a box under its spawner with the arrow weighted by the context sent, live tails from tool calls, and the event log', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, 'Bash')
+  let n = 0
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `m${++n}` }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  const SPAWN = { tool_use_id: 'tm1', prompt: 'Find where the config file is parsed and report the function. ' + 'x'.repeat(70000), description: 'find the parser', subagentType: 'Explore', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1', model: 'claude-haiku-5-5' } as const
+  await $.agent.spawn(SPAWN)
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tm2', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'What is the RFC number of TLS 1.3?', parentAgentId: 'm1' })
+  await drain($.turn.step({ turnId: 'tm1', index: 0, model: 'claude-haiku-5-5', effort: 'low', messageCount: 1, agentId: 'm1' }))
+  await $.tool.call({ tool: 'Grep', pattern: 'parse_config', path: 'tools', agentId: 'm1' })
+  await $.tool.call({ tool: 'Bash', command: 'python3 -m pytest -q', agentId: 'm1' })
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 'tm2', reason: 'answer', agentId: 'm2', usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 10000, cache_creation_input_tokens: 0 } })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
+  expect(text).toContain('Agent run pane opened.')
+  expect(text).toContain('agent run · 1 running · 1 done ($0.00)')
+  expect(text).toContain('┌ 00 main session')
+  expect(text).toMatch(/┗━━ ~18k ━━▶ ┌ 01 Explore/)                 // 70k characters: a heavy arrow
+  expect(text).toMatch(/● RUNNING\s+haiku low\s+\S+\s+1 step/)
+  expect(text).toMatch(/┗┄┄ ~\d+ ┄┄▶ ┌ 02 Web Researcher/)           // a short prompt: a light arrow, under its spawner
+  expect(text).toMatch(/● DONE\s+haiku\s+\S+\s+0 steps\s+\$0\.00/)
+  expect(text).toContain('● 01 Explore / live')
+  expect(text).toMatch(/\d\d:\d\d:\d\d  Grep "parse_config" tools/)
+  expect(text).toMatch(/ERROR \$ python3 -m pytest -q/)
+  expect(text).toContain('01 Explore spawned on haiku (~18k ctx)')   // not routed here, so no effort known at the spawn
+  expect(text).toMatch(/└─────────┬[─]+┘\n {10}┗━━/)                  // the trunk leaves the parent's box where the ┬ is
+  expect(text).toContain('02 Web Researcher spawned on haiku (~9 ctx) by 01')
+  expect(text).toMatch(/02 Web Researcher done in \S+, \$0\.00/)
+  await settled()
+})
+
 test('the agents block before any agent ran: the full pane names the block in one dim line, the glance shows nothing', { options: { routing: 'auto' } }, async ($, on) => {
   LIVE_MOCKS(on, [], [], null)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })

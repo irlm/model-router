@@ -175,9 +175,19 @@ export type RunningAgent = {
   out: number
   /** the run ended in an error or a refusal */
   failed: boolean
+  /** tokens the spawn sent it, estimated from the prompt (4 characters per token): the arrow weight in the run monitor */
+  ctx: number
+  /** its number in the run, 1 upward, as the monitor labels it */
+  n: number
+  /** its last tool calls, newest last: the monitor's live tail */
+  recent: Recent[]
 }
+/** One tool call of a subagent, as the monitor's tail shows it. */
+export type Recent = { at: number; text: string; err: boolean }
+/** One line of the run's event log. */
+export type RunEvent = { at: number; text: string; color?: string }
 /** The session as it runs: the turns so far, the families escalated (the reason), the agents running and the last that finished. */
-export type Live = { turns: Turn[]; escalated: Record<string, string>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number }
+export type Live = { turns: Turn[]; escalated: Record<string, string>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; events: RunEvent[]; nextN: number }
 
 /** A prompt that read as a different task in a session already re-reading a lot per turn, and what was done. */
 export type Switch = { at: number; ctx: number; why: string; action: 'compacted' | 'kept' | 'asked' }

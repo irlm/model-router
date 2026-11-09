@@ -167,6 +167,16 @@ when the run ends: the engine reports tokens per completed turn, nothing mid-run
 is shown) and folds into the header's `done` count, `failed` counted separately. The rows come from
 `agent.spawn`, `turn.step` and `turn.complete`; a one-second tick runs only while agents run.
 
+**The run monitor** (`/router monitor`) is the same run as a graph, in its own pane. The main session is the
+root box; each agent is a box under the one that spawned it, and the arrow to it is weighted by the context it
+was sent (estimated from the prompt at 4 characters a token: `━━` from 16k, `──` from 4k, `┄┄` below), with the
+estimate labelled. A box carries the agent's state (RUNNING, QUIET after a minute without a request, DONE with its
+cost, FAILED), model and effort, elapsed and request count, and the task. Under the graph, the live tail of the
+agents at work: their last tool calls as the engine saw them (a command, a file read, a search), an error in red;
+then the run's event log (spawned on what by whom, done in how long for how much, failed why). All of it is text,
+one line one row, so it reads in any terminal; the command prints the same text. Nothing here is a dependency
+graph of the task: the engine reports who spawned whom, not who waits on whom, so no box is marked blocked.
+
 **Main-session effort** (`/router effort advise|auto|off`; `mainEffort` in `/config`, default
 `advise`). The router routes Agent calls; the main session's requests it did not touch until now.
 Before each main-loop request the engine lets a plugin name another effort (`turn.step`); the model

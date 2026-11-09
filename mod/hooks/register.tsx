@@ -1,12 +1,13 @@
 import { atom, read, update } from 'claude-code'
 import type { Hook, Register } from 'claude-code'
 
-import type { Job, Live, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, RunningAgent, Status, StatusJson, Switch, Turn } from '../types'
+import type { Job, Live, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, RunningAgent, Status, StatusJson, Switch, Turn, Recent, RunEvent } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
 type RoutingMode = 'ask' | 'auto' | 'off'
 
 const PANE = 'model-router'
+const MONITOR = 'model-router-monitor'
 // status-3: `where` joined the value (which checkout served: the configured one, or the install's clone)
 const status = atom({ plugin: 'model-router', key: 'status' } as const, null, { shape: 'status-3' })
 const job = atom({ plugin: 'model-router', key: 'job' } as const, null, { shape: 'job-1' })
@@ -16,8 +17,8 @@ const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Ro
 const details = atom({ plugin: 'model-router', key: 'details' } as const, false, { shape: 'details-1' })
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
-const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0 }
-const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-3' })
+const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, events: [], nextN: 1 }
+const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-4' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 
@@ -99,7 +100,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.15.1'
+const WIDGET_VERSION = '0.16.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -350,7 +351,7 @@ const agentsLines = (lv: Live, now: number, full: boolean): Line[] => {
   if (running.length === 0 && lv.doneN === 0) return full ? [line('agents  none running yet this session; subagents appear here as rows: type, model effort, family, task, requests, elapsed', { dim: true })] : []
   const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
   const head = `${spin}agents running ${running.length}` + (lv.doneN ? ` · done ${lv.doneN} (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''})` : '')
-  const lines = [line(head, { bold: true, color: running.length ? 'cyan' : undefined })]
+  const lines = [line(head + (full ? ' · graph: /router monitor' : ''), { bold: true, color: running.length ? 'cyan' : undefined })]
   const row = (a: RunningAgent, depth: number) => {
     const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
     const mark = a.done === null ? '|' : a.failed ? '✗' : '✓'
@@ -438,6 +439,87 @@ const ESCALATE_ERRORS = 3      // tool errors within a turn that send its effort
 const REISSUE_MS = 10 * 60000  // an Agent call of the same family and agent within this of a routed one, with the same words, is a re-issue
 
 /** The session as it runs, at the top of the pane: a few lines a person doing the work can read in a glance. */
+const clockS = (ms: number) => {
+  const d = new Date(ms)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+}
+/** One tool call in a few words, for the monitor's tail. */
+const toolText = (e: Record<string, unknown>): string => {
+  const str = (k: string) => (typeof e[k] === 'string' ? (e[k] as string) : '')
+  switch (e.tool) {
+    case 'Bash': return `$ ${str('command').replace(/\s+/g, ' ').slice(0, 70)}`
+    case 'Read': case 'Edit': case 'Write': case 'NotebookEdit': return `${e.tool} ${str('file_path') || str('notebook_path')}`
+    case 'Grep': return `Grep "${str('pattern')}"${str('path') ? ' ' + str('path') : ''}`
+    case 'Glob': return `Glob ${str('pattern')}`
+    case 'WebSearch': return `WebSearch "${str('query')}"`
+    case 'WebFetch': return `WebFetch ${str('url')}`
+    case 'Agent': return `Agent ${str('description')}`
+    default: return String(e.tool)
+  }
+}
+/** The run as a graph: the main session, then each agent as a box under the one that spawned it, the arrow weighted by the
+ * context it was sent; below, the live tail of the agents at work and the run's event log. All of it text, one line one row. */
+const BOX_W = 40
+const weightOf = (ctx: number) => (ctx >= 16000 ? '━' : ctx >= 4000 ? '─' : '┄')
+const monitorLines = (lv: Live, now: number): Line[] => {
+  const running = Object.values(lv.agents)
+  const all = [...running, ...lv.finished].sort((x, y) => x.n - y.n)
+  const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
+  const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''})`
+  const out: Line[] = [line(head, { bold: true, color: running.length ? 'cyan' : undefined })]
+  if (all.length === 0) return [...out, line('no agent has run in this session yet; the graph draws as Agent calls spawn them', { dim: true })]
+  const inner = (t: string) => `│ ${t.slice(0, BOX_W - 2).padEnd(BOX_W - 2)} │`
+  const top = (title: string) => `┌ ${title.slice(0, BOX_W - 3)} ${'─'.repeat(Math.max(0, BOX_W - 3 - title.length))}┐`
+  const bottom = (hasChildren: boolean) => (hasChildren ? `└${'─'.repeat(9)}┬${'─'.repeat(BOX_W - 10)}┘` : `└${'─'.repeat(BOX_W)}┘`)   // the ┬ sits over the children's trunk, 10 columns in
+  const kids = (id: string | null) => all.filter(a => (a.parent === id) || (id === null && a.parent !== null && !all.some(p => p.id === a.parent)))
+  out.push(line('[ Run graph ]', { bold: true }))
+  // Draw with a trunk: lines of a child's box after the first carry the trunk mark when siblings follow.
+  const drawn: Line[] = []
+  const draw = (a: RunningAgent | null, prefix: string, arrow: string, trunk: boolean) => {
+    const children = kids(a?.id ?? null)
+    const cont = prefix + (trunk ? '┃' : ' ') + ' '.repeat(Math.max(0, arrow.length - 1))
+    if (a === null) {
+      const t = lv.turns
+      drawn.push(line(top('00 main session')))
+      drawn.push(line(inner(`${t.length} turn${t.length === 1 ? '' : 's'} · ${money(t.reduce((n, x) => n + x.cost, 0))} · ${all.length} agent${all.length === 1 ? '' : 's'} spawned`)))
+      drawn.push(line(bottom(children.length > 0)))
+    } else {
+      const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
+      const state = a.done === null ? (quiet ? '● QUIET' : '● RUNNING') : a.failed ? '● FAILED' : '● DONE'
+      const color = a.done === null ? (quiet ? 'yellow' : 'green') : a.failed ? 'red' : undefined
+      const figures = `${shortModel(a.model)} ${a.effort}`.trim() + `  ${secs((a.done ?? now) - a.startedAt)}  ${a.steps} step${a.steps === 1 ? '' : 's'}` + (a.cost !== null ? `  ${money(a.cost)}` : '')
+      drawn.push(line(`${prefix}${arrow}${top(`${String(a.n).padStart(2, '0')} ${a.type}`)}`))
+      drawn.push(line(`${cont}${inner(`${state.padEnd(10)} ${figures}`)}`, { color, dim: a.done !== null && !a.failed }))
+      drawn.push(line(`${cont}${inner(a.description)}`))
+      drawn.push(line(`${cont}${bottom(children.length > 0)}`))
+    }
+    const base = a === null ? '' : cont
+    children.forEach((c, i) => {
+      const last = i === children.length - 1
+      const w = weightOf(c.ctx)
+      draw(c, base + '          ', `${last ? '┗' : '┣'}${w}${w} ~${kilo(c.ctx)} ${w}${w}▶ `, !last)
+    })
+  }
+  draw(null, '', '', false)
+  out.push(...drawn)
+  out.push(line('arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ <4k', { dim: true }))
+  // Live: the agents at work, the most recent call first; a failed one keeps its tail while it is among the last finished.
+  const live = [...running].sort((x, y) => y.lastStepAt - x.lastStepAt).slice(0, 2)
+  const failed = lv.finished.filter(a => a.failed).slice(-1)
+  for (const a of [...live, ...(live.length < 2 ? failed : [])]) {
+    const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : a.failed ? 'FAILED' : 'DONE'
+    out.push(BLANK)
+    out.push(line(`● ${String(a.n).padStart(2, '0')} ${a.type} / ${a.done === null ? 'live' : 'stopped'}${' '.repeat(Math.max(1, 56 - a.type.length))}[${state}]`, { bold: true, color: a.done === null ? 'green' : a.failed ? 'red' : undefined }))
+    if (a.recent.length === 0) out.push(line('  no tool call yet', { dim: true }))
+    for (const r of a.recent.slice(-5)) out.push(line(`  ${clockS(r.at)}  ${r.err ? 'ERROR ' : ''}${r.text}`, { color: r.err ? 'red' : undefined, dim: !r.err }))
+  }
+  out.push(BLANK)
+  out.push(line('[ Events ]', { bold: true }))
+  if (lv.events.length === 0) out.push(line('  none yet', { dim: true }))
+  for (const ev of lv.events.slice(-8)) out.push(line(`  ${clockS(ev.at)}  ${ev.text}`, { color: ev.color }))
+  return out
+}
+
 const liveLines = (lv: Live, ctxNow: number | null, modelNow: string, s: StatusJson | null, mode: MainEffortMode): Line[] => {
   const ts = lv.turns
   const head = `this session · ${ts.length === 0 ? 'no turn yet' : `${ts.length} turn${ts.length === 1 ? '' : 's'} · ${money(ts.reduce((n, t) => n + t.cost, 0))}`}`
@@ -741,7 +823,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'router',
       description: 'Model router: the session live, where the routing stands, first-run setup, installation check, re-check it, ledger, apply, prune, pinned agent sources, pull',
-      argumentHint: 'open | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file]|list | pull | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
+      argumentHint: 'open | monitor | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file]|list | pull | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
     })
     void refresh($)
     $.clock.every(1000, async () => {
@@ -828,7 +910,10 @@ export const register: Register = (on, options) => {
         const u = e.usage
         const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, failed: e.reason === 'error' || e.reason === 'refusal', model: u?.model ?? a.model }
         const { [id]: _gone, ...rest } = v.agents
-        return { ...v, agents: rest, finished: [...v.finished, done].slice(-12), doneN: v.doneN + 1, doneCost: v.doneCost + (done.cost ?? 0), failedN: v.failedN + (done.failed ? 1 : 0) }
+        const ev: RunEvent = done.failed
+          ? { at: now, text: `${String(a.n).padStart(2, '0')} ${a.type} failed (${e.reason}) after ${secs(now - a.startedAt)}`, color: 'red' }
+          : { at: now, text: `${String(a.n).padStart(2, '0')} ${a.type} done in ${secs(now - a.startedAt)}${done.cost !== null ? `, ${money(done.cost)}` : ''}` }
+        return { ...v, agents: rest, finished: [...v.finished, done].slice(-12), doneN: v.doneN + 1, doneCost: v.doneCost + (done.cost ?? 0), failedN: v.failedN + (done.failed ? 1 : 0), events: [...v.events, ev].slice(-30) }
       })
     }
     if (e.agentId === undefined) {
@@ -851,6 +936,11 @@ export const register: Register = (on, options) => {
       const opened = await $.ui.open({ id: PANE, title: 'Model router' })
       void refresh($)
       return { text: opened.isPlaced ? 'Model router pane opened.' : `The pane waits for room: ${opened.reason}` }
+    }
+    if (verb === 'monitor') {
+      const opened = await $.ui.open({ id: MONITOR, title: 'Agent run' })
+      const text = monitorLines(await read($, live), await $.clock.now()).map(l => l.text).join('\n')
+      return { text: (opened.isPlaced ? 'Agent run pane opened.' : `The pane waits for room: ${opened.reason}`) + '\n' + text }
     }
     if (verb === 'check' || verb === 'fetch') {
       await refresh($, verb === 'fetch')
@@ -950,7 +1040,7 @@ export const register: Register = (on, options) => {
       const started = await runJob($, verb)
       return { text: started ? `${spec.title} started; the pane shows its output.` : 'Not started.' }
     }
-    return { text: 'Usage: /router [open | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file] [--accept-flags]|list | pull | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>]' }
+    return { text: 'Usage: /router [open | monitor | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file] [--accept-flags]|list | pull | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>]' }
   })
 
   // A subagent starts: one row in the agents block, under its parent when it has one.
@@ -965,9 +1055,14 @@ export const register: Register = (on, options) => {
     const r = await next(want ? { ...e, model: want.model as 'haiku' | 'sonnet' | 'opus' | 'fable', ...(want.family === 'repo_fix' ? { prompt: e.prompt + RUNNER_NOTE } : {}) } : e)
     if (r.agentId) {
       const a: RunningAgent = { id: r.agentId, parent: e.parentAgentId ?? null, type: e.subagentType, description: e.description, model: r.model, effort: want?.effort ?? '', wantEffort: want?.effort ?? null,
-        family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false }
-      a.startedAt = a.lastStepAt = await $.clock.now()
-      await update($, live, v => ({ ...v, agents: { ...v.agents, [a.id]: a } }))
+        family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false,
+        ctx: Math.round(e.prompt.length / 4), n: 0, recent: [] }
+      a.startedAt = a.lastStepAt = now
+      await update($, live, v => {
+        const n = v.nextN
+        const ev: RunEvent = { at: now, text: `${String(n).padStart(2, '0')} ${a.type} spawned on ${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''} (~${kilo(a.ctx)} ctx)${a.parent ? ` by ${String(v.agents[a.parent]?.n ?? 0).padStart(2, '0')}` : ''}` }
+        return { ...v, nextN: n + 1, agents: { ...v.agents, [a.id]: { ...a, n } }, events: [...v.events, ev].slice(-30) }
+      })
     }
     return r
   }).catch(($, e, next) => {
@@ -1023,7 +1118,15 @@ export const register: Register = (on, options) => {
   // What every main-loop tool call came to: the errors and Agent calls of the turn in progress.
   on('tool.call', async ($, e, next) => {
     const r = await next(e)
-    if ((e as { agentId?: string }).agentId === undefined) {
+    const agentId = (e as { agentId?: string }).agentId
+    if (agentId !== undefined && (await read($, live)).agents[agentId]) {
+      const rec: Recent = { at: await $.clock.now(), text: toolText(e as unknown as Record<string, unknown>), err: (r as { isError?: boolean }).isError === true }
+      await update($, live, v => {
+        const a = v.agents[agentId]
+        return a ? { ...v, agents: { ...v.agents, [agentId]: { ...a, recent: [...a.recent, rec].slice(-8) } } } : v
+      })
+    }
+    if (agentId === undefined) {
       const p = plans.get(currentTurn)
       if (p) {
         if (e.tool === 'Agent') p.agentCalls++
@@ -1086,6 +1189,22 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => {
     $.ui.toast(`router: the routing hook failed (${failureText(next.error)}); the Agent call runs as asked`)
     return next(e)
+  })
+
+  // The run monitor: its own pane, the graph of the agents and their live tails, redrawn with the second tick while any runs.
+  on('ui.render', { component: 'Pane', requestId: MONITOR }, async ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+    const lv = await read($, live)
+    await read($, tick)
+    const width = Math.max(40, (e.viewport?.columns ?? 100) - 1)
+    const cut = (t: string) => (t.length > width ? t.slice(0, width - 1) + '…' : t)
+    return (
+      <Box flexDirection="column">
+        {monitorLines(lv, await $.clock.now()).map(l => (
+          <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text === '' ? ' ' : cut(l.text)}</Text>
+        ))}
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

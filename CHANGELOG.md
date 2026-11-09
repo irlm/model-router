@@ -3,6 +3,12 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.20.1 — 2026-11-08
+
+- The glance keeps only what is acted on: the header bar with three dim facts under it (the repository, the
+  30-day spend, the routed count), Session live, Agents, Limits, To check, and the top three suggestions with a
+  count of the rest. Details (d) shows every section, as before; `/router check` prints them all.
+
 ## 0.20.0 — 2026-11-08
 
 - The main pane drawn like the run monitor: a header bar (the session's turns, cost, cache hit, context and model

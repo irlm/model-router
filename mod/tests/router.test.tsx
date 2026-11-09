@@ -93,7 +93,6 @@ test('/router check prints the table and the status line counts the advice', asy
     const ui = await $.ui.mount({ ...PANE, surface })
     expect((await ui.find({ type: 'Text', text: /routing v1.1/ }))?.text).toContain('routing v1.1')
     expect(await ui.find({ type: 'Button', text: /Re-check routing/ })).toBeTruthy()
-    expect((await ui.find({ type: 'Text', text: /^\[ Status \]$/ }))?.text).toBe('[ Status ]')              // the framed sections
     expect((await ui.find({ type: 'Text', text: /^\[ Suggestions \]$/ }))?.text).toBe('[ Suggestions ]')
     expect((await ui.find({ type: 'Text', text: /^Model router$/ }))?.text).toBe('Model router')             // the header bar
     expect(await ui.find({ type: 'Button', text: /Monitor/ })).toBeTruthy()

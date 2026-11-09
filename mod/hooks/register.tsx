@@ -107,7 +107,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.20.0'
+const WIDGET_VERSION = '0.20.1'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -1655,15 +1655,6 @@ export const register: Register = (on, options) => {
     ))
     const liveAll = liveLines(lv, ctx, modelNow, s?.json ?? null, mainEffortMode)
     const ver = versionLines(s?.json ?? null, true)[0]
-    const header = (
-      <Box flexDirection="column">
-        <Box borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="row" justifyContent="space-between">
-          <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Model router</Text></Text>
-          <Text dimColor>{liveAll[0]?.text.replace(/^this session · /, '') ?? ''}</Text>
-        </Box>
-        {ver ? <Text color={ver.color} dimColor={ver.dim}>{ver.text}</Text> : null}
-      </Box>
-    )
     const worst = Math.max(0, ...limits.map(l => l.percentUsed))
     const summary = s?.json
       ? summaryLines(s.json, s.at, await read($, routed), s.where, full, await read($, switches), ctx, modelNow)
@@ -1687,14 +1678,40 @@ export const register: Register = (on, options) => {
       if (t.startsWith('no model-router checkout') || t.startsWith('reading')) return ['Status', 'yellow']
       return ['Status', undefined]
     }
+    const named = groups.filter(g => g.length).map(g => ({ g, t: titleOf(g[0]) }))
+    // The glance: what is acted on (the session live, the agents, the limits, what is to check, the top suggestions) and a
+    // few dim facts under the header; Details (d) adds every other section, the way /router check prints them.
+    const GLANCE_SUGGESTIONS = 3
+    const quick: Line[] = []
+    if (!full) {
+      const status = named.find(x => x.t[0] === 'Status')?.g ?? []
+      for (const l of status) if (/^(read |repo |spend )/.test(l.text)) quick.push(line(l.text.replace(/ · prev .*$/, ''), { dim: true }))
+      const routedG = named.find(x => x.t[0] === 'Routed')?.g
+      if (routedG) quick.push(line(routedG[0].text.replace(/ \(mode .*$/, ''), { dim: true }))
+    }
+    // a Status that is a warning (no checkout, an error reading it) stays in the glance, in yellow
+    const shown = full ? named : named.filter(x => x.t[0] === 'To check' || x.t[0] === 'Suggestions' || (x.t[0] === 'Status' && x.t[1] === 'yellow')).map(x => {
+      if (x.t[0] !== 'Suggestions' || x.g.length <= GLANCE_SUGGESTIONS + 1) return x
+      return { ...x, g: [...x.g.slice(0, GLANCE_SUGGESTIONS + 1), line(`${x.g.length - GLANCE_SUGGESTIONS - 1} more under Details (d)`, { dim: true })] }
+    })
     const sections = busy && j
       ? [frame('Job', [line(`running ${j.name} since ${clock(j.startedAt)} · the summary returns when it ends`, { bold: true })], 'cyan')]
       : [
           frame('Session live', liveAll.slice(1), 'cyan'),
           frame('Agents', agentsLines(lv, now, full), Object.keys(lv.agents).length ? 'green' : undefined),
           frame('Limits', limitLines(limits), worst >= 80 ? 'red' : worst >= 50 ? 'yellow' : 'green'),
-          ...groups.filter(g => g.length).map(g => { const [t, c] = titleOf(g[0]); return frame(t, g, c) }),
+          ...shown.map(x => frame(x.t[0], x.g, x.t[1])),
         ]
+    const header = (
+      <Box flexDirection="column">
+        <Box borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="row" justifyContent="space-between">
+          <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Model router</Text></Text>
+          <Text dimColor>{liveAll[0]?.text.replace(/^this session · /, '') ?? ''}</Text>
+        </Box>
+        {ver ? <Text color={ver.color} dimColor={ver.dim}>{ver.text}</Text> : null}
+        {quick.map(row)}
+      </Box>
+    )
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
     const used = busy ? 8 : liveAll.length + 3 + limits.length + summary.length + groups.length * 3 + 8
     const logRoom = Math.max(3, rows - used)

@@ -170,7 +170,9 @@ is shown) and folds into the header's `done` count, `failed` counted separately.
 **The pane's look.** Since 0.20.0 the main pane is drawn like the monitor: a header bar with the session's
 figures, each section in a titled frame whose border carries its colour (Limits turn yellow at half a window and
 red at 80%, Agents green while any runs, To check yellow), the job output framed, the buttons in a footer. The
-text inside each frame is what `/router check` prints, line for line.
+text inside each frame is what `/router check` prints, line for line. The glance shows the header with the repository,
+the spend and the routed count under it, Session live, Agents, Limits, To check and the top three suggestions; Details
+(`d`) adds every other section.
 
 **The run monitor** (`/router monitor`) is the same run drawn as a graph, in its own pane. The main session is
 the root box (cyan); each agent is a box to the right of the one that spawned it, placed on a grid (a column per

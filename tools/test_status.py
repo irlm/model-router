@@ -622,15 +622,22 @@ class Runs(unittest.TestCase):
     CALLS = [{'ts': '2026-11-01T10:15', 'session': '/t/s1.jsonl', 'type': 'Explore', 'description': 'find the loader', 'prompt_chars': 400, 'class': 'find_feature', 'agent': 'x1', 'model': 'claude-haiku-5-5', 'cost': 0.01, 'failed': False, 'tok': {'output_tokens': 500}},
              {'ts': '2026-11-01T10:17', 'session': '/t/s1.jsonl', 'type': 'Web Researcher', 'description': 'look up a default', 'prompt_chars': 100, 'class': 'web_research', 'agent': 'x2', 'model': 'claude-haiku-5-5', 'cost': 0.02, 'failed': False, 'tok': {}},
              {'ts': '2026-11-01T11:40', 'session': '/t/s1.jsonl', 'type': 'general-purpose', 'description': 'write the report', 'prompt_chars': 2000, 'class': 'research_synthesis', 'agent': None, 'model': None, 'model_asked': 'opus', 'cost': None, 'failed': True},
-             {'ts': '2026-11-01T10:16', 'session': '/t/s2.jsonl', 'type': 'Explore', 'description': 'other session', 'prompt_chars': 80, 'class': 'find_feature', 'agent': 'y1', 'model': 'claude-haiku-5-5', 'cost': 0.005, 'failed': False}]
+             {'ts': '2026-11-01T10:16', 'session': '/t/s2.jsonl', 'type': 'Explore', 'description': 'other session', 'prompt_chars': 80, 'class': 'find_feature', 'agent': 'y1', 'model': 'claude-haiku-5-5', 'cost': 0.005, 'failed': False},
+             # made inside agent x1's own transcript: it belongs under x1 in the first run, not in a run of its own
+             {'ts': '2026-11-01T10:16', 'session': '/t/agent-x1.jsonl', 'type': 'Web Researcher', 'description': 'nested lookup', 'prompt_chars': 60, 'class': 'web_research', 'agent': 'z1', 'model': 'claude-haiku-5-5', 'cost': 0.002, 'failed': False},
+             # made inside an agent whose spawner is not in the window: a run of its own
+             {'ts': '2026-11-01T12:00', 'session': '/t/agent-q9.jsonl', 'type': 'Explore', 'description': 'orphan lookup', 'prompt_chars': 60, 'class': 'find_feature', 'agent': 'q2', 'model': 'claude-haiku-5-5', 'cost': 0.001, 'failed': False}]
 
     def test_group_splits_a_session_at_a_gap_and_keeps_sessions_apart(self):
         import runs
         got = runs.group(self.CALLS)
-        self.assertEqual([(r['meta']['agentN'], r['meta']['prompt']) for r in got], [(2, 'find the loader'), (1, 'write the report'), (1, 'other session')])
+        self.assertEqual([(r['meta']['agentN'], r['meta']['prompt']) for r in got], [(3, 'find the loader'), (1, 'write the report'), (1, 'other session'), (1, 'orphan lookup')])
         first = got[0]
         self.assertEqual(first['source'], 'transcript')
-        self.assertEqual(first['meta']['cost'], 0.03)
+        self.assertEqual(first['meta']['cost'], 0.032)
+        nested = first['agents'][2]
+        self.assertEqual((nested['description'], nested['parent'], nested['n']), ('nested lookup', 'x1', 3))   # under its spawner, numbered after the top level
+        self.assertIsNone(first['agents'][0]['parent'])
         self.assertEqual(first['agents'][0]['model'], 'haiku')
         self.assertEqual(first['agents'][0]['ctx'], 100)
         self.assertEqual(got[1]['meta']['failedN'], 1)
@@ -643,10 +650,11 @@ class Runs(unittest.TestCase):
             live.parent.mkdir()
             live.write_text(json.dumps(self.LIVE), encoding='utf-8')
             written = runs.import_runs(runs_dir=d, calls=self.CALLS)
-            self.assertEqual(len(written), 3)
+            self.assertEqual(len(written), 4)
             self.assertEqual(runs.import_runs(runs_dir=d, calls=self.CALLS), [])          # the second import adds nothing
+            self.assertEqual(len(runs.import_runs(runs_dir=d, calls=self.CALLS, rebuild=True)), 4)   # rebuild drops and rewrites the imported ones
             rows = runs.list_runs(d)
-            self.assertEqual(len(rows), 4)
+            self.assertEqual(len(rows), 5)
             self.assertEqual({r['source'] for r in rows}, {'live', 'transcript'})
             self.assertEqual(rows[0]['id'], 'turn:t1')                                   # sorted by start: the fixture's 2025 run first
             run, path = runs.find('turn:t1', d)
@@ -667,10 +675,10 @@ class Runs(unittest.TestCase):
         self.assertIn('| 02 | general-purpose | claude-fable-5-1 | unmeasured | 1 | 50s | - | stopped | long check |', md)
         self.assertIn('### 01 Explore: find the parser', md)
         self.assertIn('tools/config.py:42', md)
-        self.assertIn('- 12:26  01 Explore spawned', md)
+        self.assertIn(f"- {runs.when(1_762_000_000_000)[-5:]}  01 Explore spawned", md)
         with tempfile.TemporaryDirectory() as d:
             path = runs.export(self.LIVE, d)
-            self.assertEqual(path.name, '2025-11-01-find-where-the-parser-loads-the-schema.md')
+            self.assertEqual(path.name, f"{runs.when(1_762_000_000_000)[:10]}-find-where-the-parser-loads-the-schema.md")
             self.assertIn('## Agents', path.read_text(encoding='utf-8'))
 
 

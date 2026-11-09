@@ -10,7 +10,7 @@ reports those only while the widget is loaded).
   python3 tools/runs.py list [--json]
   python3 tools/runs.py show <id>
   python3 tools/runs.py export <id> [--out-dir DIR]
-  python3 tools/runs.py import [--days N]
+  python3 tools/runs.py import [--days N] [--rebuild]
 """
 import argparse
 import datetime
@@ -73,8 +73,9 @@ def find(id_or_file, runs_dir=None):
 
 
 def when(ms):
+    """Local date and time, the clock the widget names the run folders by."""
     try:
-        return datetime.datetime.fromtimestamp(ms / 1000, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M')
+        return datetime.datetime.fromtimestamp(ms / 1000).strftime('%Y-%m-%d %H:%M')
     except (TypeError, ValueError, OSError):
         return '?'
 
@@ -143,11 +144,21 @@ def export(run, out_dir):
     return path
 
 
+def parent_agent(call):
+    """The agent whose transcript this call sits in: a subagent's transcript is agent-<its id>.jsonl; None from a main session."""
+    stem = Path(call.get('session', '')).stem
+    return stem[len('agent-'):] if stem.startswith('agent-') else None
+
+
 def group(calls, gap_min=GAP_MIN):
-    """Agent calls (tools/consumption.py's, sorted) into runs: one session's calls, a new run after a gap of gap_min minutes."""
+    """Agent calls (tools/consumption.py's, sorted) into runs: one session's calls, a new run after a gap of gap_min minutes.
+    A call made inside a subagent's own transcript joins the run of the call that spawned that subagent, under it,
+    the way the live graph hangs a child under its spawner; one whose spawner is not in the window stands alone."""
+    by_agent = {c['agent']: c for c in calls if c.get('agent')}
+    nested = [c for c in calls if parent_agent(c) in by_agent]
     runs = []
     by_session = {}
-    for c in sorted(calls, key=lambda c: (c.get('session', ''), c.get('ts', ''))):
+    for c in sorted((c for c in calls if c not in nested), key=lambda c: (c.get('session', ''), c.get('ts', ''))):
         s = c.get('session', '')
         try:
             t = datetime.datetime.strptime(c['ts'][:16], '%Y-%m-%dT%H:%M').replace(tzinfo=datetime.timezone.utc)
@@ -164,10 +175,22 @@ def group(calls, gap_min=GAP_MIN):
     for r in runs:
         started = int(r['start'].timestamp() * 1000)
         sess = Path(r['session']).stem[:8]
+        # the calls a run's agents made themselves, under the agent that made them, after the top-level ones
+        top = [c for _, c in r['calls']]
+        kids = []
+        frontier = list(top)
+        while frontier:
+            found = [c for c in nested if parent_agent(c) in {x.get('agent') for x in frontier} and c not in kids]
+            kids.extend(found)
+            frontier = found
         agents = []
-        for i, (t, c) in enumerate(r['calls'], 1):
+        for i, c in enumerate(top + sorted(kids, key=lambda c: c.get('ts', '')), 1):
+            try:
+                t = datetime.datetime.strptime(c['ts'][:16], '%Y-%m-%dT%H:%M').replace(tzinfo=datetime.timezone.utc)
+            except (KeyError, ValueError):
+                t = r['start']
             at = int(t.timestamp() * 1000)
-            agents.append({'id': c.get('agent') or f"call-{i}", 'parent': None, 'type': c.get('type', ''), 'description': c.get('description', ''),
+            agents.append({'id': c.get('agent') or f"call-{i}", 'parent': parent_agent(c), 'type': c.get('type', ''), 'description': c.get('description', ''),
                            'model': (c.get('model') or c.get('model_asked') or '').replace('claude-', '').split('-')[0] if (c.get('model') or c.get('model_asked')) else '',
                            'effort': '', 'wantEffort': None, 'family': c.get('class'), 'startedAt': at, 'lastStepAt': at, 'steps': 0, 'done': at,
                            'cost': c.get('cost'), 'out': (c.get('tok') or {}).get('output_tokens', 0), 'failed': bool(c.get('failed')), 'stopped': False,
@@ -177,14 +200,19 @@ def group(calls, gap_min=GAP_MIN):
         for a in agents:
             a['runId'] = rid
         first = r['calls'][0][1]
-        out.append({'source': 'transcript', 'meta': {'id': rid, 'startedAt': started, 'endedAt': int(r['calls'][-1][0].timestamp() * 1000), 'prompt': (first.get('description') or '')[:120],
+        out.append({'source': 'transcript', 'meta': {'id': rid, 'startedAt': started, 'endedAt': max(a['done'] for a in agents), 'prompt': (first.get('description') or '')[:120],
                                                     'name': None, 'agentN': len(agents), 'cost': cost, 'failedN': sum(1 for a in agents if a['failed']), 'stoppedN': 0, 'saved': None},
                     'agents': agents, 'events': []})
-    return out
+    return sorted(out, key=lambda r: r['meta']['startedAt'])
 
 
-def import_runs(days=30, runs_dir=None, calls=None):
-    """Runs for the window, rebuilt from the transcripts' Agent calls; files already present (by id) are kept."""
+def import_runs(days=30, runs_dir=None, calls=None, rebuild=False):
+    """Runs for the window, rebuilt from the transcripts' Agent calls; files already present (by id) are kept,
+    unless rebuild: then every file an earlier import wrote (never one the widget saved) is removed first."""
+    if rebuild:
+        for p in files(runs_dir):
+            if p.name.endswith('-transcript.json'):
+                p.unlink()
     if calls is None:
         sys.path.insert(0, str(HERE))
         import consumption  # noqa: E402
@@ -210,6 +238,7 @@ def main(argv=None):
     ap.add_argument('--json', action='store_true')
     ap.add_argument('--days', type=int, default=30)
     ap.add_argument('--out-dir', default='docs/runs')
+    ap.add_argument('--rebuild', action='store_true', help='import: drop the files an earlier import wrote and rebuild them')
     a = ap.parse_args(argv)
     if a.verb == 'list':
         rows = list_runs()
@@ -232,7 +261,7 @@ def main(argv=None):
         run, _ = find(a.words[0])
         print(f"report written: {export(run, a.out_dir)}")
     else:
-        written = import_runs(a.days)
+        written = import_runs(a.days, rebuild=a.rebuild)
         print(f"{len(written)} run(s) rebuilt from the last {a.days} days of transcripts into {RUNS}" + (f"; the first: {written[0]}" if written else ' (nothing new: every run of the window is already saved)'))
 
 

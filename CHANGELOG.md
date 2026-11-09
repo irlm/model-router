@@ -3,6 +3,13 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.19.1 — 2026-11-08
+
+- Runs rebuilt from the transcripts: a call made inside a subagent's own transcript now joins the run of the
+  call that spawned it, under it, as the live graph draws it, instead of standing as a one-agent run of its own
+  (`/router runs import --rebuild` redoes the imported files). Every run time is local, the same clock the run
+  folders are named by: the list, the history and the reports said UTC while the folders said local.
+
 ## 0.19.0 — 2026-11-08
 
 - Runs. The agents a prompt spawns are one run (a resume or a nested spawn joins its parent's run); a named task

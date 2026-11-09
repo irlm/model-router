@@ -107,7 +107,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.19.0'
+const WIDGET_VERSION = '0.19.1'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -446,6 +446,11 @@ const ESCALATE_ERRORS = 3      // tool errors within a turn that send its effort
 const REISSUE_MS = 10 * 60000  // an Agent call of the same family and agent within this of a routed one, with the same words, is a re-issue
 
 /** The session as it runs, at the top of the pane: a few lines a person doing the work can read in a glance. */
+/** A local date and time, YYYY-MM-DD HH:MM: the same clock the run folders are named by. */
+const stamp = (ms: number) => {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${clock(ms)}`
+}
 const clockS = (ms: number) => {
   const d = new Date(ms)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
@@ -590,10 +595,10 @@ const runReport = (lvAll: Live, id: string, now: number): string => {
   const m = runOf(lvAll, id)
   const lv = scopeOf(lvAll, id)
   const agents = [...Object.values(lv.agents), ...lv.finished].sort((x, y) => x.n - y.n || x.run - y.run)
-  const d = (ms: number) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ')
+  const d = stamp
   const out: string[] = []
   out.push(`# Agent run: ${m?.name ?? m?.prompt ?? id}`, '')
-  if (m) out.push(`started ${d(m.startedAt)} UTC${m.endedAt ? `, ended ${d(m.endedAt)}` : ', still running'} · ${m.agentN} agent${m.agentN === 1 ? '' : 's'} · ${money(m.cost)}${m.failedN ? ` · ${m.failedN} failed` : ''}${m.stoppedN ? ` · ${m.stoppedN} stopped` : ''}`, '')
+  if (m) out.push(`started ${d(m.startedAt)}${m.endedAt ? `, ended ${d(m.endedAt)}` : ', still running'} · ${m.agentN} agent${m.agentN === 1 ? '' : 's'} · ${money(m.cost)}${m.failedN ? ` · ${m.failedN} failed` : ''}${m.stoppedN ? ` · ${m.stoppedN} stopped` : ''}`, '')
   if (m?.prompt && !m.name) out.push('## Asked', '', m.prompt, '')
   out.push('## Graph', '', '```text', ...monitorLines(lvAll, now, id).map(l => l.text), '```', '')
   out.push('## Agents', '', '| # | agent | model effort | family | steps | elapsed | cost | outcome | task |', '|---|---|---|---|---|---|---|---|---|')
@@ -1225,7 +1230,7 @@ export const register: Register = (on, options) => {
       }
       const rows = await listSavedRuns($)
       if (rows.length === 0) return { text: `no run saved yet under ${runsDir || '<config>/model-router/runs'}; a run is saved when its last agent ends (or the task is ended). /router runs import rebuilds the days before the widget watched from the transcripts.` }
-      return { text: [`${rows.length} saved run${rows.length === 1 ? '' : 's'} (${runsDir}):`, ...rows.slice(-30).map(r => `  ${new Date(r.startedAt).toISOString().slice(0, 16).replace('T', ' ')}  ${(r.name ? `task ${r.name}` : r.prompt).slice(0, 60).padEnd(60)}  ${String(r.agentN).padStart(3)} agents  ${money(r.cost).padStart(6)}  ${r.source === 'transcript' ? 'from transcripts' : ''}  ${r.id}`), '/router runs show <id> prints one; /router monitor save <id> writes its report into docs/runs/.'].join('\n') }
+      return { text: [`${rows.length} saved run${rows.length === 1 ? '' : 's'} (${runsDir}):`, ...rows.slice(-30).map(r => `  ${stamp(r.startedAt)}  ${(r.name ? `task ${r.name}` : r.prompt).slice(0, 60).padEnd(60)}  ${String(r.agentN).padStart(3)} agents  ${money(r.cost).padStart(6)}  ${r.source === 'transcript' ? 'from transcripts' : ''}  ${r.id}`), '/router runs show <id> prints one; /router monitor save <id> writes its report into docs/runs/.'].join('\n') }
     }
     if (verb === 'check' || verb === 'fetch') {
       await refresh($, verb === 'fetch')
@@ -1527,7 +1532,7 @@ export const register: Register = (on, options) => {
           <Text> </Text>
           <Text color="cyan" bold>[ Saved on this machine ]</Text>
           {older.length === 0 && <Text dimColor>{saved.length ? 'all listed above' : 'none listed; /router runs lists them, /router runs import rebuilds the days before the widget watched'}</Text>}
-          {older.map(r => <Text dimColor>{`${new Date(r.startedAt).toISOString().slice(0, 16).replace('T', ' ')}  ${(r.name ? `task ${r.name}` : r.prompt).slice(0, 56).padEnd(56)}  ${String(r.agentN).padStart(2)} agents  ${money(r.cost).padStart(6)}  ${r.source === 'transcript' ? 'from transcripts' : ''}  ${r.id}`}</Text>)}
+          {older.map(r => <Text dimColor>{`${stamp(r.startedAt)}  ${(r.name ? `task ${r.name}` : r.prompt).slice(0, 56).padEnd(56)}  ${String(r.agentN).padStart(2)} agents  ${money(r.cost).padStart(6)}  ${r.source === 'transcript' ? 'from transcripts' : ''}  ${r.id}`}</Text>)}
           <Text dimColor>/router runs show &lt;id&gt; prints a saved run; /router monitor save &lt;id&gt; writes its report into docs/runs/</Text>
           {footer}
         </Box>

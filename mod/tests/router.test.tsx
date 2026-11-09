@@ -631,6 +631,8 @@ test('the run monitor before any agent: the main session drawn alone, WORKING wh
   const steps: unknown[] = []
   LIVE_MOCKS(on, seen, steps, 'Bash')
   on('ui.open', () => ({ value: { isPlaced: true } }))
+  let n = 0
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `mm${++n}` }))
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   let { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
   expect(text).toContain('┌ 00 main session')
@@ -659,6 +661,20 @@ test('the run monitor before any agent: the main session drawn alone, WORKING wh
   ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
   expect(text).toMatch(/● IDLE\s+1 turn · /)
   expect(text).toMatch(/\[IDLE since \d\d:\d\d:\d\d\]/)
+  // a run of two agents ends: the finished ones keep their tail, and the main session's panel is back beside them
+  const SPAWN = { tool_use_id: 'mq1', prompt: 'Find where the config is parsed.', description: 'find the parser', subagentType: 'Explore', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1', model: 'claude-haiku-5-5' } as const
+  await $.agent.spawn(SPAWN)
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'mq2', description: 'find the loader' })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).not.toContain('● 00 main session / live')                       // two at work: their tails have the room
+  await $.turn.complete({ answer: 'ok', durationMs: 1000, isAborted: false, turnId: 'mq1', reason: 'answer', agentId: 'mm1' })
+  await $.turn.complete({ answer: 'ok', durationMs: 1000, isAborted: false, turnId: 'mq2', reason: 'answer', agentId: 'mm2' })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toContain('● 01 Explore / stopped')
+  expect(text).toContain('● 00 main session / live')
+  const ui2 = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  expect((await ui2.find({ type: 'Text', text: /^● 00 main session \/ live$/ }))?.text).toBe('● 00 main session / live')
+  await ui2.unmount()
   await settled()
 })
 

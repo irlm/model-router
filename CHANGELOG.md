@@ -3,6 +3,12 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.21.2 — 2026-11-09
+
+- The main session's panel in the monitor shows whenever fewer than two agents are *at work*. 0.21.0 counted the
+  finished agents that keep their tail, so after a run of two or more agents the panel stayed hidden until the next
+  run began; the session's own tool calls were going unseen between runs.
+
 ## 0.21.1 — 2026-11-09
 
 - A prompt that runs a test command is not a research note. "Run pytest and report the failures" on a general-purpose

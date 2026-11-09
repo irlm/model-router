@@ -108,7 +108,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.21.1'
+const WIDGET_VERSION = '0.21.2'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -533,7 +533,8 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null): Li
     tail(`● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''} / ${a.done === null ? 'live' : 'stopped'}`, state, a.recent, a.done === null ? 'green' : bad(a) ? 'red' : undefined)
   }
   // The main session's own tail when there is room for it: always before any agent, beside a lone agent after.
-  if (live.length + rest.length < 2) tail('● 00 main session / live', mainWord(lv.main, now), lv.main.recent, 'cyan')
+  // The main session's own tail whenever fewer than two agents are at work; finished agents do not take its place.
+  if (live.length < 2) tail('● 00 main session / live', mainWord(lv.main, now), lv.main.recent, 'cyan')
   out.push(BLANK)
   out.push(line('[ Events ]', { bold: true }))
   if (lv.events.length === 0) out.push(line('  none yet', { dim: true }))
@@ -1626,8 +1627,9 @@ export const register: Register = (on, options) => {
         {runText}
       </Box>
     )
-    // The main session's own panel when there is room: alone before any agent runs, beside a lone agent after.
-    const mainPanel = tails.length < 2 && (
+    // The main session's own panel whenever fewer than two agents are at work: alone before any agent runs, beside a
+    // lone agent, and again after a run ends (finished agents keep their tail but do not take its place).
+    const mainPanel = running.length < 2 && (
       <Box borderStyle="round" borderColor="cyan" flexDirection="column" paddingX={1}>
         <Box flexDirection="row" justifyContent="space-between">
           <Text color="cyan" bold>● 00 main session / live</Text>

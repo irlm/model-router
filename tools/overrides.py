@@ -12,6 +12,7 @@ import argparse
 import datetime
 import json
 import os
+import sys
 from pathlib import Path
 
 FILE = Path(os.environ.get('CLAUDE_CONFIG_DIR') or (Path.home() / '.claude')) / 'model-router' / 'overrides.json'
@@ -74,7 +75,15 @@ def main(argv=None):
     ap.add_argument('verb', choices=['set', 'clear', 'list', 'dismiss', 'undismiss'])
     ap.add_argument('words', nargs='*')
     ap.add_argument('--why', default='')
+    # A project key begins with a dash (a path's slashes), so the caller puts the words after `--`. Python 3.10's argparse
+    # loses `--` before a star positional that follows another, so the split is done here: options before, words after.
+    argv = list(sys.argv[1:] if argv is None else argv)
+    rest = []
+    if '--' in argv:
+        i = argv.index('--')
+        argv, rest = argv[:i], argv[i + 1:]
     a = ap.parse_args(argv)
+    a.words = list(a.words) + rest
     if a.verb in ('dismiss', 'undismiss'):
         if len(a.words) != 1:
             raise SystemExit('dismiss needs the suggestion id')

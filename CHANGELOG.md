@@ -3,6 +3,11 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.16.2 — 2026-11-08
+
+- Python 3.10's argparse drops the `--` that 0.16.1 put before the overrides script's words, so `/router prefer`
+  still failed there; the script now splits the words after `--` off itself before parsing.
+
 ## 0.16.1 — 2026-11-08
 
 - The routed log was never written and `/router prefer` could not set an override: the project key is the cwd

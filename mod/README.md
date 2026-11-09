@@ -186,7 +186,9 @@ the live panels of the agents at work: their last tool calls as the engine saw t
 search), an error in red, a blinking cursor while the agent runs; when fewer than two run, the last finished
 keep their panel. Then the run's event log (spawned on what by whom, done in how long for how much, failed why).
 `g` switches to the same run as text lines, one line one row, which `/router monitor` also prints; `m` opens the
-main pane. Nothing here is a dependency graph of the task: the engine reports who spawned whom, not who waits
+main pane. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
+`● IDLE` after, with the turns and cost so far, and a panel of its own lists the main session's last tool calls
+(shown whenever fewer than two agents are at work); agents hang under the box as they spawn. Nothing here is a dependency graph of the task: the engine reports who spawned whom, not who waits
 on whom, so no box is marked blocked and no waiting arrow is drawn.
 
 **Runs, history and reports.** The monitor shows one run at a time: the agents the current prompt spawned (a

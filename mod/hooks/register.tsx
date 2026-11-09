@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Hook, Register } from 'claude-code'
 
-import type { Job, Live, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, RunningAgent, Status, StatusJson, Switch, Turn, Recent, RunEvent, RunMeta, SavedRun } from '../types'
+import type { Job, Live, MainLive, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, RunningAgent, Status, StatusJson, Switch, Turn, Recent, RunEvent, RunMeta, SavedRun } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
 type RoutingMode = 'ask' | 'auto' | 'off'
@@ -17,8 +17,9 @@ const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Ro
 const details = atom({ plugin: 'model-router', key: 'details' } as const, false, { shape: 'details-1' })
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
-const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, stoppedN: 0, events: [], nextN: 1, runs: [], task: null }
-const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-7' })
+const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, stoppedN: 0, events: [], nextN: 1, runs: [], task: null, main: { busy: false, since: 0, lastAt: 0, recent: [] } }
+// live-8: `main`, the main session's own state and tool tail, so the monitor has something to draw before any agent runs
+const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-8' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 /** The run monitor's view: the drawn graph, or the same run as text lines. */
@@ -107,7 +108,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.20.1'
+const WIDGET_VERSION = '0.21.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -480,7 +481,8 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null): Li
   const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
   const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''})`
   const out: Line[] = [line(head, { bold: true, color: running.length ? 'cyan' : undefined }), line(runLine(lvAll, runId), { dim: true })]
-  if (all.length === 0) return [...out, line('no agent has run in this session yet; the graph draws as Agent calls spawn them', { dim: true })]
+  // Before any agent: the main session is drawn alone, with its state and its own tool tail; agents hang under it as they spawn.
+  if (all.length === 0) out.push(line('no agent spawned yet; Agent calls hang under the session box as they spawn', { dim: true }))
   // Every line of a box is BOX_W + 2 columns: ┌ title ─┐ / │ text │ / └──┘.
   const inner = (t: string) => `│ ${t.slice(0, BOX_W - 2).padEnd(BOX_W - 2)} │`
   const top = (title: string) => { const t = title.slice(0, BOX_W - 3); return `┌ ${t} ${'─'.repeat(BOX_W - 2 - t.length)}┐` }
@@ -493,9 +495,9 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null): Li
     const cont = prefix + (trunk ? '┃' : ' ') + ' '.repeat(Math.max(0, arrow.length - 1))
     if (a === null) {
       const t = lv.turns
-      drawn.push(line(top('00 main session')))
-      drawn.push(line(inner(`${t.length} turn${t.length === 1 ? '' : 's'} · ${money(t.reduce((n, x) => n + x.cost, 0))} · ${all.length} agent${all.length === 1 ? '' : 's'} spawned`)))
-      drawn.push(line(bottom(children.length > 0)))
+      drawn.push(line(top('00 main session'), { color: 'cyan' }))
+      drawn.push(line(inner(`${mainState(lv.main)}  ${t.length} turn${t.length === 1 ? '' : 's'} · ${money(t.reduce((n, x) => n + x.cost, 0))} · ${all.length} agent${all.length === 1 ? '' : 's'} spawned`), { color: 'cyan' }))
+      drawn.push(line(bottom(children.length > 0), { color: 'cyan' }))
     } else {
       // The whole box carries the state's colour: green at work, yellow quiet, red failed or stopped; a finished box in the default colour.
       const { state, color } = stateOf(a, now)
@@ -520,14 +522,18 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null): Li
   // Live: the agents at work, the most recent call first; when fewer than two run, the last finished (a failed one first) keep their tail.
   const live = [...running].sort((x, y) => y.lastStepAt - x.lastStepAt).slice(0, 2)
   const rest = [...lv.finished].sort((x, y) => Number(bad(y)) - Number(bad(x)) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - live.length)
+  const tail = (title: string, state: string, recent: Recent[], color: string | undefined) => {
+    out.push(BLANK)
+    out.push(line(`${title}${' '.repeat(Math.max(1, 62 - title.length))}[${state}]`, { bold: true, color }))
+    if (recent.length === 0) out.push(line('  no tool call yet', { dim: true }))
+    for (const r of recent.slice(-5)) out.push(line(`  ${clockS(r.at)}  ${r.err ? 'ERROR ' : ''}${r.text}`, { color: r.err ? 'red' : undefined, dim: !r.err }))
+  }
   for (const a of [...live, ...rest]) {
     const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : `${endWord(a)} ${bad(a) ? 'after' : 'in'} ${secs((a.done ?? now) - a.startedAt)}`
-    const title = `● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''} / ${a.done === null ? 'live' : 'stopped'}`
-    out.push(BLANK)
-    out.push(line(`${title}${' '.repeat(Math.max(1, 62 - title.length))}[${state}]`, { bold: true, color: a.done === null ? 'green' : bad(a) ? 'red' : undefined }))
-    if (a.recent.length === 0) out.push(line('  no tool call yet', { dim: true }))
-    for (const r of a.recent.slice(-5)) out.push(line(`  ${clockS(r.at)}  ${r.err ? 'ERROR ' : ''}${r.text}`, { color: r.err ? 'red' : undefined, dim: !r.err }))
+    tail(`● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''} / ${a.done === null ? 'live' : 'stopped'}`, state, a.recent, a.done === null ? 'green' : bad(a) ? 'red' : undefined)
   }
+  // The main session's own tail when there is room for it: always before any agent, beside a lone agent after.
+  if (live.length + rest.length < 2) tail('● 00 main session / live', mainWord(lv.main, now), lv.main.recent, 'cyan')
   out.push(BLANK)
   out.push(line('[ Events ]', { bold: true }))
   if (lv.events.length === 0) out.push(line('  none yet', { dim: true }))
@@ -551,6 +557,9 @@ const weightFor = (ctx: number): Weight => (ctx >= 16000 ? HEAVY : ctx >= 4000 ?
 /** How a finished run ended: STOPPED (aborted), FAILED (an error or a refusal) or DONE. */
 const endWord = (a: RunningAgent) => (a.stopped ? 'STOPPED' : a.failed ? 'FAILED' : 'DONE')
 const bad = (a: RunningAgent) => a.failed || a.stopped
+/** The main session's state word for its box (at work while a turn runs) and the bracket of its panel (how long, or idle since when). */
+const mainState = (m: MainLive) => (m.busy ? '● WORKING' : '● IDLE')
+const mainWord = (m: MainLive, now: number) => (m.busy ? `WORKING ${secs(now - m.since)}` : m.lastAt ? `IDLE since ${clockS(m.lastAt)}` : 'IDLE')
 const stateOf = (a: RunningAgent, now: number) => {
   const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
   return { state: a.done === null ? (quiet ? '● QUIET' : '● RUNNING') : `● ${endWord(a)}`, color: a.done === null ? (quiet ? 'yellow' : 'green') : bad(a) ? 'red' : undefined }
@@ -642,7 +651,7 @@ const sceneOf = (lv: Live, now: number, width: number): Scene => {
     }
     if (a === null) {
       const t = lv.turns
-      boxes.push({ a, x, y: row, w, color: 'cyan', title: '00 main session', state: `${t.length} turn${t.length === 1 ? '' : 's'} · ${money(t.reduce((n, z) => n + z.cost, 0))}`, figures: '', desc: fit(`${all.length} agent${all.length === 1 ? '' : 's'} spawned`) })
+      boxes.push({ a, x, y: row, w, color: 'cyan', title: '00 main session', state: mainState(lv.main), figures: `${t.length} turn${t.length === 1 ? '' : 's'} · ${money(t.reduce((n, z) => n + z.cost, 0))}`, desc: fit(`${all.length} agent${all.length === 1 ? '' : 's'} spawned`) })
     } else {
       const { state, color } = stateOf(a, now)
       const parts = [`${shortModel(a.model)} ${a.effort}`.trim(), secs((a.done ?? now) - a.startedAt), `${a.steps} step${a.steps === 1 ? '' : 's'}`, ...(a.cost !== null ? [money(a.cost)] : [])]
@@ -1177,7 +1186,7 @@ export const register: Register = (on, options) => {
       const t: Turn = { at: await $.clock.now(), turnId: e.turnId, model: u?.model ?? '', effort: p?.applied ?? p?.sessionEffort ?? '', sessionEffort: p?.sessionEffort ?? '',
         in: u?.input_tokens ?? 0, out: u?.output_tokens ?? 0, cacheRead: u?.cache_read_input_tokens ?? 0, cacheWrite: u?.cache_creation_input_tokens ?? 0,
         cost: u ? turnCost(u) : 0, errors: p?.errors ?? 0, agentCalls: p?.agentCalls ?? 0, routed: p?.routed ?? 0, family: p?.family ?? null, gear: p?.gear ?? 'same', advised: p?.wouldApply ?? null }
-      await update($, live, v => ({ ...v, turns: [...v.turns, t].slice(-60) }))
+      await update($, live, v => ({ ...v, turns: [...v.turns, t].slice(-60), main: { ...v.main, busy: false, lastAt: t.at } }))
       await closeIdleRuns($)
     }
     return next(e)
@@ -1375,6 +1384,8 @@ export const register: Register = (on, options) => {
     if (e.agentId !== undefined) return next(e)
     currentTurn = e.turnId
     lastPrompt = e.text ?? ''
+    const began = await $.clock.now()
+    await update($, live, v => ({ ...v, main: { ...v.main, busy: true, since: began } }))
     const m = e.text ? matchFamily('', e.text) : null
     const s = await read($, status)
     const f = m && s?.json ? s.json.families.find(x => x.name === m.family) : null
@@ -1433,6 +1444,9 @@ export const register: Register = (on, options) => {
         if (e.tool === 'Agent') p.agentCalls++
         if ((r as { isError?: boolean }).isError) p.errors++
       }
+      // The main session's own tail, for the monitor's root panel.
+      const rec: Recent = { at: await $.clock.now(), text: toolText(e as unknown as Record<string, unknown>), err: (r as { isError?: boolean }).isError === true }
+      await update($, live, v => ({ ...v, main: { ...v.main, recent: [...v.main.recent, rec].slice(-8) } }))
     }
     return r
   })
@@ -1576,21 +1590,20 @@ export const register: Register = (on, options) => {
     const graph = (
       <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
         <Text color="cyan" bold>[ Run graph ]</Text>
-        <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · graph: live · ${running.length ? 'at work' : 'idle'}`}</Text>
-        {all.length === 0 ? <Text dimColor>no agent has run in this session yet; the graph draws as Agent calls spawn them</Text> : (
-          <Box position="relative" width={scene.width} height={scene.height}>
-            {[...scene.rows].flatMap(([y, segs]) => segs.map(s => (
-              <Box position="absolute" top={y} left={s.x}><Text color={s.color} dimColor={!s.color}>{s.text}</Text></Box>
-            )))}
-            {scene.boxes.map(b => (
-              <Box position="absolute" top={b.y} left={b.x} width={b.w} borderStyle="round" borderColor={b.color} borderDimColor={!b.color} flexDirection="column">
-                <Text bold wrap="truncate">{b.title}</Text>
-                <Text wrap="truncate"><Text color={b.color}>{b.state}</Text><Text>{b.figures ? `  ${b.figures}` : ''}</Text></Text>
-                <Text dimColor wrap="truncate">{b.desc}</Text>
-              </Box>
-            ))}
-          </Box>
-        )}
+        <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · graph: live · ${running.length ? 'at work' : lv.main.busy ? 'main session at work' : 'idle'}`}</Text>
+        {all.length === 0 && <Text dimColor>no agent spawned yet; Agent calls hang under the session box as they spawn</Text>}
+        <Box position="relative" width={scene.width} height={scene.height}>
+          {[...scene.rows].flatMap(([y, segs]) => segs.map(s => (
+            <Box position="absolute" top={y} left={s.x}><Text color={s.color} dimColor={!s.color}>{s.text}</Text></Box>
+          )))}
+          {scene.boxes.map(b => (
+            <Box position="absolute" top={b.y} left={b.x} width={b.w} borderStyle="round" borderColor={b.color} borderDimColor={!b.color} flexDirection="column">
+              <Text bold wrap="truncate">{b.title}</Text>
+              <Text wrap="truncate"><Text color={b.color}>{b.state}</Text><Text>{b.figures ? `  ${b.figures}` : ''}</Text></Text>
+              <Text dimColor wrap="truncate">{b.desc}</Text>
+            </Box>
+          ))}
+        </Box>
         <Text dimColor>arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ &lt;4k</Text>
       </Box>
     )
@@ -1610,7 +1623,21 @@ export const register: Register = (on, options) => {
         {runText}
       </Box>
     )
-    const right = <Box flexDirection="column" width={twoCol ? rightW : undefined}>{tails.map(panel)}</Box>
+    // The main session's own panel when there is room: alone before any agent runs, beside a lone agent after.
+    const mainPanel = tails.length < 2 && (
+      <Box borderStyle="round" borderColor="cyan" flexDirection="column" paddingX={1}>
+        <Box flexDirection="row" justifyContent="space-between">
+          <Text color="cyan" bold>● 00 main session / live</Text>
+          <Text color="cyan">{`[${mainWord(lv.main, now)}]`}</Text>
+        </Box>
+        {lv.main.recent.length === 0 && <Text dimColor>no tool call yet</Text>}
+        {lv.main.recent.slice(-5).map(r => (
+          <Text><Text dimColor>{clockS(r.at)}  </Text><Text color={r.err ? 'red' : undefined}>{`${r.err ? 'ERROR ' : ''}${r.text}`}</Text></Text>
+        ))}
+        {lv.main.busy && <Text color="cyan">$ ▌</Text>}
+      </Box>
+    )
+    const right = <Box flexDirection="column" width={twoCol ? rightW : undefined}>{tails.map(panel)}{mainPanel}</Box>
     return (
       <Box flexDirection="column">
         {header}

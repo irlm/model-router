@@ -139,10 +139,12 @@ an error in red; then the run's event log. A sketch:
  List (g)  History (3) (h)  Save report (s)  Model router (m)
 ```
 
-An agent the engine resumes under the same id (a hand-back, a follow-up) is a new run of the same box,
-"02 Web Researcher · run 2"; a child hangs under the run active when it spawned. Nothing here is a
-dependency graph: the engine reports who spawned whom, not who waits on whom, so no box is marked
-blocked.
+Before any agent has run, the main session is drawn alone: its box says `● WORKING` while a turn runs
+and `● IDLE` after, with the turns and cost so far, and its own live panel lists the main session's tool
+calls; agents hang under it as they spawn. An agent the engine resumes under the same id (a hand-back, a
+follow-up) is a new run of the same box, "02 Web Researcher · run 2"; a child hangs under the run active
+when it spawned. Nothing here is a dependency graph: the engine reports who spawned whom, not who waits
+on whom, so no box is marked blocked.
 
 **Runs, tasks and reports.** The agents a prompt spawns are one run; `/router task start <name>` …
 `/router task end` groups everything under a name across as many prompts as it takes. When a run's last

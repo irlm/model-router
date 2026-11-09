@@ -3,6 +3,14 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.21.0 — 2026-11-09
+
+- The run monitor draws the main session before any agent runs, instead of one line saying nothing has run: the
+  `00 main session` box carries its state (`● WORKING` while a turn runs, `● IDLE` after) with the turns and cost so
+  far, and the main session has a live panel of its own (its last tool calls, an error in red, how long the turn
+  has run or idle since when), shown whenever fewer than two agents are at work. Agents hang under the box as they
+  spawn, as before. A Windows session with the monitor open and no subagent yet looked dead; it was waiting.
+
 ## 0.20.1 — 2026-11-08
 
 - The glance keeps only what is acted on: the header bar with three dim facts under it (the repository, the

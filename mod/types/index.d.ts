@@ -212,8 +212,10 @@ export type SavedRun = { file: string; id: string; startedAt: number; prompt: st
 export type Recent = { at: number; text: string; err: boolean }
 /** One line of the run's event log. */
 export type RunEvent = { at: number; text: string; color?: string; runId: string }
+/** The main session itself, for the monitor's root box and its panel: at work since a turn began, its last tool calls. */
+export type MainLive = { busy: boolean; since: number; lastAt: number; recent: Recent[] }
 /** The session as it runs: the turns so far, the families escalated (the reason), the agents running and the last that finished. */
-export type Live = { turns: Turn[]; escalated: Record<string, string>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; stoppedN: number; events: RunEvent[]; nextN: number; runs: RunMeta[]; task: string | null }
+export type Live = { turns: Turn[]; escalated: Record<string, string>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; stoppedN: number; events: RunEvent[]; nextN: number; runs: RunMeta[]; task: string | null; main: MainLive }
 
 /** A prompt that read as a different task in a session already re-reading a lot per turn, and what was done. */
 export type Switch = { at: number; ctx: number; why: string; action: 'compacted' | 'kept' | 'asked' }

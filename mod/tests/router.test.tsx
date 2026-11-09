@@ -617,6 +617,42 @@ test('the run monitor: the main session at the root, each agent a box under its 
 
 const MONITOR_PANE = { plugin: 'model-router', component: 'Pane', requestId: 'model-router-monitor', props: { title: 'Agent run', isFocused: false, bodyColumns: 150, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } } as const
 
+test('the run monitor before any agent: the main session drawn alone, WORKING while its turn runs and IDLE after, with its own tool tail', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, 'Bash')
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
+  expect(text).toContain('┌ 00 main session')
+  expect(text).toMatch(/● IDLE\s+0 turns · \$0\.00 · 0 agents spawned/)
+  expect(text).toContain('no agent spawned yet; Agent calls hang under the session box as they spawn')
+  expect(text).toMatch(/● 00 main session \/ live\s+\[IDLE\]/)
+  expect(text).toContain('no tool call yet')
+  // a turn begins: the box says WORKING, the panel counts the time and lists the main session's own tool calls
+  await $.turn.start({ text: 'look at how the parser loads its schema', turnId: 'mt1' })
+  await $.tool.call({ tool: 'Grep', pattern: 'parse_config', path: 'tools' })
+  await $.tool.call({ tool: 'Bash', command: 'python3 -m pytest -q' })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toMatch(/● WORKING\s+0 turns/)
+  expect(text).toMatch(/● 00 main session \/ live\s+\[WORKING \S+\]/)
+  expect(text).toMatch(/\d\d:\d\d:\d\d  Grep "parse_config" tools/)
+  expect(text).toMatch(/ERROR \$ python3 -m pytest -q/)
+  const ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^00 main session$/ }))?.text).toBe('00 main session')
+  expect((await ui.find({ type: 'Text', text: /^● WORKING$/ }))?.text).toBe('● WORKING')
+  expect((await ui.find({ type: 'Text', text: /^● 00 main session \/ live$/ }))?.text).toBe('● 00 main session / live')
+  expect((await ui.find({ type: 'Text', text: /Grep "parse_config" tools/ }))?.text).toContain('Grep "parse_config" tools')
+  expect((await ui.find({ type: 'Text', text: /main session at work/ }))?.text).toContain('main session at work')
+  await ui.unmount()
+  // the turn ends: IDLE since its end, one turn counted
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 'mt1', reason: 'answer', usage: { model: 'claude-fable-5-1', input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toMatch(/● IDLE\s+1 turn · /)
+  expect(text).toMatch(/\[IDLE since \d\d:\d\d:\d\d\]/)
+  await settled()
+})
+
 test('the run monitor pane draws the graph: a box per agent in its state colour, the arrow label between spawner and child, the live panel of the agent at work, the event log; the list view is the text; a narrow pane stacks', { options: { routing: 'auto' } }, async ($, on) => {
   const seen: Record<string, unknown>[] = []
   const steps: unknown[] = []

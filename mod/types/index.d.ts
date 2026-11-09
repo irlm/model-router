@@ -185,13 +185,35 @@ export type RunningAgent = {
   run: number
   /** its last tool calls, newest last: the monitor's live tail */
   recent: Recent[]
+  /** the run (task) this agent belongs to: turn:<id> for the prompt that spawned it, task:<slug> under a named task */
+  runId: string
+  /** its final answer, the first 2000 characters, kept for the run's report */
+  answer: string
 }
+/** One run (task): the agents a prompt spawned, or everything under a named task. */
+export type RunMeta = {
+  id: string
+  startedAt: number
+  /** null while an agent of it still runs (or the named task is open) */
+  endedAt: number | null
+  /** the prompt's first 120 characters, or the task's name */
+  prompt: string
+  name: string | null
+  agentN: number
+  cost: number
+  failedN: number
+  stoppedN: number
+  /** the file it was saved to under <config>/model-router/runs, once saved */
+  saved: string | null
+}
+/** A run saved on this machine, as tools/runs.py lists it. */
+export type SavedRun = { file: string; id: string; startedAt: number; prompt: string; name: string | null; agentN: number; cost: number; source: 'live' | 'transcript' }
 /** One tool call of a subagent, as the monitor's tail shows it. */
 export type Recent = { at: number; text: string; err: boolean }
 /** One line of the run's event log. */
-export type RunEvent = { at: number; text: string; color?: string }
+export type RunEvent = { at: number; text: string; color?: string; runId: string }
 /** The session as it runs: the turns so far, the families escalated (the reason), the agents running and the last that finished. */
-export type Live = { turns: Turn[]; escalated: Record<string, string>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; stoppedN: number; events: RunEvent[]; nextN: number }
+export type Live = { turns: Turn[]; escalated: Record<string, string>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; stoppedN: number; events: RunEvent[]; nextN: number; runs: RunMeta[]; task: string | null }
 
 /** A prompt that read as a different task in a session already re-reading a lot per turn, and what was done. */
 export type Switch = { at: number; ctx: number; why: string; action: 'compacted' | 'kept' | 'asked' }
@@ -201,6 +223,6 @@ export type Job = { name: string; lines: string[]; isRunning: boolean; exitCode:
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live>; tick: Shaped<number>; monitorView: Shaped<'graph' | 'list'> }
+    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live>; tick: Shaped<number>; monitorView: Shaped<'graph' | 'list'>; monitorRun: Shaped<string | null>; monitorHistory: Shaped<boolean>; savedRuns: Shaped<SavedRun[]> }
   }
 }

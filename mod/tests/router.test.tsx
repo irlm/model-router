@@ -434,7 +434,7 @@ test('ask mode routes the call when the person picks the measured option', { opt
   expect(text).toContain('[find_feature] routed')
 })
 
-const LIVE_MOCKS = (on: On, seen: Record<string, unknown>[], steps: unknown[], failing: string | null) => {
+const LIVE_MOCKS = (on: On, seen: Record<string, unknown>[], steps: unknown[], failing: string | null, runsJson: unknown[] | null = null) => {
   on('command.register', () => ({ value: { command: 'router' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   mock.clock(on, { now: 1_762_000_000_000 })
@@ -442,7 +442,7 @@ const LIVE_MOCKS = (on: On, seen: Record<string, unknown>[], steps: unknown[], f
   on('fs.exists', () => ({ value: true }))
   // the status this machine would read: find_feature and fix_bug as the shared fixture, plus web_research decided at haiku low
   const LIVE_STATUS = { ...STATUS, families: [...STATUS.families, { name: 'web_research', model: 'haiku', effort: 'low', variant: '', rate: '76/78', cost_per_success: 0.0197, can_run: true, why: '', last_check: null }] }
-  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(LIVE_STATUS) } }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : e.argv[1] === 'tools/runs.py' ? { ...ok, stdout: e.argv.includes('--json') ? JSON.stringify(runsJson ?? []) : `${(runsJson ?? []).length} saved` } : { ...ok, stdout: JSON.stringify(LIVE_STATUS) } }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
   on('session.model', () => ({ value: 'claude-fable-5-1' }))
@@ -657,6 +657,81 @@ test('the run monitor pane draws the graph: a box per agent in its state colour,
   // the g button switches to the list view: the text drawing
   await ui.press({ key: 'view' })
   expect((await ui.find({ type: 'Text', text: /[┣┗]━━ ~18k ━━▶ ┌ 01 Explore/ }))?.text).toContain('┌ 01 Explore')
+  await ui.unmount()
+  await settled()
+})
+
+test('runs: the agents a prompt spawned are one run, saved when its last agent ends; a named task groups what follows until it ends; the monitor shows the current run and lists the others; a report is written into docs/runs', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  const writes: { path: string; text: string }[] = []
+  const SAVED = [{ file: '/home/me/.claude/model-router/runs/2026-11-01/101500-old-task-transcript.json', id: 'transcript:abc:20261101T1015', startedAt: 1_761_992_100_000, prompt: 'an old task', name: null, agentN: 2, cost: 0.03, source: 'transcript' }]
+  LIVE_MOCKS(on, seen, steps, null, SAVED)
+  let n = 0
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `r${++n}` }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('fs.write', (_, e) => { writes.push(e as { path: string; text: string }); return { value: undefined } })
+  await $.session.start({ cwd: '/work/proj', surface: 'terminal', isInteractive: true })
+  // run 1: a prompt spawns two agents; the run ends and is saved when the second one ends
+  await $.turn.start({ text: 'find where the parser loads the schema', turnId: 't1' })
+  const SPAWN = { tool_use_id: 'tr1', prompt: 'Find where the config file is parsed and report the function.', description: 'find the parser', subagentType: 'Explore', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1', model: 'claude-haiku-5-5' } as const
+  await $.agent.spawn(SPAWN)
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tr2', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'What is the RFC number of TLS 1.3?' })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
+  expect(text).toContain('run 1/1 this session · "find where the parser loads the schema" · 2 agents · $0.00 · running')
+  await $.turn.complete({ answer: 'the parser is in tools/config.py', durationMs: 1000, isAborted: false, turnId: 'tr1', reason: 'answer', agentId: 'r1', usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } })
+  expect(writes.length).toBe(0)                                                    // one agent still runs: not saved yet
+  await $.turn.complete({ answer: 'RFC 8446', durationMs: 1000, isAborted: false, turnId: 'tr2', reason: 'answer', agentId: 'r2' })
+  expect(writes.length).toBe(1)
+  expect(writes[0].path).toMatch(/^\/home\/me\/\.claude\/model-router\/runs\/\d{4}-\d\d-\d\d\/\d{6}-find-where-the-parser-loads-the-schema\.json$/)
+  const saved = JSON.parse(writes[0].text) as { source: string; meta: { id: string; agentN: number; endedAt: number | null }; agents: { answer: string }[] }
+  expect(saved.source).toBe('live')
+  expect(saved.meta.id).toBe('turn:t1')
+  expect(saved.meta.agentN).toBe(2)
+  expect(saved.meta.endedAt).not.toBeNull()
+  expect(saved.agents.map(a => a.answer)).toEqual(['the parser is in tools/config.py', 'RFC 8446'])
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toContain('run 1/1 this session · "find where the parser loads the schema" · 2 agents · $0.00 · ended')
+  expect(text).toContain('· saved')
+  // run 2: a named task groups the agents of several prompts, and ends only by hand
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'task start cache invalidation bug' }))
+  expect(text).toContain('task "cache invalidation bug" open')
+  await $.turn.start({ text: 'trace the invalidation path', turnId: 't2' })
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tr3', description: 'trace invalidation', prompt: 'Trace the cache invalidation path.' })
+  await $.turn.complete({ answer: 'found', durationMs: 1000, isAborted: false, turnId: 'tr3', reason: 'answer', agentId: 'r3' })
+  await $.turn.start({ text: 'now check the tests', turnId: 't3' })
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tr4', description: 'check tests', prompt: 'Run the cache tests.' })
+  await $.turn.complete({ answer: 'green', durationMs: 1000, isAborted: false, turnId: 'tr4', reason: 'answer', agentId: 'r4' })
+  expect(writes.length).toBe(1)                                                    // the task is open: nothing saved yet
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toContain('run 2/2 this session · task "cache invalidation bug" · 2 agents')
+  expect(text).toContain('┌ 03 Explore')
+  expect(text).not.toContain('┌ 01 Explore')                                      // the current run only
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'task end' }))
+  expect(text).toMatch(/task "cache invalidation bug" closed; saved to .*cache-invalidation-bug\.json/)
+  expect(writes.length).toBe(2)
+  // the report of the current run into the project
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor save' }))
+  expect(text).toMatch(/^report written: docs\/runs\/\d{4}-\d\d-\d\d-cache-invalidation-bug\.md/)
+  const report = writes[2].text
+  expect(report).toContain('# Agent run: cache invalidation bug')
+  expect(report).toContain('| 03 | Explore | haiku |')
+  expect(report).toContain('### 03 Explore: trace invalidation')
+  expect(report).toContain('found')
+  // the saved runs on this machine, listed through the Python tool
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'runs' }))
+  expect(text).toContain('1 saved run')
+  expect(text).toContain('an old task')
+  expect(text).toContain('from transcripts')
+  // the pane: the history view lists the session's runs and the saved one; picking a run shows it
+  const ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^run 2\/2 this session/ }))?.text).toContain('task "cache invalidation bug"')
+  await ui.press({ key: 'history' })
+  expect((await ui.find({ type: 'Text', text: /^\[ Runs this session \]$/ }))?.text).toBe('[ Runs this session ]')
+  expect((await ui.find({ type: 'Text', text: /an old task/ }))?.text).toContain('from transcripts')
+  await ui.press({ key: 'run-turn:t1' })
+  expect((await ui.find({ type: 'Text', text: /^run 1\/2 this session/ }))?.text).toContain('find where the parser loads the schema')
+  expect((await ui.find({ type: 'Text', text: /^01 Explore$/ }))?.text).toBe('01 Explore')
   await ui.unmount()
   await settled()
 })

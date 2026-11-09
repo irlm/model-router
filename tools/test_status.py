@@ -610,6 +610,70 @@ class LeadingDashKeys(unittest.TestCase):
             self.assertEqual(overrides.read().get('-Users-me-proj', {}), {})
 
 
+class Runs(unittest.TestCase):
+    """tools/runs.py: the runs the widget saved, listed, printed, exported; the days before it watched rebuilt from Agent calls."""
+    LIVE = {'source': 'live', 'meta': {'id': 'turn:t1', 'startedAt': 1_762_000_000_000, 'endedAt': 1_762_000_060_000, 'prompt': 'find where the parser loads the schema', 'name': None,
+                                       'agentN': 2, 'cost': 0.0123, 'failedN': 0, 'stoppedN': 1, 'saved': None},
+            'agents': [{'id': 'a1', 'parent': None, 'type': 'Explore', 'description': 'find the parser', 'model': 'claude-haiku-5-5', 'effort': 'low', 'family': 'find_feature',
+                        'startedAt': 1_762_000_000_000, 'done': 1_762_000_012_000, 'steps': 3, 'cost': 0.0123, 'failed': False, 'stopped': False, 'n': 1, 'run': 1, 'answer': 'tools/config.py:42'},
+                       {'id': 'a2', 'parent': None, 'type': 'general-purpose', 'description': 'long check', 'model': 'claude-fable-5-1', 'effort': '', 'family': None,
+                        'startedAt': 1_762_000_010_000, 'done': 1_762_000_060_000, 'steps': 1, 'cost': None, 'failed': False, 'stopped': True, 'n': 2, 'run': 1, 'answer': ''}],
+            'events': [{'at': 1_762_000_000_000, 'text': '01 Explore spawned on haiku low (~15 ctx)', 'runId': 'turn:t1'}]}
+    CALLS = [{'ts': '2026-11-01T10:15', 'session': '/t/s1.jsonl', 'type': 'Explore', 'description': 'find the loader', 'prompt_chars': 400, 'class': 'find_feature', 'agent': 'x1', 'model': 'claude-haiku-5-5', 'cost': 0.01, 'failed': False, 'tok': {'output_tokens': 500}},
+             {'ts': '2026-11-01T10:17', 'session': '/t/s1.jsonl', 'type': 'Web Researcher', 'description': 'look up a default', 'prompt_chars': 100, 'class': 'web_research', 'agent': 'x2', 'model': 'claude-haiku-5-5', 'cost': 0.02, 'failed': False, 'tok': {}},
+             {'ts': '2026-11-01T11:40', 'session': '/t/s1.jsonl', 'type': 'general-purpose', 'description': 'write the report', 'prompt_chars': 2000, 'class': 'research_synthesis', 'agent': None, 'model': None, 'model_asked': 'opus', 'cost': None, 'failed': True},
+             {'ts': '2026-11-01T10:16', 'session': '/t/s2.jsonl', 'type': 'Explore', 'description': 'other session', 'prompt_chars': 80, 'class': 'find_feature', 'agent': 'y1', 'model': 'claude-haiku-5-5', 'cost': 0.005, 'failed': False}]
+
+    def test_group_splits_a_session_at_a_gap_and_keeps_sessions_apart(self):
+        import runs
+        got = runs.group(self.CALLS)
+        self.assertEqual([(r['meta']['agentN'], r['meta']['prompt']) for r in got], [(2, 'find the loader'), (1, 'write the report'), (1, 'other session')])
+        first = got[0]
+        self.assertEqual(first['source'], 'transcript')
+        self.assertEqual(first['meta']['cost'], 0.03)
+        self.assertEqual(first['agents'][0]['model'], 'haiku')
+        self.assertEqual(first['agents'][0]['ctx'], 100)
+        self.assertEqual(got[1]['meta']['failedN'], 1)
+        self.assertEqual(got[1]['agents'][0]['model'], 'opus')                      # asked, never priced: the asked model stands
+
+    def test_import_writes_new_runs_only_and_list_shows_both_sources(self):
+        import runs
+        with tempfile.TemporaryDirectory() as d:
+            live = Path(d) / '2026-11-01' / '101500-find-where.json'
+            live.parent.mkdir()
+            live.write_text(json.dumps(self.LIVE), encoding='utf-8')
+            written = runs.import_runs(runs_dir=d, calls=self.CALLS)
+            self.assertEqual(len(written), 3)
+            self.assertEqual(runs.import_runs(runs_dir=d, calls=self.CALLS), [])          # the second import adds nothing
+            rows = runs.list_runs(d)
+            self.assertEqual(len(rows), 4)
+            self.assertEqual({r['source'] for r in rows}, {'live', 'transcript'})
+            self.assertEqual(rows[0]['id'], 'turn:t1')                                   # sorted by start: the fixture's 2025 run first
+            run, path = runs.find('turn:t1', d)
+            self.assertEqual(path, live)
+            with self.assertRaises(SystemExit):
+                runs.find('nope', d)
+
+    def test_text_and_markdown_name_the_agents_and_how_each_ended(self):
+        import runs
+        t = runs.text(self.LIVE)
+        self.assertIn('2 agents · $0.01 · 1 stopped', t)
+        self.assertIn('Explore', t)
+        self.assertIn('stopped', t)
+        md = runs.markdown(self.LIVE)
+        self.assertIn('# Agent run: find where the parser loads the schema', md)
+        self.assertIn('## Asked', md)
+        self.assertIn('| 01 | Explore | claude-haiku-5-5 low | find_feature | 3 | 12s | $0.01 | done | find the parser |', md)
+        self.assertIn('| 02 | general-purpose | claude-fable-5-1 | unmeasured | 1 | 50s | - | stopped | long check |', md)
+        self.assertIn('### 01 Explore: find the parser', md)
+        self.assertIn('tools/config.py:42', md)
+        self.assertIn('- 12:26  01 Explore spawned', md)
+        with tempfile.TemporaryDirectory() as d:
+            path = runs.export(self.LIVE, d)
+            self.assertEqual(path.name, '2025-11-01-find-where-the-parser-loads-the-schema.md')
+            self.assertIn('## Agents', path.read_text(encoding='utf-8'))
+
+
 class Release(unittest.TestCase):
     def test_the_version_is_the_newest_changelog_entry(self):
         self.assertEqual(release.changelog_top(), release.version())                      # the repository's own state

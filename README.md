@@ -76,6 +76,7 @@ tools/claude_home.py   where Claude Code keeps its files (~/.claude, or CLAUDE_C
 tools/fixtures/          transcript rows as each Claude Code version writes them, content replaced: the format test
 tools/status.py          where the routing stands on this machine, what is worth doing, and the suggestions (text or --json)
 tools/consumption.py     the last 30 days of interactive work by model and effort, every Agent call priced and classified
+tools/runs.py            the runs the widget saved (list, show, export as markdown), and runs rebuilt from the transcripts
 tools/update.py          re-check: regress.py on every family whose fixtures exist here, then commit and push
 mod/                     the Claude Code widget: status line + /router pane over the scripts above
 ```
@@ -104,7 +105,7 @@ the data side (classifier, suggestions, per-change savings), `python3 bench/comm
 
 The widget also routes each Agent call: when a measured family covers the task and the call asks
 for a dearer model than the decision, it asks you, routes the subagent (auto) or stays out (off), per
-the "Route Agent calls" option; nothing unmeasured is touched. `/router monitor` opens the run as a graph: each agent under the one that spawned it, the arrow weighted by the context sent, its live tail and the event log. The pane also shows the subscription's rate-limit windows, what the last 30 days consumed (main
+the "Route Agent calls" option; nothing unmeasured is touched. `/router monitor` opens the run as a graph: each agent under the one that spawned it, the arrow weighted by the context sent, its live tail and the event log; runs are saved as they end, `/router task` groups a long task, `/router monitor save` writes a run's report into docs/runs/. The pane also shows the subscription's rate-limit windows, what the last 30 days consumed (main
 sessions by model and effort from the transcripts, each Agent call priced and classified) and
 suggestions: where the same work could consume less, each labelled `measured`, `extrapolated`
 or `unmeasured` with the cell its number comes from. The monthly ledger keeps the same 30-day

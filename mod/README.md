@@ -182,6 +182,20 @@ keep their panel. Then the run's event log (spawned on what by whom, done in how
 main pane. Nothing here is a dependency graph of the task: the engine reports who spawned whom, not who waits
 on whom, so no box is marked blocked and no waiting arrow is drawn.
 
+**Runs, history and reports.** The monitor shows one run at a time: the agents the current prompt spawned (a
+nested spawn or a resume joins its parent's run), or everything under a named task opened with `/router task
+start <name>` and closed with `/router task end`, across as many prompts as it takes. The line under the header
+names the run: its place among the session's runs, its words, agents and cost, whether it ended and was saved.
+`h` lists the session's runs (pick one by its number; `c` returns to the current) and the runs saved on this
+machine. A run is saved when its last agent ends (a task when it is ended): one JSON file under
+`<config>/model-router/runs/<day>/`, with every agent, its final answer and the events, so a long day is many
+small files rather than one growing pane. `/router runs` lists them, `/router runs show <id>` prints one, and
+`/router runs import [--days N]` rebuilds the days before the widget watched from the transcripts' Agent calls
+(prompt, model, cost; no per-second timing and no tool tail, which the engine reports only while the widget is
+loaded). `/router monitor save [id]`, or `s` in the pane, writes a run into the project as
+`docs/runs/<day>-<words>.md`: what was asked, the graph as text, the agents with model, effort, cost and
+outcome, their answers, the events; the document to review a long investigation or hand to someone.
+
 **Main-session effort** (`/router effort advise|auto|off`; `mainEffort` in `/config`, default
 `advise`). The router routes Agent calls; the main session's requests it did not touch until now.
 Before each main-loop request the engine lets a plugin name another effort (`turn.step`); the model

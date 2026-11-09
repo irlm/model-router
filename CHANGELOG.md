@@ -3,6 +3,20 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.19.0 — 2026-11-08
+
+- Runs. The agents a prompt spawns are one run (a resume or a nested spawn joins its parent's run); a named task
+  (`/router task start <name>` … `/router task end`) groups everything under it across prompts. The monitor
+  shows the current run alone, names it under the header (its place among the session's runs, its words, agents,
+  cost, ended or running, saved), and `h` lists the session's runs to pick one, with `c` back to the current.
+- Runs are saved: when a run's last agent ends (or the task is ended) its JSON goes to
+  `<config>/model-router/runs/<day>/<time>-<words>.json` with every agent, its answer and the events; `/router
+  runs` lists what is saved, `/router runs show <id>` prints one, `/router runs import [--days N]` rebuilds runs
+  for the days before the widget watched from the transcripts' Agent calls (prompts, models, costs; no timing).
+- Reports: `/router monitor save [id]` (or `s` in the pane) writes the run into the project as
+  `docs/runs/<day>-<words>.md`: what was asked, the graph as text, the agents with model, effort, cost and
+  outcome, their answers, the events. New `tools/runs.py` behind the list, show, export and import.
+
 ## 0.18.1 — 2026-11-08
 
 - An agent stopped before it answered (aborted by the person or the session) was drawn as DONE; it is now

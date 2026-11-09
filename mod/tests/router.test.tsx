@@ -239,11 +239,15 @@ test('auto mode routes a research note to the decided family once it is measured
   on('ui.status', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
   on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return { result: {} } })
+  SPAWN_MOCKS(on, seen)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
-  await $.tool.call({ tool: 'Agent', description: 'compare options', prompt: 'Research and compare three message queues; write up a report.', subagent_type: 'general-purpose' })
-  const call = seen.find(x => x.tool === 'Agent')
-  expect([call?.model, call?.effort]).toEqual(['sonnet', 'low'])
+  const NOTE = { tool: 'Agent', description: 'compare options', prompt: 'Research and compare three message queues; write up a report.', subagent_type: 'general-purpose' } as const
+  await $.tool.call(NOTE)
+  const sp = await $.agent.spawn(spawnOf(NOTE))
+  expect(spawnSeen(seen)?.model).toBe('sonnet')
+  await drain($.turn.step({ turnId: 'ta', index: 0, model: 'claude-sonnet-5-5', effort: 'high', messageCount: 1, agentId: sp.agentId }))
+  expect((seen.filter(x => x.tool === '$step').at(-1) as { effort?: string })?.effort).toBe('low')
 })
 
 test('an override for this project routes before the family default, and prefer sets one', { options: { routing: 'auto' } }, async ($, on) => {
@@ -262,11 +266,12 @@ test('an override for this project routes before the family default, and prefer 
   on('ui.status', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
   on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return { result: {} } })
+  SPAWN_MOCKS(on, seen)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   await $.tool.call(EXPLORE)
-  const call = seen.find(x => x.tool === 'Agent')
-  expect([call?.model, call?.effort]).toEqual(['opus', 'low'])   // the family says haiku low; the project's override wins
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBe('opus')   // the family says haiku low; the project's override wins
   expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer' })).text).toContain('code-explore -> opus low')
   expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer research-synthesis opus low' })).text).toContain('override set for this project')
   expect(argvs.some(a => a.includes('tools/overrides.py set - research-synthesis opus low'))).toBe(true)
@@ -342,9 +347,20 @@ const ROUTING_MOCKS = (on: On, seen: Record<string, unknown>[], ask: 'deny' | st
     if (e.tool === 'AskUserQuestion') return ask === 'deny' ? { deny: 'no one to ask' } : { result: { questions: e.questions, answers: { [e.questions[0]?.question ?? '']: ask, [e.questions[0]?.header ?? '']: ask } } }
     return { result: {} }
   })
+  SPAWN_MOCKS(on, seen)
 }
+/** The engine side of a spawn and a subagent's request, recorded in `seen` as `$spawn` and `$step` rows: what the subagent runs on. */
+let spawned = 0
+const SPAWN_MOCKS = (on: On, seen: Record<string, unknown>[]) => {
+  on('agent.spawn', (_, e) => { seen.push({ tool: '$spawn', ...e }); return { model: e.model ?? 'claude-fable-5-1', agentId: `a${++spawned}` } })
+  on('turn.step', async function* (_, e) { seen.push({ tool: '$step', ...e }); return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } })
+}
+/** The spawn an Agent call makes, as the engine reports it. */
+const spawnOf = (call: { tool_use_id?: string; prompt: string; description: string; subagent_type?: string }) =>
+  ({ tool_use_id: call.tool_use_id ?? 'tu', prompt: call.prompt, description: call.description, subagentType: call.subagent_type ?? 'general-purpose', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1' } as const)
+const spawnSeen = (seen: Record<string, unknown>[]) => seen.filter(x => x.tool === '$spawn').at(-1) as { model?: string } | undefined
 
-const EXPLORE = { tool: 'Agent', description: 'find the parser', prompt: 'Find where the config file is parsed and report the function.', subagent_type: 'Explore' } as const
+const EXPLORE = { tool: 'Agent', tool_use_id: 'tu-explore', description: 'find the parser', prompt: 'Find where the config file is parsed and report the function.', subagent_type: 'Explore' } as const
 
 test('auto mode runs an Explore call on haiku low, the measured find_feature default', { options: { routing: 'auto' } }, async ($, on) => {
   const seen: Record<string, unknown>[] = []
@@ -353,8 +369,11 @@ test('auto mode runs an Explore call on haiku low, the measured find_feature def
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   await $.tool.call(EXPLORE)
   const call = seen.find(x => x.tool === 'Agent')
-  expect(call?.model).toBe('haiku')
-  expect(call?.effort).toBe('low')
+  expect([call?.model, call?.effort]).toEqual([undefined, undefined])   // the tool input is never rewritten: auto mode's review of it stands
+  const sp = await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBe('haiku')                           // the spawn inside the call carries the model
+  await drain($.turn.step({ turnId: 'ta', index: 0, model: 'claude-haiku-5-5', effort: 'high', messageCount: 1, agentId: sp.agentId }))
+  expect((seen.filter(x => x.tool === '$step').at(-1) as { effort?: string })?.effort).toBe('low')   // and its requests the effort
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('routed this session: 1 routed, 0 kept (mode auto')
   expect(text).toContain('Explore: inherit -> haiku low  [find_feature] auto  find the parser')
@@ -368,6 +387,8 @@ test('a research report (unmeasured) and a routed agent already on haiku low are
   await $.tool.call({ tool: 'Agent', description: 'compare options', prompt: 'Research and compare three message queues; write up a report.', subagent_type: 'general-purpose' })
   await $.tool.call({ tool: 'Agent', description: 'look up', prompt: 'What is the default value of shared_buffers?', subagent_type: 'Web Researcher' })
   for (const call of seen.filter(x => x.tool === 'Agent')) expect(call.model).toBeUndefined()
+  await $.agent.spawn(spawnOf({ prompt: 'What is the default value of shared_buffers?', description: 'look up', subagent_type: 'Web Researcher' }))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).not.toContain('routed this session')
 })
@@ -380,6 +401,8 @@ test('ask mode keeps the call when no one can answer', { options: { routing: 'as
   await $.tool.call(EXPLORE)
   const kept = seen.find(x => x.tool === 'Agent')
   expect(kept?.model).toBeUndefined()
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('[find_feature] kept')
 })
@@ -390,7 +413,9 @@ test('off mode touches nothing', { options: { routing: 'off' } }, async ($, on) 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   await $.tool.call(EXPLORE)
+  await $.agent.spawn(spawnOf(EXPLORE))
   expect(seen.find(x => x.tool === 'Agent')?.model).toBeUndefined()
+  expect(spawnSeen(seen)?.model).toBeUndefined()
   expect(seen.some(x => x.tool === 'AskUserQuestion')).toBe(false)
 })
 
@@ -402,8 +427,8 @@ test('ask mode routes the call when the person picks the measured option', { opt
   await $.tool.call(EXPLORE)
   const ask = seen.find(x => x.tool === 'AskUserQuestion') as { questions?: { options?: { label: string }[] }[] } | undefined
   expect(ask?.questions?.[0]?.options?.map(o => o.label)).toEqual(['haiku low (measured 214/216, $0.005/success)', 'Keep inherit', 'Always route this session'])
-  const call = seen.find(x => x.tool === 'Agent')
-  expect(call?.model).toBe('haiku')
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('[find_feature] routed')
 })
@@ -476,15 +501,17 @@ test('a routed Agent call that fails escalates its family: the next call runs as
   const seen: Record<string, unknown>[] = []
   const steps: unknown[] = []
   LIVE_MOCKS(on, seen, steps, 'Agent')
+  on('agent.spawn', (_, e) => { seen.push({ tool: '$spawn', ...e }); return { model: e.model ?? 'claude-fable-5-1', agentId: `a${++spawned}` } })
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   await $.turn.start({ text: 'find where the config loader is', turnId: 't1' })
   await $.tool.call(EXPLORE)
-  const first = seen.filter(x => x.tool === 'Agent').at(-1)
-  expect([first?.model, first?.effort]).toEqual(['haiku', 'low'])     // routed, then it failed
-  await $.tool.call({ ...EXPLORE, description: 'find the schema loader' })
-  const second = seen.filter(x => x.tool === 'Agent').at(-1)
-  expect([second?.model, second?.effort]).toEqual([undefined, undefined])   // as asked: the family is escalated this session
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBe('haiku')     // routed, then it failed
+  const again = { ...EXPLORE, tool_use_id: 'tu-explore-2', description: 'find the schema loader' }
+  await $.tool.call(again)
+  await $.agent.spawn(spawnOf(again))
+  expect(spawnSeen(seen)?.model).toBeUndefined()   // as asked: the family is escalated this session
   await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer', usage: USAGE })
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('agents   2 calls · 1 routed · escalated: find_feature (a call routed to haiku low failed)')
@@ -496,13 +523,16 @@ test('an Agent call re-issued within minutes of a routed one, with the same word
   const seen: Record<string, unknown>[] = []
   const steps: unknown[] = []
   LIVE_MOCKS(on, seen, steps, null)
+  on('agent.spawn', (_, e) => { seen.push({ tool: '$spawn', ...e }); return { model: e.model ?? 'claude-fable-5-1', agentId: `a${++spawned}` } })
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   await $.tool.call(EXPLORE)
-  expect(seen.filter(x => x.tool === 'Agent').at(-1)?.model).toBe('haiku')
-  await $.tool.call({ ...EXPLORE, description: EXPLORE.description + ' again' })
-  const second = seen.filter(x => x.tool === 'Agent').at(-1)
-  expect(second?.model).toBe(undefined)
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  const again = { ...EXPLORE, tool_use_id: 'tu-explore-2', description: EXPLORE.description + ' again' }
+  await $.tool.call(again)
+  await $.agent.spawn(spawnOf(again))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('escalated: find_feature (re-issued within 10 min of a routed call)')
   await settled()   // the detached work (log writes, the change record) ends inside the test

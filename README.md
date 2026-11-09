@@ -103,7 +103,7 @@ rest; `claude plugin validate mod` and `claude plugin test mod` check the mod, `
 the data side (classifier, suggestions, per-change savings), `python3 bench/common/test_harness.py` the runners.
 
 The widget also routes each Agent call: when a measured family covers the task and the call asks
-for a dearer model than the decision, it asks you, rewrites the call (auto) or stays out (off), per
+for a dearer model than the decision, it asks you, routes the subagent (auto) or stays out (off), per
 the "Route Agent calls" option; nothing unmeasured is touched. The pane also shows the subscription's rate-limit windows, what the last 30 days consumed (main
 sessions by model and effort from the transcripts, each Agent call priced and classified) and
 suggestions: where the same work could consume less, each labelled `measured`, `extrapolated`

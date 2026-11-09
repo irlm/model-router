@@ -158,6 +158,8 @@ export type RunningAgent = {
   description: string
   model: string
   effort: string
+  /** the effort the router decided for it, set on each of its requests; null when the call was not routed */
+  wantEffort: string | null
   family: string | null
   startedAt: number
   /** model requests so far */

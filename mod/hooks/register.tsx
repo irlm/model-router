@@ -17,7 +17,7 @@ const details = atom({ plugin: 'model-router', key: 'details' } as const, false,
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
 const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0 }
-const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-2' })
+const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-3' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 
@@ -647,6 +647,10 @@ const BROWSER = ['in the browser', 'chrome', 'web page', 'the page at', 'fill th
 const EXPLORE_TYPES = new Set(['Explore', 'Codebase Onboarding Engineer'])
 const MODELS = new Set(['sonnet', 'opus', 'haiku', 'fable'])
 const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max'])
+/** A routing decision waiting for its spawn: the Agent call's id (and its words, for a spawn whose id is not known) → what the subagent runs on. */
+type PendingRoute = { at: number; description: string; prompt: string; model: string; effort: string; family: string }
+const pendingRoutes = new Map<string, PendingRoute>()
+const PENDING_MS = 10 * 60000
 const RUNNER_NOTE = '\n\nRun the test command before you finish; the task counts as done only when the suite passes.'
 
 type Match = { family: string; why: string }
@@ -935,11 +939,18 @@ export const register: Register = (on, options) => {
   })
 
   // A subagent starts: one row in the agents block, under its parent when it has one.
+  // The routing decision for this Agent call (made in tool.call below) is applied here, on the spawn, never on the
+  // Agent tool's input: a tool input a hook changes loses the auto-mode review and the call is bounced once.
   on('agent.spawn', async ($, e, next) => {
-    const r = await next(e)
+    const now = await $.clock.now()
+    for (const [k, v] of pendingRoutes) if (now - v.at > PENDING_MS) pendingRoutes.delete(k)
+    const key = pendingRoutes.has(e.tool_use_id) ? e.tool_use_id : [...pendingRoutes].find(([, v]) => v.description === e.description && v.prompt === e.prompt)?.[0]
+    const want = key !== undefined ? pendingRoutes.get(key) : undefined
+    if (key !== undefined) pendingRoutes.delete(key)
+    const r = await next(want ? { ...e, model: want.model as 'haiku' | 'sonnet' | 'opus' | 'fable', ...(want.family === 'repo_fix' ? { prompt: e.prompt + RUNNER_NOTE } : {}) } : e)
     if (r.agentId) {
-      const a: RunningAgent = { id: r.agentId, parent: e.parentAgentId ?? null, type: e.subagentType, description: e.description, model: r.model, effort: (e as { effort?: string }).effort ?? '',
-        family: matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false }
+      const a: RunningAgent = { id: r.agentId, parent: e.parentAgentId ?? null, type: e.subagentType, description: e.description, model: r.model, effort: want?.effort ?? '', wantEffort: want?.effort ?? null,
+        family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false }
       a.startedAt = a.lastStepAt = await $.clock.now()
       await update($, live, v => ({ ...v, agents: { ...v.agents, [a.id]: a } }))
     }
@@ -963,14 +974,17 @@ export const register: Register = (on, options) => {
   on('turn.step', async function* ($, e, next) {
     if (e.agentId !== undefined) {
       const id = e.agentId
-      if ((await read($, live)).agents[id]) {
+      const a0 = (await read($, live)).agents[id]
+      const want = a0?.wantEffort && EFFORTS.has(a0.wantEffort) ? a0.wantEffort as 'low' | 'medium' | 'high' | 'xhigh' | 'max' : null
+      if (a0) {
         const at = await $.clock.now()
         await update($, live, v => {
           const a = v.agents[id]
-          return a ? { ...v, agents: { ...v.agents, [id]: { ...a, steps: a.steps + 1, lastStepAt: at, model: e.model || a.model, effort: typeof e.effort === 'string' ? e.effort : a.effort } } } : v
+          return a ? { ...v, agents: { ...v.agents, [id]: { ...a, steps: a.steps + 1, lastStepAt: at, model: e.model || a.model, effort: want ?? (typeof e.effort === 'string' ? e.effort : a.effort) } } } : v
         })
       }
-      return yield* next(e)
+      // The routed effort rides on the subagent's own requests (the spawn carries the model, not the effort).
+      return yield* next(want && e.effort !== want ? { ...e, effort: want } : e)
     }
     const p = plans.get(e.turnId)
     if (!p) return yield* next(e)
@@ -1002,7 +1016,8 @@ export const register: Register = (on, options) => {
   })
 
   // Every Agent call: when a measured family covers the task and the call asks for something dearer than
-  // the family's decision, rewrite it (auto), ask (ask), or leave it (off). Nothing unmeasured is touched.
+  // the family's decision, route it (auto), ask (ask), or leave it (off). Nothing unmeasured is touched.
+  // The decision is kept for the agent.spawn this call makes; the Agent tool's own input stays as the model wrote it.
   // A family escalated this session (a routed call failed, or was re-issued within minutes) runs as asked.
   on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
     if (routingMode === 'off') return next(e)
@@ -1041,12 +1056,9 @@ export const register: Register = (on, options) => {
     $.ui.toast(`router: ${agent} on ${c.model} ${c.effort} (${c.family} ${c.rate})`)
     const p = plans.get(currentTurn)
     if (p) p.routed++
-    const r = await next({
-      ...e,
-      model: c.model as 'sonnet' | 'opus' | 'haiku' | 'fable',
-      effort: c.effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max',
-      ...(c.family === 'repo_fix' ? { prompt: e.prompt + RUNNER_NOTE } : {}),
-    })
+    // Not a rewrite of the tool input (auto mode would bounce the call): the spawn inside this call picks it up.
+    pendingRoutes.set(e.tool_use_id ?? `${at}:${e.description}`, { at, description: e.description, prompt: e.prompt, model: c.model, effort: c.effort, family: c.family })
+    const r = await next(e)
     // The routed call failed: the family runs as asked for the rest of the session, and the pane says why.
     if ((r as { isError?: boolean }).isError && c.family !== 'override') {
       await update($, live, v => ({ ...v, escalated: { ...v.escalated, [c.family]: `a call routed to ${c.model} ${c.effort} failed` } }))

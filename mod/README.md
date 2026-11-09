@@ -56,7 +56,12 @@ inheritance, or an explicit bigger model), it acts by the "Route Agent calls" op
   effort with its evidence (`haiku low (measured 214/216, $0.005/success)`), keep what was asked,
   or always route for this session. A dismissed question keeps the call; so does a run with no
   one to ask.
-- `auto`: the call is rewritten and a toast says so.
+- `auto`: the subagent runs on the decided model and effort and a toast says so.
+
+The decision is applied on the subagent itself, never on the Agent tool's input: the spawn the call
+makes gets the model (`agent.spawn`) and each of the subagent's requests gets the effort (`turn.step`).
+A tool input a plugin rewrites loses auto mode's review and the call is bounced once with "issue the
+call once more"; the Agent call here stays as the model wrote it, so auto mode's verdict stands.
 - `off`: nothing.
 
 Nothing unmeasured is touched: a research report, a design, a review, a plan keep their model
@@ -163,7 +168,7 @@ is shown) and folds into the header's `done` count, `failed` counted separately.
 `agent.spawn`, `turn.step` and `turn.complete`; a one-second tick runs only while agents run.
 
 **Main-session effort** (`/router effort advise|auto|off`; `mainEffort` in `/config`, default
-`advise`). The router rewrites Agent calls; the main session's requests it did not touch until now.
+`advise`). The router routes Agent calls; the main session's requests it did not touch until now.
 Before each main-loop request the engine lets a plugin name another effort (`turn.step`); the model
 stays, since changing the model would re-write the cache. The rule: when the prompt reads as a
 measured family (the same matcher as for Agent calls: a short fact lookup, a browser flow, a fix with

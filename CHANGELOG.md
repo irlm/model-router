@@ -3,6 +3,15 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.15.0 — 2026-11-08
+
+- Routing no longer rewrites the Agent tool's input. The decision is kept for the spawn the call makes
+  (`agent.spawn` gets the model, and the prompt note for `repo_fix`) and for the subagent's own requests
+  (`turn.step` gets the effort). In auto mode a tool input a plugin changes loses the classifier's review
+  and the call is bounced once ("issue the Agent call once more"); every routed call paid that bounce.
+  The agents block shows the routed effort from the spawn on. Ask, off, escalation and the routed log
+  are unchanged.
+
 ## 0.14.1 — 2026-11-08
 
 - The agents block names itself before any subagent has run: the full pane and `/router check` carry one

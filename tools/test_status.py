@@ -631,7 +631,7 @@ class Runs(unittest.TestCase):
     def test_group_splits_a_session_at_a_gap_and_keeps_sessions_apart(self):
         import runs
         got = runs.group(self.CALLS)
-        self.assertEqual([(r['meta']['agentN'], r['meta']['prompt']) for r in got], [(3, 'find the loader'), (1, 'write the report'), (1, 'other session'), (1, 'orphan lookup')])
+        self.assertEqual([(r['meta']['agentN'], r['meta']['prompt']) for r in got], [(3, 'find the loader'), (1, 'other session'), (1, 'write the report'), (1, 'orphan lookup')])   # by start time
         first = got[0]
         self.assertEqual(first['source'], 'transcript')
         self.assertEqual(first['meta']['cost'], 0.032)
@@ -640,8 +640,8 @@ class Runs(unittest.TestCase):
         self.assertIsNone(first['agents'][0]['parent'])
         self.assertEqual(first['agents'][0]['model'], 'haiku')
         self.assertEqual(first['agents'][0]['ctx'], 100)
-        self.assertEqual(got[1]['meta']['failedN'], 1)
-        self.assertEqual(got[1]['agents'][0]['model'], 'opus')                      # asked, never priced: the asked model stands
+        self.assertEqual(got[2]['meta']['failedN'], 1)
+        self.assertEqual(got[2]['agents'][0]['model'], 'opus')                      # asked, never priced: the asked model stands
 
     def test_import_writes_new_runs_only_and_list_shows_both_sources(self):
         import runs

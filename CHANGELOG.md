@@ -3,6 +3,11 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.19.2 — 2026-11-08
+
+- Tests only: 0.19.1 shipped with one expectation in the wrong order (rebuilt runs come back by start time), so its
+  CI run is red; nothing in the widget or the tools changed.
+
 ## 0.19.1 — 2026-11-08
 
 - Runs rebuilt from the transcripts: a call made inside a subagent's own transcript now joins the run of the

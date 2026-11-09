@@ -274,7 +274,8 @@ test('an override for this project routes before the family default, and prefer 
   expect(spawnSeen(seen)?.model).toBe('opus')   // the family says haiku low; the project's override wins
   expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer' })).text).toContain('code-explore -> opus low')
   expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer research-synthesis opus low' })).text).toContain('override set for this project')
-  expect(argvs.some(a => a.includes('tools/overrides.py set - research-synthesis opus low'))).toBe(true)
+  expect(argvs.some(a => a.includes('tools/overrides.py set --why set from the pane -- - research-synthesis opus low'))).toBe(true)   // the key after --: it may start with a dash
+  expect(argvs.some(a => a.includes('tools/routed_log.py add find_feature Explore inherit opus low auto --project=-'))).toBe(true)
   expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer nope' })).text).toContain('prefer needs')
 })
 

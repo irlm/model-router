@@ -591,6 +591,25 @@ class Install(unittest.TestCase):
         self.assertIn('release.py', untagged['widget version']['step'])
 
 
+class LeadingDashKeys(unittest.TestCase):
+    """A project key is the cwd with its slashes as dashes, so it begins with one: the scripts must take it as a value."""
+    def test_routed_log_add_takes_a_dashed_project_key(self):
+        import routed_log
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(routed_log, 'LOG', Path(d) / 'routed.jsonl'), contextlib.redirect_stdout(io.StringIO()):
+            routed_log.main(['add', 'find_feature', 'Explore', 'inherit', 'haiku low', 'auto', '--project=-Users-me-proj'])
+            self.assertEqual(routed_log.read()[0]['project'], '-Users-me-proj')
+            with self.assertRaises(SystemExit):                                              # the old shape: argparse takes the key for an option
+                routed_log.main(['add', 'find_feature', 'Explore', 'inherit', 'haiku low', 'auto', '--project', '-Users-me-proj'])
+
+    def test_overrides_set_and_clear_take_a_dashed_project_key_after_double_dash(self):
+        import overrides
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(overrides, 'FILE', Path(d) / 'overrides.json'), contextlib.redirect_stdout(io.StringIO()):
+            overrides.main(['set', '--why', 'from the pane', '--', '-Users-me-proj', 'code-explore', 'opus', 'low'])
+            self.assertEqual(overrides.read()['-Users-me-proj']['code-explore']['model'], 'opus')
+            overrides.main(['clear', '--', '-Users-me-proj', 'code-explore'])
+            self.assertEqual(overrides.read().get('-Users-me-proj', {}), {})
+
+
 class Release(unittest.TestCase):
     def test_the_version_is_the_newest_changelog_entry(self):
         self.assertEqual(release.changelog_top(), release.version())                      # the repository's own state

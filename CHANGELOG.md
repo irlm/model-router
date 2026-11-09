@@ -3,6 +3,13 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.16.1 — 2026-11-08
+
+- The routed log was never written and `/router prefer` could not set an override: the project key is the cwd
+  with its slashes as dashes, so it begins with a dash, and argparse took it for an option ("expected one
+  argument"). The key now travels as `--project=KEY` to the routed log and after `--` to the overrides script.
+  Found with 0.15.1's toast of the first failed write.
+
 ## 0.16.0 — 2026-11-08
 
 - The run monitor, a second pane (`/router monitor`): the session's agents as a graph, the main session at the

@@ -39,13 +39,13 @@ def add(family, agent, src, dst, decision, project=''):
     return e
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('verb', choices=['add', 'list'])
     ap.add_argument('words', nargs='*')
     ap.add_argument('--project', default='')
     ap.add_argument('--days', type=int, default=30)
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     if a.verb == 'list':
         for e in read(a.days):
             print(f"{e['at']}  {e['family']:18} {e['agent']}: {e['from']} -> {e['to']}  {e['decision']}  {e.get('project', '')}")

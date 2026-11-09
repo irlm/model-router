@@ -69,12 +69,12 @@ def clear(project, cls):
     return gone
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('verb', choices=['set', 'clear', 'list', 'dismiss', 'undismiss'])
     ap.add_argument('words', nargs='*')
     ap.add_argument('--why', default='')
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     if a.verb in ('dismiss', 'undismiss'):
         if len(a.words) != 1:
             raise SystemExit('dismiss needs the suggestion id')

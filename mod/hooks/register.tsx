@@ -100,7 +100,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.16.0'
+const WIDGET_VERSION = '0.16.1'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -667,14 +667,15 @@ async function recordChange($: Dollar, kind: string, detail: string, projected?:
   await refresh($)
 }
 
-/** One line in this machine's routed log (tools/routed_log.py), so the weekly slots can count what the router did. */
+/** One line in this machine's routed log (tools/routed_log.py), so the weekly slots can count what the router did.
+ * The project key begins with a dash (a path's slashes), so it travels as --project=KEY: as a separate word argparse reads it as an option. */
 let routedLogWarned = false
 /** A hook failure as one line of text, whatever shape the engine gives it. */
 const failureText = (err: unknown) => typeof err === 'string' ? err : (err as { message?: string } | null)?.message ?? JSON.stringify(err)
 async function logRouted($: Dollar, family: string, agent: string, from: string, to: string, decision: string) {
   try {
     const py = await findPython($)
-    const r = await $.process.run([py, 'tools/routed_log.py', 'add', family, agent, from, to, decision, '--project', projectKey], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
+    const r = await $.process.run([py, 'tools/routed_log.py', 'add', family, agent, from, to, decision, `--project=${projectKey}`], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
     if (r.exitCode !== 0) throw new Error(r.stderr.trim().split('\n').pop() || `exit ${r.exitCode}`)
   } catch (err) {
     // the log is a convenience: routing stands without it; the first failure of the session is said, with its reason
@@ -959,13 +960,13 @@ export const register: Register = (on, options) => {
       }
       const py = await findPython($)
       if (words[0] === 'clear' && words[1]) {
-        await $.process.run([py, 'tools/overrides.py', 'clear', projectKey, words[1]], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
+        await $.process.run([py, 'tools/overrides.py', 'clear', '--', projectKey, words[1]], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
         await recordChange($, 'override', `cleared ${words[1]} in ${projectKey}`)
         return { text: `override cleared: ${words[1]} in this project; the family default applies again.` }
       }
       const [cls, mdl, eff] = words
       if (!cls || !mdl || !eff || !MODELS.has(mdl) || !EFFORTS.has(eff)) return { text: 'prefer needs <class> <model> <effort>, e.g. /router prefer research-synthesis opus low (models haiku|sonnet|opus|fable; efforts low|medium|high|xhigh|max)' }
-      const r = await $.process.run([py, 'tools/overrides.py', 'set', projectKey, cls, mdl, eff, '--why', 'set from the pane'], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
+      const r = await $.process.run([py, 'tools/overrides.py', 'set', '--why', 'set from the pane', '--', projectKey, cls, mdl, eff], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
       if (r.exitCode !== 0) return { text: `could not set the override: ${r.stderr.trim().split('\n').pop() ?? ''}` }
       await recordChange($, 'override', `${cls} -> ${mdl} ${eff} in ${projectKey}`)
       return { text: `override set for this project: ${cls} calls run on ${mdl} ${eff} (ask or auto mode). The pane counts the saving from now; /router prefer clear ${cls} undoes it.` }

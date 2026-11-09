@@ -143,6 +143,25 @@ effort, `↑` went back up inside the turn after 3 tool errors, `?` would have g
 The plan gauge is what the transcripts show saved since the last change against what the suggestion
 projected: the same two numbers as "After a change", as a bar.
 
+**Agents running.** While subagents run, the block under the live lines lists them the way a
+connection monitor lists connections:
+
+```
+▘ agents running 2 · done 5 ($0.31, 1 failed)
+  | Explore                haiku low   find_feature   find the parser                     4 steps    12s
+  | general-purpose        fable high  unmeasured     compare three queues                9 steps    48s
+    └ | Web Researcher     haiku low   web_research   look up the RFC                     2 steps     5s
+  ✓ Explore                haiku low   find_feature   find the schema loader              6 steps    20s  $0.02
+```
+
+One row per agent: its type, the model and effort it runs at, the measured family its prompt read as,
+the task, requests so far and elapsed time; a child under the agent that spawned it. The spinner moves
+in the header only; a row with no request for a minute turns yellow with `quiet`; the glance shows six
+rows and `+N more running, slowest …` (Details lists all). A finished agent shows its cost (known only
+when the run ends: the engine reports tokens per completed turn, nothing mid-run, so no tokens-per-second
+is shown) and folds into the header's `done` count, `failed` counted separately. The rows come from
+`agent.spawn`, `turn.step` and `turn.complete`; a one-second tick runs only while agents run.
+
 **Main-session effort** (`/router effort advise|auto|off`; `mainEffort` in `/config`, default
 `advise`). The router rewrites Agent calls; the main session's requests it did not touch until now.
 Before each main-loop request the engine lets a plugin name another effort (`turn.step`); the model

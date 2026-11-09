@@ -3,6 +3,15 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.14.0 — 2026-11-08
+
+- The agents block: the subagents running in this session, one row each like a connection monitor
+  (type, model and effort, measured family, task, requests so far, elapsed), children under their
+  parent, a spinner in the header while any runs, a row quiet for a minute in yellow, the glance capped
+  at 6 rows with "+N more"; a finished agent shows its cost and folds into the header's done count
+  (failed ones counted). From `agent.spawn`, `turn.step` and `turn.complete`; a 1-second tick while
+  agents run moves the clocks. `/router check` prints the same rows as text.
+
 ## 0.13.0 — 2026-11-08
 
 - The pane opens with the session live: turns and their cost as a sparkline, cache hit, the effort gear per

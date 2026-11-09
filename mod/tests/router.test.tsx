@@ -507,3 +507,33 @@ test('an Agent call re-issued within minutes of a routed one, with the same word
   expect(text).toContain('escalated: find_feature (re-issued within 10 min of a routed call)')
   await settled()   // the detached work (log writes, the change record) ends inside the test
 })
+
+test('the agents block: a spawned agent is one row with its model, family and steps; its child sits under it; a finished one collapses into the counts', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, null)
+  let n = 0
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `a${++n}` }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  const SPAWN = { tool_use_id: 'tu1', prompt: 'Find where the config file is parsed and report the function.', description: 'find the parser', subagentType: 'Explore', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1', model: 'claude-haiku-5-5' } as const
+  await $.agent.spawn(SPAWN)
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tu2', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'What is the RFC number of TLS 1.3?', parentAgentId: 'a1' })
+  await drain($.turn.step({ turnId: 'ta1', index: 0, model: 'claude-haiku-5-5', effort: 'low', messageCount: 1, agentId: 'a1' }))
+  await drain($.turn.step({ turnId: 'ta1', index: 1, model: 'claude-haiku-5-5', effort: 'low', messageCount: 3, agentId: 'a1' }))
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('agents running 2')
+  expect(text).toMatch(/[▖▘▝▗] agents running 2/)
+  expect(text).toMatch(/\| Explore\s+haiku low\s+find_feature\s+find the parser\s+2 steps/)
+  expect(text).toMatch(/└ \| Web Researcher\s+haiku\s+web_research\s+look up the RFC\s+0 steps/)
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 'ta2', reason: 'answer', agentId: 'a2', usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 10000, cache_creation_input_tokens: 0 } })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).toContain('agents running 1 · done 1 ($0.00)')
+  expect(text).toMatch(/✓ Web Researcher\s+haiku\s+web_research\s+look up the RFC\s+0 steps\s+\S+\s+\$0\.00/)
+  await $.turn.complete({ answer: '', durationMs: 1000, isAborted: false, turnId: 'ta1', reason: 'error', agentId: 'a1' })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).toContain('agents running 0 · done 2 ($0.00, 1 failed)')
+  expect(text).toMatch(/✗ Explore/)
+  await settled()
+})
+

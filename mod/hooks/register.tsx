@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Hook, Register } from 'claude-code'
 
-import type { Job, Live, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, Status, StatusJson, Switch, Turn } from '../types'
+import type { Job, Live, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, RunningAgent, Status, StatusJson, Switch, Turn } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
 type RoutingMode = 'ask' | 'auto' | 'off'
@@ -16,7 +16,10 @@ const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Ro
 const details = atom({ plugin: 'model-router', key: 'details' } as const, false, { shape: 'details-1' })
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
-const live = atom({ plugin: 'model-router', key: 'live' } as const, { turns: [], escalated: {} } as Live, { shape: 'live-1' })
+const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0 }
+const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-2' })
+/** A second counter while agents run: the elapsed clocks and the spinner move between events. */
+const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 
 // What the buttons and /router <verb> run, from the checkout's root. In the clone the plugin install
 // made (`clone`), nothing is committed: the ledger prints its entry, the re-check keeps its results local.
@@ -325,6 +328,46 @@ let repo = repoOption
 // '' when the configured checkout serves; 'marketplace clone' when the clone the plugin install made does.
 let where = ''
 let python = ''
+/** The model's family word: haiku, sonnet, opus, fable; else the id without its prefix. */
+const shortModel = (m: string) => Object.keys(PRICES).find(k => m.toLowerCase().includes(k)) ?? m.replace(/^claude-/, '')
+const SPIN = '▖▘▝▗'
+const secs = (ms: number) => (ms < 60000 ? `${Math.max(0, Math.round(ms / 1000))}s` : `${Math.floor(ms / 60000)}m${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')}`)
+/** The agents of this session, the way a connection monitor lists connections: one row each, children under their parent,
+ * the spinner in the header alone, a row with no request for a minute in yellow, the glance capped at a few rows. */
+const QUIET_MS = 60000
+const GLANCE_ROWS = 6
+const agentsLines = (lv: Live, now: number, full: boolean): Line[] => {
+  const running = Object.values(lv.agents)
+  if (running.length === 0 && lv.doneN === 0) return []
+  const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
+  const head = `${spin}agents running ${running.length}` + (lv.doneN ? ` · done ${lv.doneN} (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''})` : '')
+  const lines = [line(head, { bold: true, color: running.length ? 'cyan' : undefined })]
+  const row = (a: RunningAgent, depth: number) => {
+    const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
+    const mark = a.done === null ? '|' : a.failed ? '✗' : '✓'
+    const lead = depth ? '  '.repeat(depth) + '└ ' : '  '
+    const who = `${lead}${mark} ${a.type}`.padEnd(26)
+    const what = `${shortModel(a.model)} ${a.effort || ''}`.trim().padEnd(12) + (a.family ?? 'unmeasured').padEnd(15) + a.description.slice(0, 34).padEnd(35)
+    const tail = `${String(a.steps).padStart(3)} step${a.steps === 1 ? ' ' : 's'} ${secs((a.done ?? now) - a.startedAt).padStart(6)}` + (a.cost !== null ? `  ${money(a.cost)}` : quiet ? '  quiet' : '')
+    return line(`${who}${what}${tail}`, { dim: a.done !== null && !a.failed, color: a.failed ? 'red' : quiet ? 'yellow' : undefined })
+  }
+  const rows: Line[] = []
+  const tree = (parent: string | null, depth: number) => {
+    for (const a of running.filter(x => x.parent === parent).sort((x, y) => x.startedAt - y.startedAt)) {
+      rows.push(row(a, depth))
+      tree(a.id, depth + 1)
+    }
+  }
+  tree(null, 0)
+  for (const a of running.filter(x => x.parent && !lv.agents[x.parent])) rows.push(row(a, 0))   // a parent already gone: at the top
+  if (!full && rows.length > GLANCE_ROWS) {
+    const slowest = Math.max(...running.map(a => now - a.startedAt))
+    lines.push(...rows.slice(0, GLANCE_ROWS - 1), line(`  +${rows.length - GLANCE_ROWS + 1} more running, slowest ${secs(slowest)} (Details)`, { dim: true }))
+  } else lines.push(...rows)
+  for (const a of lv.finished.slice(full ? -6 : -2)) lines.push(row(a, 0))
+  return lines
+}
+
 let routingMode: RoutingMode = 'ask'
 type MainEffortMode = 'off' | 'advise' | 'auto'
 let mainEffortMode: MainEffortMode = 'advise'
@@ -681,6 +724,9 @@ export const register: Register = (on, options) => {
       argumentHint: 'open | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file]|list | pull | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
     })
     void refresh($)
+    $.clock.every(1000, async () => {
+      if (Object.keys((await read($, live)).agents).length > 0) await update($, tick, n => n + 1)
+    })
     if (refreshMinutes > 0) {
       $.clock.every(Math.max(1, refreshMinutes) * 60000, () => {
         void refresh($)
@@ -753,6 +799,18 @@ export const register: Register = (on, options) => {
       const ctx = await contextTokens($)
       $.ui.status(statusLine(s.json, s.rateLimits, (await read($, routed)).length, statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
     }
+    if (e.agentId !== undefined) {
+      const id = e.agentId
+      const now = await $.clock.now()
+      await update($, live, v => {
+        const a = v.agents[id]
+        if (!a) return v
+        const u = e.usage
+        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, failed: e.reason === 'error' || e.reason === 'refusal', model: u?.model ?? a.model }
+        const { [id]: _gone, ...rest } = v.agents
+        return { ...v, agents: rest, finished: [...v.finished, done].slice(-12), doneN: v.doneN + 1, doneCost: v.doneCost + (done.cost ?? 0), failedN: v.failedN + (done.failed ? 1 : 0) }
+      })
+    }
     if (e.agentId === undefined) {
       const p = plans.get(e.turnId)
       plans.delete(e.turnId)
@@ -779,7 +837,8 @@ export const register: Register = (on, options) => {
       const s = await read($, status)
       const ctx = await contextTokens($)
       const modelNow = await $.session.model().catch(() => '')
-      return { text: [...liveLines(await read($, live), ctx?.tokens ?? null, modelNow, s?.json ?? null, mainEffortMode), BLANK, ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, modelNow) : [line(s?.error ?? 'no status')])].map(l => l.text).join('\n') }
+      const lv = await read($, live)
+      return { text: [...liveLines(lv, ctx?.tokens ?? null, modelNow, s?.json ?? null, mainEffortMode), ...agentsLines(lv, await $.clock.now(), true), BLANK, ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, modelNow) : [line(s?.error ?? 'no status')])].map(l => l.text).join('\n') }
     }
     if (verb === 'prefer') {
       const words = e.args.trim().split(/\s+/).slice(1)
@@ -874,6 +933,18 @@ export const register: Register = (on, options) => {
     return { text: 'Usage: /router [open | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file] [--accept-flags]|list | pull | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>]' }
   })
 
+  // A subagent starts: one row in the agents block, under its parent when it has one.
+  on('agent.spawn', async ($, e, next) => {
+    const r = await next(e)
+    if (r.agentId) {
+      const a: RunningAgent = { id: r.agentId, parent: e.parentAgentId ?? null, type: e.subagentType, description: e.description, model: r.model, effort: (e as { effort?: string }).effort ?? '',
+        family: matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false }
+      a.startedAt = a.lastStepAt = await $.clock.now()
+      await update($, live, v => ({ ...v, agents: { ...v.agents, [a.id]: a } }))
+    }
+    return r
+  })
+
   // The main loop's turn begins: what its prompt reads as decides the effort its requests may run at.
   on('turn.start', async ($, e, next) => {
     if (e.agentId !== undefined) return next(e)
@@ -889,7 +960,17 @@ export const register: Register = (on, options) => {
   // Before each main-loop request: the family's measured effort when the prompt read as one (auto), the session's own
   // effort again once the turn hit 3 tool errors (the task is harder than its words), nothing otherwise.
   on('turn.step', async function* ($, e, next) {
-    if (e.agentId !== undefined) return yield* next(e)
+    if (e.agentId !== undefined) {
+      const id = e.agentId
+      if ((await read($, live)).agents[id]) {
+        const at = await $.clock.now()
+        await update($, live, v => {
+          const a = v.agents[id]
+          return a ? { ...v, agents: { ...v.agents, [id]: { ...a, steps: a.steps + 1, lastStepAt: at, model: e.model || a.model, effort: typeof e.effort === 'string' ? e.effort : a.effort } } } : v
+        })
+      }
+      return yield* next(e)
+    }
     const p = plans.get(e.turnId)
     if (!p) return yield* next(e)
     if (e.index === 0 || !p.sessionEffort) p.sessionEffort = typeof e.effort === 'string' ? e.effort : e.effort === undefined ? '' : String(e.effort)
@@ -979,12 +1060,14 @@ export const register: Register = (on, options) => {
     const j = await read($, job)
     const busy = j?.isRunning === true
     const full = await read($, details)
+    await read($, tick)   // read so the second counter redraws the pane while agents run
     const limits = s?.rateLimits ?? []
     // While a job runs the pane is the job: its output, nothing else; the summary returns when it ends.
     const body: Line[] = busy && j
       ? [line(`running ${j.name} since ${clock(j.startedAt)} · the summary returns when it ends`, { bold: true })]
       : [
           ...liveLines(await read($, live), (await contextTokens($))?.tokens ?? null, await $.session.model().catch(() => ''), s?.json ?? null, mainEffortMode),
+          ...agentsLines(await read($, live), await $.clock.now(), full),
           BLANK,
           ...limitLines(limits),
           ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full, await read($, switches), (await contextTokens($))?.tokens ?? null, await $.session.model().catch(() => '')) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]),

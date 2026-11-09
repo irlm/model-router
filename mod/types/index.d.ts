@@ -149,8 +149,31 @@ export type Turn = {
   /** advise mode: the effort the turn would have run at */
   advised: string | null
 }
-/** The session as it runs: the turns so far and the families escalated (the reason), kept until the session ends. */
-export type Live = { turns: Turn[]; escalated: Record<string, string> }
+/** One subagent of this session: started by an Agent call (or a workflow), running until its turn completes. */
+export type RunningAgent = {
+  id: string
+  /** the agent that spawned it; null from the main loop */
+  parent: string | null
+  type: string
+  description: string
+  model: string
+  effort: string
+  family: string | null
+  startedAt: number
+  /** model requests so far */
+  steps: number
+  /** when the last request began; a row quiet for a minute is marked */
+  lastStepAt: number
+  /** when its run ended; null while it runs */
+  done: number | null
+  /** catalog $ of the run, known when it ends */
+  cost: number | null
+  out: number
+  /** the run ended in an error or a refusal */
+  failed: boolean
+}
+/** The session as it runs: the turns so far, the families escalated (the reason), the agents running and the last that finished. */
+export type Live = { turns: Turn[]; escalated: Record<string, string>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number }
 
 /** A prompt that read as a different task in a session already re-reading a lot per turn, and what was done. */
 export type Switch = { at: number; ctx: number; why: string; action: 'compacted' | 'kept' | 'asked' }
@@ -160,6 +183,6 @@ export type Job = { name: string; lines: string[]; isRunning: boolean; exitCode:
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live> }
+    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live>; tick: Shaped<number> }
   }
 }

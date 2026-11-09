@@ -167,6 +167,11 @@ when the run ends: the engine reports tokens per completed turn, nothing mid-run
 is shown) and folds into the header's `done` count, `failed` counted separately. The rows come from
 `agent.spawn`, `turn.step` and `turn.complete`; a one-second tick runs only while agents run.
 
+**The pane's look.** Since 0.20.0 the main pane is drawn like the monitor: a header bar with the session's
+figures, each section in a titled frame whose border carries its colour (Limits turn yellow at half a window and
+red at 80%, Agents green while any runs, To check yellow), the job output framed, the buttons in a footer. The
+text inside each frame is what `/router check` prints, line for line.
+
 **The run monitor** (`/router monitor`) is the same run drawn as a graph, in its own pane. The main session is
 the root box (cyan); each agent is a box to the right of the one that spawned it, placed on a grid (a column per
 depth, a centred tree down the rows), its border in the state's colour: green at work, yellow QUIET after a

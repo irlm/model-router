@@ -3,6 +3,15 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.20.0 — 2026-11-08
+
+- The main pane drawn like the run monitor: a header bar (the session's turns, cost, cache hit, context and model
+  on the right; the loaded version under it), then every section in its own frame with a title, the border in the
+  section's colour (Session live cyan, Agents green while any runs, Limits green/yellow/red by the fullest
+  window, To check yellow, Routed cyan), the job's output in a frame of its own (cyan while it runs, red when it
+  failed), and the buttons in a footer with a new `g` that opens the monitor. The lines inside are exactly what
+  `/router check` prints: the producers are shared, only the framing changed.
+
 ## 0.19.2 — 2026-11-08
 
 - Tests only: 0.19.1 shipped with one expectation in the wrong order (rebuilt runs come back by start time), so its

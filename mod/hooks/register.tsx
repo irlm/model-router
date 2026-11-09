@@ -107,7 +107,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.19.2'
+const WIDGET_VERSION = '0.20.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -1627,6 +1627,9 @@ export const register: Register = (on, options) => {
     )
   })
 
+  // The main pane, drawn like the run monitor: a header bar, then every section in a frame with a title, the border in
+  // the section's colour (limits by how full a window is, agents green while any runs, to-check yellow), the buttons
+  // in a footer. The lines inside are the same as /router check prints: the producers are shared, only the framing is here.
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const s = await read($, status)
@@ -1634,52 +1637,87 @@ export const register: Register = (on, options) => {
     const busy = j?.isRunning === true
     const full = await read($, details)
     await read($, tick)   // read so the second counter redraws the pane while agents run
+    const lv = await read($, live)
+    const now = await $.clock.now()
+    const ctx = (await contextTokens($))?.tokens ?? null
+    const modelNow = await $.session.model().catch(() => '')
     const limits = s?.rateLimits ?? []
-    // While a job runs the pane is the job: its output, nothing else; the summary returns when it ends.
-    const body: Line[] = busy && j
-      ? [line(`running ${j.name} since ${clock(j.startedAt)} · the summary returns when it ends`, { bold: true })]
+    const width = Math.max(40, (e.props as { bodyColumns?: number }).bodyColumns ?? (e.viewport?.columns ?? 100) - 1)
+    const inner = width - 4
+    // One line stays one line: cut to the frame's width instead of wrapping (/router check keeps the full text).
+    const cut = (t: string) => (t.length > inner ? t.slice(0, inner - 1) + '…' : t)
+    const row = (l: Line) => <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text === '' ? ' ' : l.wrap ? l.text : cut(l.text)}</Text>
+    const frame = (title: string, lines: Line[], color?: string) => (lines.length === 0 ? null : (
+      <Box borderStyle="single" borderColor={color} borderDimColor={!color} flexDirection="column" paddingX={1}>
+        <Text color={color ?? 'cyan'} bold>{`[ ${title} ]`}</Text>
+        {lines.map(row)}
+      </Box>
+    ))
+    const liveAll = liveLines(lv, ctx, modelNow, s?.json ?? null, mainEffortMode)
+    const ver = versionLines(s?.json ?? null, true)[0]
+    const header = (
+      <Box flexDirection="column">
+        <Box borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="row" justifyContent="space-between">
+          <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Model router</Text></Text>
+          <Text dimColor>{liveAll[0]?.text.replace(/^this session · /, '') ?? ''}</Text>
+        </Box>
+        {ver ? <Text color={ver.color} dimColor={ver.dim}>{ver.text}</Text> : null}
+      </Box>
+    )
+    const worst = Math.max(0, ...limits.map(l => l.percentUsed))
+    const summary = s?.json
+      ? summaryLines(s.json, s.at, await read($, routed), s.where, full, await read($, switches), ctx, modelNow)
+      : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]
+    // The summary's sections are separated by blank lines; each becomes a frame, titled by what its first line says.
+    const groups: Line[][] = [[]]
+    for (const l of summary) {
+      if (l.text === '') { if (groups[groups.length - 1].length) groups.push([]) } else groups[groups.length - 1].push(l)
+    }
+    const titleOf = (first: Line): [string, string | undefined] => {
+      const t = first.text.toLowerCase()
+      if (t.startsWith('suggestions')) return ['Suggestions', undefined]
+      if (t.startsWith('families')) return ['Routing', first.color === 'yellow' ? 'yellow' : undefined]
+      if (t.startsWith('to check')) return ['To check', 'yellow']
+      if (t.startsWith('by week')) return ['By week', undefined]
+      if (t.startsWith('consumption')) return ['Consumption', undefined]
+      if (t.startsWith('learned')) return ['Learned on this machine', undefined]
+      if (t.startsWith('context')) return ['Context', undefined]
+      if (t.startsWith('routed this session')) return ['Routed', 'cyan']
+      if (t.startsWith('since') || t.startsWith('no change')) return ['Changes', undefined]
+      if (t.startsWith('no model-router checkout') || t.startsWith('reading')) return ['Status', 'yellow']
+      return ['Status', undefined]
+    }
+    const sections = busy && j
+      ? [frame('Job', [line(`running ${j.name} since ${clock(j.startedAt)} · the summary returns when it ends`, { bold: true })], 'cyan')]
       : [
-          ...liveLines(await read($, live), (await contextTokens($))?.tokens ?? null, await $.session.model().catch(() => ''), s?.json ?? null, mainEffortMode),
-          ...agentsLines(await read($, live), await $.clock.now(), full),
-          ...versionLines(s?.json ?? null, full),
-          BLANK,
-          ...limitLines(limits),
-          ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full, await read($, switches), (await contextTokens($))?.tokens ?? null, await $.session.model().catch(() => '')) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]),
+          frame('Session live', liveAll.slice(1), 'cyan'),
+          frame('Agents', agentsLines(lv, now, full), Object.keys(lv.agents).length ? 'green' : undefined),
+          frame('Limits', limitLines(limits), worst >= 80 ? 'red' : worst >= 50 ? 'yellow' : 'green'),
+          ...groups.filter(g => g.length).map(g => { const [t, c] = titleOf(g[0]); return frame(t, g, c) }),
         ]
     const rows = Math.max(12, (e.viewport?.rows ?? 40) - 2)
-    // One line stays one line: cut to the pane's width instead of wrapping (/router check keeps the full text).
-    const width = Math.max(40, (e.viewport?.columns ?? 100) - 1)
-    const cut = (t: string) => (t.length > width ? t.slice(0, width - 1) + '…' : t)
-    const logRoom = Math.max(3, rows - body.length - 3)
+    const used = busy ? 8 : liveAll.length + 3 + limits.length + summary.length + groups.length * 3 + 8
+    const logRoom = Math.max(3, rows - used)
     // A job that ended well keeps one line; its whole output stays under Details, and a failure shows it all.
     const log = j ? (busy || j.exitCode !== 0 || full ? j.lines.slice(-logRoom) : j.lines.slice(-1)) : []
+    const jobFrame = j && log.length
+      ? frame(busy ? `Job: ${j.name}, running since ${clock(j.startedAt)}` : `Last job: ${j.name}${j.exitCode === null ? '' : ` (exit ${j.exitCode})`}`, log.map(t => line(t, { dim: true })), busy ? 'cyan' : j.exitCode ? 'red' : undefined)
+      : null
     return (
       <Box flexDirection="column">
+        {header}
+        {sections}
+        {jobFrame}
         <Box flexDirection="row" gap={1} flexWrap="wrap">
           <Button key="refresh" hotkey="r" onPress={() => { void refresh($) }}>Refresh</Button>
           <Button key="fetch" hotkey="f" onPress={() => { void refresh($, true) }}>Fetch origin</Button>
           <Button key="update" hotkey="u" variant="primary" dimColor={busy} onPress={() => { void runJob($, 'update') }}>Re-check routing</Button>
           <Button key="details" hotkey="d" onPress={() => { void update($, details, v => !v) }}>{full ? 'Less' : 'Details'}</Button>
-        </Box>
-        <Box flexDirection="row" gap={1} flexWrap="wrap">
+          <Button key="monitor" hotkey="g" onPress={() => { void $.ui.open({ id: MONITOR, title: 'Agent run' }) }}>Monitor</Button>
           <Button key="ledger" hotkey="l" dimColor={busy} onPress={() => { void runJob($, 'ledger') }}>Ledger now</Button>
           <Button key="apply" hotkey="a" dimColor={busy} onPress={() => { void runJob($, 'apply') }}>Apply agents</Button>
           <Button key="pull" hotkey="p" dimColor={busy} onPress={() => { void runJob($, 'pull') }}>Pull</Button>
         </Box>
-        {body.map(l => (
-          <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>
-            {l.text === '' ? ' ' : l.wrap ? l.text : cut(l.text)}
-          </Text>
-        ))}
-        {j && (
-          <Text weight="bold">
-            {busy ? 'running' : 'last job'}: {j.name}
-            {j.exitCode === null ? '' : ` (exit ${j.exitCode})`}
-          </Text>
-        )}
-        {log.map(line => (
-          <Text dimColor>{line === '' ? ' ' : cut(line)}</Text>
-        ))}
       </Box>
     )
   })

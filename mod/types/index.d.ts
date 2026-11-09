@@ -177,8 +177,10 @@ export type RunningAgent = {
   failed: boolean
   /** tokens the spawn sent it, estimated from the prompt (4 characters per token): the arrow weight in the run monitor */
   ctx: number
-  /** its number in the run, 1 upward, as the monitor labels it */
+  /** its number in the run, 1 upward, as the monitor labels it; a resumed agent (the same id spawned again) keeps its number */
   n: number
+  /** 1 for the first run of this id, 2 for its first resume, and so on */
+  run: number
   /** its last tool calls, newest last: the monitor's live tail */
   recent: Recent[]
 }

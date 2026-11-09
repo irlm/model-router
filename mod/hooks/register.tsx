@@ -18,7 +18,7 @@ const details = atom({ plugin: 'model-router', key: 'details' } as const, false,
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
 const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, events: [], nextN: 1 }
-const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-4' })
+const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-5' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 
@@ -100,7 +100,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.16.2'
+const WIDGET_VERSION = '0.17.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -459,24 +459,32 @@ const toolText = (e: Record<string, unknown>): string => {
 }
 /** The run as a graph: the main session, then each agent as a box under the one that spawned it, the arrow weighted by the
  * context it was sent; below, the live tail of the agents at work and the run's event log. All of it text, one line one row. */
-const BOX_W = 40
+const BOX_W = 48
 const weightOf = (ctx: number) => (ctx >= 16000 ? '━' : ctx >= 4000 ? '─' : '┄')
 const monitorLines = (lv: Live, now: number): Line[] => {
   const running = Object.values(lv.agents)
-  const all = [...running, ...lv.finished].sort((x, y) => x.n - y.n)
+  const all = [...running, ...lv.finished].sort((x, y) => x.n - y.n || x.run - y.run)
   const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
   const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''})`
   const out: Line[] = [line(head, { bold: true, color: running.length ? 'cyan' : undefined })]
   if (all.length === 0) return [...out, line('no agent has run in this session yet; the graph draws as Agent calls spawn them', { dim: true })]
+  // Every line of a box is BOX_W + 2 columns: ┌ title ─┐ / │ text │ / └──┘.
   const inner = (t: string) => `│ ${t.slice(0, BOX_W - 2).padEnd(BOX_W - 2)} │`
-  const top = (title: string) => `┌ ${title.slice(0, BOX_W - 3)} ${'─'.repeat(Math.max(0, BOX_W - 3 - title.length))}┐`
+  const top = (title: string) => { const t = title.slice(0, BOX_W - 3); return `┌ ${t} ${'─'.repeat(BOX_W - 2 - t.length)}┐` }
   const bottom = (hasChildren: boolean) => (hasChildren ? `└${'─'.repeat(9)}┬${'─'.repeat(BOX_W - 10)}┘` : `└${'─'.repeat(BOX_W)}┘`)   // the ┬ sits over the children's trunk, 10 columns in
-  const kids = (id: string | null) => all.filter(a => (a.parent === id) || (id === null && a.parent !== null && !all.some(p => p.id === a.parent)))
+  // A child's parent is the run of that id active when the child spawned (an id resumed later is another run, not another parent).
+  const parentOf = (c: RunningAgent): RunningAgent | null => {
+    if (c.parent === null) return null
+    const runs = all.filter(p => p.id === c.parent).sort((x, y) => x.startedAt - y.startedAt)
+    if (runs.length === 0) return null
+    return [...runs].reverse().find(p => p.startedAt <= c.startedAt) ?? runs[0]
+  }
+  const kids = (p: RunningAgent | null) => all.filter(a => parentOf(a) === p)
   out.push(line('[ Run graph ]', { bold: true }))
   // Draw with a trunk: lines of a child's box after the first carry the trunk mark when siblings follow.
   const drawn: Line[] = []
   const draw = (a: RunningAgent | null, prefix: string, arrow: string, trunk: boolean) => {
-    const children = kids(a?.id ?? null)
+    const children = kids(a)
     const cont = prefix + (trunk ? '┃' : ' ') + ' '.repeat(Math.max(0, arrow.length - 1))
     if (a === null) {
       const t = lv.turns
@@ -486,12 +494,14 @@ const monitorLines = (lv: Live, now: number): Line[] => {
     } else {
       const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
       const state = a.done === null ? (quiet ? '● QUIET' : '● RUNNING') : a.failed ? '● FAILED' : '● DONE'
+      // The whole box carries the state's colour: green at work, yellow quiet, red failed; a finished box in the default colour.
       const color = a.done === null ? (quiet ? 'yellow' : 'green') : a.failed ? 'red' : undefined
       const figures = `${shortModel(a.model)} ${a.effort}`.trim() + `  ${secs((a.done ?? now) - a.startedAt)}  ${a.steps} step${a.steps === 1 ? '' : 's'}` + (a.cost !== null ? `  ${money(a.cost)}` : '')
-      drawn.push(line(`${prefix}${arrow}${top(`${String(a.n).padStart(2, '0')} ${a.type}`)}`))
-      drawn.push(line(`${cont}${inner(`${state.padEnd(10)} ${figures}`)}`, { color, dim: a.done !== null && !a.failed }))
-      drawn.push(line(`${cont}${inner(a.description)}`))
-      drawn.push(line(`${cont}${bottom(children.length > 0)}`))
+      const title = `${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''}`
+      drawn.push(line(`${prefix}${arrow}${top(title)}`, { color }))
+      drawn.push(line(`${cont}${inner(`${state.padEnd(9)}  ${figures}`)}`, { color }))
+      drawn.push(line(`${cont}${inner(a.description)}`, { color }))
+      drawn.push(line(`${cont}${bottom(children.length > 0)}`, { color }))
     }
     const base = a === null ? '' : cont
     children.forEach((c, i) => {
@@ -504,12 +514,14 @@ const monitorLines = (lv: Live, now: number): Line[] => {
   out.push(...drawn)
   out.push(line('arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ <4k', { dim: true }))
   // Live: the agents at work, the most recent call first; a failed one keeps its tail while it is among the last finished.
+  // Live: the agents at work, the most recent call first; when fewer than two run, the last finished (a failed one first) keep their tail.
   const live = [...running].sort((x, y) => y.lastStepAt - x.lastStepAt).slice(0, 2)
-  const failed = lv.finished.filter(a => a.failed).slice(-1)
-  for (const a of [...live, ...(live.length < 2 ? failed : [])]) {
-    const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : a.failed ? 'FAILED' : 'DONE'
+  const rest = [...lv.finished].sort((x, y) => Number(y.failed) - Number(x.failed) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - live.length)
+  for (const a of [...live, ...rest]) {
+    const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : a.failed ? `FAILED after ${secs((a.done ?? now) - a.startedAt)}` : `DONE in ${secs((a.done ?? now) - a.startedAt)}`
+    const title = `● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''} / ${a.done === null ? 'live' : 'stopped'}`
     out.push(BLANK)
-    out.push(line(`● ${String(a.n).padStart(2, '0')} ${a.type} / ${a.done === null ? 'live' : 'stopped'}${' '.repeat(Math.max(1, 56 - a.type.length))}[${state}]`, { bold: true, color: a.done === null ? 'green' : a.failed ? 'red' : undefined }))
+    out.push(line(`${title}${' '.repeat(Math.max(1, 62 - title.length))}[${state}]`, { bold: true, color: a.done === null ? 'green' : a.failed ? 'red' : undefined }))
     if (a.recent.length === 0) out.push(line('  no tool call yet', { dim: true }))
     for (const r of a.recent.slice(-5)) out.push(line(`  ${clockS(r.at)}  ${r.err ? 'ERROR ' : ''}${r.text}`, { color: r.err ? 'red' : undefined, dim: !r.err }))
   }
@@ -1057,12 +1069,17 @@ export const register: Register = (on, options) => {
     if (r.agentId) {
       const a: RunningAgent = { id: r.agentId, parent: e.parentAgentId ?? null, type: e.subagentType, description: e.description, model: r.model, effort: want?.effort ?? '', wantEffort: want?.effort ?? null,
         family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false,
-        ctx: Math.round(e.prompt.length / 4), n: 0, recent: [] }
+        ctx: Math.round(e.prompt.length / 4), n: 0, run: 1, recent: [] }
       a.startedAt = a.lastStepAt = now
       await update($, live, v => {
-        const n = v.nextN
-        const ev: RunEvent = { at: now, text: `${String(n).padStart(2, '0')} ${a.type} spawned on ${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''} (~${kilo(a.ctx)} ctx)${a.parent ? ` by ${String(v.agents[a.parent]?.n ?? 0).padStart(2, '0')}` : ''}` }
-        return { ...v, nextN: n + 1, agents: { ...v.agents, [a.id]: { ...a, n } }, events: [...v.events, ev].slice(-30) }
+        // The engine resumes an agent under the same id (a hand-back, a follow-up message): that is a new run of the same box, not a new agent.
+        const prior = v.finished.filter(x => x.id === a.id)
+        const n = prior.length ? prior[0].n : v.nextN
+        const run = prior.length + 1
+        const nn = String(n).padStart(2, '0')
+        const by = a.parent ? ` by ${String(v.agents[a.parent]?.n ?? v.finished.find(x => x.id === a.parent)?.n ?? 0).padStart(2, '0')}` : ''
+        const ev: RunEvent = { at: now, text: run > 1 ? `${nn} ${a.type} resumed (run ${run}, ~${kilo(a.ctx)} ctx)` : `${nn} ${a.type} spawned on ${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''} (~${kilo(a.ctx)} ctx)${by}` }
+        return { ...v, nextN: prior.length ? v.nextN : n + 1, agents: { ...v.agents, [a.id]: { ...a, n, run } }, events: [...v.events, ev].slice(-30) }
       })
     }
     return r

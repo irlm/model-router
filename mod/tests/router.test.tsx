@@ -577,7 +577,7 @@ test('the run monitor: the main session at the root, each agent a box under its 
   await $.tool.call({ tool: 'Grep', pattern: 'parse_config', path: 'tools', agentId: 'm1' })
   await $.tool.call({ tool: 'Bash', command: 'python3 -m pytest -q', agentId: 'm1' })
   await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 'tm2', reason: 'answer', agentId: 'm2', usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 10000, cache_creation_input_tokens: 0 } })
-  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
   expect(text).toContain('Agent run pane opened.')
   expect(text).toContain('agent run · 1 running · 1 done ($0.00)')
   expect(text).toContain('┌ 00 main session')
@@ -592,6 +592,23 @@ test('the run monitor: the main session at the root, each agent a box under its 
   expect(text).toMatch(/└─────────┬[─]+┘\n {10}┗━━/)                  // the trunk leaves the parent's box where the ┬ is
   expect(text).toContain('02 Web Researcher spawned on haiku (~9 ctx) by 01')
   expect(text).toMatch(/02 Web Researcher done in \S+, \$0\.00/)
+  expect(text).toMatch(/● 02 Web Researcher \/ stopped\s+\[DONE in \S+\]/)   // one agent at work: the finished one keeps its tail
+  // every line of a box is the same width: the top border, the inner lines and the bottom
+  const rows = text.split('\n')
+  const i = rows.findIndex(l => l.includes('┌ 01 Explore'))
+  const box = rows.slice(i, i + 4).map(l => l.trimEnd().length)
+  expect(box.length).toBe(4)
+  expect(new Set(box).size).toBe(1)
+  // the engine resumes an agent under the same id: the same box, run 2, and 02's child count does not double
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tm3', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'What is the RFC number of TLS 1.3? (again)', parentAgentId: 'm1' })
+  n = 1   // the mock hands out m2 again
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 'tm3', reason: 'answer', agentId: 'm3' })
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tm4', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'And the year?', parentAgentId: 'm1' })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toContain('┌ 02 Web Researcher · run 2 ')
+  expect(text).toContain('02 Web Researcher resumed (run 2, ~3 ctx)')
+  expect((text.match(/┌ 03 Web Researcher/g) ?? []).length).toBe(1)
+  expect(text.indexOf('┌ 02 Web Researcher ─')).toBeLessThan(text.indexOf('┌ 02 Web Researcher · run 2'))   // runs in order
   await settled()
 })
 

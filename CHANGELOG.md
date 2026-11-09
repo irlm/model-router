@@ -3,6 +3,14 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.17.0 — 2026-11-08
+
+- The run monitor, after a first real run: an agent the engine resumes under the same id (a hand-back, a
+  follow-up) is a new run of the same box ("03 general-purpose · run 2"), not a new agent, and a child hangs
+  under the run that was active when it spawned, so it is drawn once; the whole box carries its state's
+  colour (green at work, yellow quiet, red failed); wider boxes so the cost is not cut; the top border as wide
+  as the rest; when fewer than two agents run, the last finished keep their tail in the live section.
+
 ## 0.16.2 — 2026-11-08
 
 - Python 3.10's argparse drops the `--` that 0.16.1 put before the overrides script's words, so `/router prefer`

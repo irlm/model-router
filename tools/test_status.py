@@ -40,6 +40,10 @@ class Classify(unittest.TestCase):
         self.assertEqual(c('general-purpose', 'open http://x, click sign in, report pass/fail per item'), 'browser-flow')
         self.assertEqual(c('general-purpose', 'what is the default value of X'), 'fact-lookup')
         self.assertEqual(c('general-purpose', 'research the landscape and write a report'), 'research-synthesis')
+        # running a test command and reporting what it said is not a research note (a real misroute, 2026-11-09)
+        self.assertEqual(c('general-purpose', 'run python3 -m pytest cart and report the failures with their assertion messages'), 'other')
+        self.assertEqual(c('general-purpose', 'report the failures of the suite'), 'other')
+        self.assertEqual(c('general-purpose', 'compare the two queues and write a report'), 'research-synthesis')
         self.assertEqual(c('general-purpose', 'fix the failing test'), 'code-change')
         self.assertEqual(c('general-purpose', 'hello'), 'other')
 

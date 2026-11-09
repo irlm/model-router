@@ -3,6 +3,13 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.21.1 — 2026-11-09
+
+- A prompt that runs a test command is not a research note. "Run pytest and report the failures" on a general-purpose
+  agent matched `report` and was routed to the research family (Sonnet low) in a real session; the classifier now
+  skips the research match when the prompt names a test runner, and the keyword is `a report` / `the report` /
+  `report on`, not the bare word. The same change in `tools/consumption.py`, so the ledger counts it the same way.
+
 ## 0.21.0 — 2026-11-09
 
 - The run monitor draws the main session before any agent runs, instead of one line saying nothing has run: the

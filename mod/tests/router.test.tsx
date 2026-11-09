@@ -251,6 +251,15 @@ test('auto mode routes a research note to the decided family once it is measured
   expect(spawnSeen(seen)?.model).toBe('sonnet')
   await drain($.turn.step({ turnId: 'ta', index: 0, model: 'claude-sonnet-5-5', effort: 'high', messageCount: 1, agentId: sp.agentId }))
   expect((seen.filter(x => x.tool === '$step').at(-1) as { effort?: string })?.effort).toBe('low')
+  // running a test command and reporting what it said is not a research note: left on the session's model (a real misroute, 2026-11-09)
+  const TESTS = { tool: 'Agent', description: 'run the cart tests', prompt: 'Run python3 -m pytest cart -q and report the failures with their assertion messages. Do not change any file.', subagent_type: 'general-purpose' } as const
+  await $.tool.call(TESTS)
+  await $.agent.spawn(spawnOf(TESTS))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('routed this session: 1 routed')
+  expect(text).toMatch(/general-purpose\s+fable\s+unmeasured\s+run the cart tests/)   // the agents row: the session's model, no family
+  expect(text).not.toMatch(/\[research_synthesis\] auto\s+run the cart tests/)         // and no routed line for it
 })
 
 test('an override for this project routes before the family default, and prefer sets one', { options: { routing: 'auto' } }, async ($, on) => {

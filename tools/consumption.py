@@ -35,9 +35,13 @@ TOKENS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_cre
 
 LOOKUP = ('what is the', 'which version', 'latest version', 'look up', 'find out', 'check the docs', 'default value',
           'release date', 'is it supported', 'what does the doc', 'current version', 'find the url')
-SYNTHESIS = ('research', 'compare', 'comparison', 'report', 'compile', 'deep dive', 'survey', 'landscape', 'fact-dense',
+# 'a report', not 'report': "report the failures" is what every command-running prompt says.
+SYNTHESIS = ('research', 'compare', 'comparison', 'a report', 'the report', 'report on', 'compile', 'deep dive', 'survey', 'landscape', 'fact-dense',
              'summarize the', 'write up', 'notes that let')
 CODE = ('fix', 'implement', 'refactor', 'write tests', 'bug', 'add a', 'change the', 'migrate', 'failing test')
+# A prompt that runs a test command is not a research note, whatever else it says (the widget's RUNNER list).
+RUNNER = ('failing test', 'test command', 'run the tests', 'run the test', 'npm test', 'vitest', 'pytest', 'cargo test', 'go test',
+          'make test', 'tests pass', 'test passes', 'the suite')
 BROWSER = ('in the browser', 'chrome', 'web page', 'the page at', 'fill the form', 'fill in the form', 'click', 'sign in', 'log in',
            'navigate to', 'open http', 'checklist', 'pass/fail')   # the same list the widget's router uses
 
@@ -58,7 +62,7 @@ def classify(subagent_type, prompt):
         return 'code-review'
     if len(p) < 900 and any(k in p for k in LOOKUP):
         return 'fact-lookup'
-    if any(k in p for k in SYNTHESIS):
+    if any(k in p for k in SYNTHESIS) and not any(k in p for k in RUNNER):
         return 'research-synthesis'
     if any(k in p for k in CODE):
         return 'code-change'

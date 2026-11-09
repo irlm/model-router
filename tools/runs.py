@@ -93,7 +93,7 @@ def text(run):
     m = run.get('meta') or {}
     agents = sorted(run.get('agents') or [], key=lambda a: (a.get('n', 0), a.get('run', 1)))
     out = [f"run {m.get('id', '?')}: {m.get('name') or m.get('prompt') or ''}",
-           f"started {when(m.get('startedAt', 0))} UTC" + (f", ended {when(m['endedAt'])}" if m.get('endedAt') else '')
+           f"started {when(m.get('startedAt', 0))}" + (f", ended {when(m['endedAt'])}" if m.get('endedAt') else '')
            + f" · {m.get('agentN', len(agents))} agents · {money(float(m.get('cost') or 0))}"
            + (f" · {m['failedN']} failed" if m.get('failedN') else '') + (f" · {m['stoppedN']} stopped" if m.get('stoppedN') else '')
            + (" · from transcripts" if run.get('source') == 'transcript' else '')]
@@ -112,7 +112,7 @@ def markdown(run):
     m = run.get('meta') or {}
     agents = sorted(run.get('agents') or [], key=lambda a: (a.get('n', 0), a.get('run', 1)))
     out = [f"# Agent run: {m.get('name') or m.get('prompt') or m.get('id', '')}", '',
-           f"started {when(m.get('startedAt', 0))} UTC" + (f", ended {when(m['endedAt'])}" if m.get('endedAt') else '')
+           f"started {when(m.get('startedAt', 0))}" + (f", ended {when(m['endedAt'])}" if m.get('endedAt') else '')
            + f" · {m.get('agentN', len(agents))} agents · {money(float(m.get('cost') or 0))}"
            + (f" · {m['failedN']} failed" if m.get('failedN') else '') + (f" · {m['stoppedN']} stopped" if m.get('stoppedN') else '')
            + (" · rebuilt from the transcripts (no timing, no tool tail)" if run.get('source') == 'transcript' else ''), '']

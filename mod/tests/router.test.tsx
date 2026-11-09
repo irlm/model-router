@@ -508,6 +508,15 @@ test('an Agent call re-issued within minutes of a routed one, with the same word
   await settled()   // the detached work (log writes, the change record) ends inside the test
 })
 
+test('the agents block before any agent ran: the full pane names the block in one dim line, the glance shows nothing', { options: { routing: 'auto' } }, async ($, on) => {
+  LIVE_MOCKS(on, [], [], null)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('agents  none running yet this session')
+  expect(text).not.toContain('agents running')
+  await settled()
+})
+
 test('the agents block: a spawned agent is one row with its model, family and steps; its child sits under it; a finished one collapses into the counts', { options: { routing: 'auto' } }, async ($, on) => {
   const seen: Record<string, unknown>[] = []
   const steps: unknown[] = []

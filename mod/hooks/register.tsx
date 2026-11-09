@@ -338,7 +338,8 @@ const QUIET_MS = 60000
 const GLANCE_ROWS = 6
 const agentsLines = (lv: Live, now: number, full: boolean): Line[] => {
   const running = Object.values(lv.agents)
-  if (running.length === 0 && lv.doneN === 0) return []
+  // Nothing has run yet: the full pane (and /router check) still names the block so a dev knows where agents will appear; the glance stays short.
+  if (running.length === 0 && lv.doneN === 0) return full ? [line('agents  none running yet this session; subagents appear here as rows: type, model effort, family, task, requests, elapsed', { dim: true })] : []
   const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
   const head = `${spin}agents running ${running.length}` + (lv.doneN ? ` · done ${lv.doneN} (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''})` : '')
   const lines = [line(head, { bold: true, color: running.length ? 'cyan' : undefined })]

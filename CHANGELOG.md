@@ -3,6 +3,11 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.14.1 — 2026-11-08
+
+- The agents block names itself before any subagent has run: the full pane and `/router check` carry one
+  dim line saying where the rows will appear; the glance stays as short as before.
+
 ## 0.14.0 — 2026-11-08
 
 - The agents block: the subagents running in this session, one row each like a connection monitor

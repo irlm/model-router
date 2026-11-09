@@ -3,6 +3,17 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.18.0 — 2026-11-08
+
+- The run monitor is drawn: a header bar, the graph as real boxes with a border in the state's colour (cyan
+  for the main session, green at work, yellow quiet, red failed, dim when done) placed on a grid, a column
+  per depth and a centred tree down the rows, the arrows between them in box-drawing glyphs weighted by the
+  context sent with the token label on the branch; beside it, when the pane is 130 columns or wider, the live
+  panels of the agents at work (their last tool calls, a blinking cursor), under it when narrower; the event
+  log in its own frame; a footer with `g` (the same run as text lines, the earlier view) and `m` (the main
+  pane). `/router monitor` still prints the text drawing. Not drawn, by design: a blocked state or dependency
+  arrows, since the engine reports who spawned whom, not who waits on whom.
+
 ## 0.17.0 — 2026-11-08
 
 - The run monitor, after a first real run: an agent the engine resumes under the same id (a hand-back, a

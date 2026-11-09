@@ -21,6 +21,8 @@ const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN:
 const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-5' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
+/** The run monitor's view: the drawn graph, or the same run as text lines. */
+const monitorView = atom({ plugin: 'model-router', key: 'monitorView' } as const, 'graph' as 'graph' | 'list', { shape: 'monitorView-1' })
 
 // What the buttons and /router <verb> run, from the checkout's root. In the clone the plugin install
 // made (`clone`), nothing is committed: the ledger prints its entry, the re-check keeps its results local.
@@ -100,7 +102,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.17.0'
+const WIDGET_VERSION = '0.18.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -463,7 +465,7 @@ const BOX_W = 48
 const weightOf = (ctx: number) => (ctx >= 16000 ? '━' : ctx >= 4000 ? '─' : '┄')
 const monitorLines = (lv: Live, now: number): Line[] => {
   const running = Object.values(lv.agents)
-  const all = [...running, ...lv.finished].sort((x, y) => x.n - y.n || x.run - y.run)
+  const { all, kids } = treeOf(lv)
   const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
   const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''})`
   const out: Line[] = [line(head, { bold: true, color: running.length ? 'cyan' : undefined })]
@@ -472,14 +474,6 @@ const monitorLines = (lv: Live, now: number): Line[] => {
   const inner = (t: string) => `│ ${t.slice(0, BOX_W - 2).padEnd(BOX_W - 2)} │`
   const top = (title: string) => { const t = title.slice(0, BOX_W - 3); return `┌ ${t} ${'─'.repeat(BOX_W - 2 - t.length)}┐` }
   const bottom = (hasChildren: boolean) => (hasChildren ? `└${'─'.repeat(9)}┬${'─'.repeat(BOX_W - 10)}┘` : `└${'─'.repeat(BOX_W)}┘`)   // the ┬ sits over the children's trunk, 10 columns in
-  // A child's parent is the run of that id active when the child spawned (an id resumed later is another run, not another parent).
-  const parentOf = (c: RunningAgent): RunningAgent | null => {
-    if (c.parent === null) return null
-    const runs = all.filter(p => p.id === c.parent).sort((x, y) => x.startedAt - y.startedAt)
-    if (runs.length === 0) return null
-    return [...runs].reverse().find(p => p.startedAt <= c.startedAt) ?? runs[0]
-  }
-  const kids = (p: RunningAgent | null) => all.filter(a => parentOf(a) === p)
   out.push(line('[ Run graph ]', { bold: true }))
   // Draw with a trunk: lines of a child's box after the first carry the trunk mark when siblings follow.
   const drawn: Line[] = []
@@ -530,6 +524,121 @@ const monitorLines = (lv: Live, now: number): Line[] => {
   if (lv.events.length === 0) out.push(line('  none yet', { dim: true }))
   for (const ev of lv.events.slice(-8)) out.push(line(`  ${clockS(ev.at)}  ${ev.text}`, { color: ev.color }))
   return out
+}
+
+/** The run as a drawing: every agent a box on a grid (a column per depth, rows by a centred tree layout), the arrow from its
+ * spawner weighted by the context sent. Pure: the pane draws the scene with positioned elements, nothing is measured on screen. */
+type Seg = { x: number; text: string; color?: string }
+type NodeBox = { a: RunningAgent | null; x: number; y: number; w: number; color?: string; title: string; state: string; figures: string; desc: string }
+type Scene = { boxes: NodeBox[]; rows: Map<number, Seg[]>; width: number; height: number }
+const BOX_H = 5     // border, three lines, border
+const PITCH = 6     // rows a leaf takes: its box and a row to the next
+const GAP = 14      // columns between depths: the arrow and its label
+type Weight = { h: string; v: string; j: Record<string, string> }
+const HEAVY: Weight = { h: '━', v: '┃', j: { ud: '┃', ur: '┗', dr: '┏', udr: '┣', lr: '━', lrd: '┳', lru: '┻', lrud: '╋', lud: '┫', ld: '┓', lu: '┛', r: '━', l: '━', u: '┃', d: '┃' } }
+const LIGHT: Weight = { h: '─', v: '│', j: { ud: '│', ur: '└', dr: '┌', udr: '├', lr: '─', lrd: '┬', lru: '┴', lrud: '┼', lud: '┤', ld: '┐', lu: '┘', r: '─', l: '─', u: '│', d: '│' } }
+const DASHED: Weight = { ...LIGHT, h: '┄', v: '┆' }
+const weightFor = (ctx: number): Weight => (ctx >= 16000 ? HEAVY : ctx >= 4000 ? LIGHT : DASHED)
+const stateOf = (a: RunningAgent, now: number) => {
+  const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
+  return { state: a.done === null ? (quiet ? '● QUIET' : '● RUNNING') : a.failed ? '● FAILED' : '● DONE', color: a.done === null ? (quiet ? 'yellow' : 'green') : a.failed ? 'red' : undefined }
+}
+/** The tree of a run: every record (running and finished), and a child's parent as the run of that id active at the child's spawn. */
+const treeOf = (lv: Live) => {
+  const all = [...Object.values(lv.agents), ...lv.finished].sort((x, y) => x.n - y.n || x.run - y.run)
+  const parentOf = (c: RunningAgent): RunningAgent | null => {
+    if (c.parent === null) return null
+    const runs = all.filter(p => p.id === c.parent).sort((x, y) => x.startedAt - y.startedAt)
+    if (runs.length === 0) return null
+    return [...runs].reverse().find(p => p.startedAt <= c.startedAt) ?? runs[0]
+  }
+  const kids = (p: RunningAgent | null) => all.filter(a => parentOf(a) === p)
+  return { all, kids }
+}
+const sceneOf = (lv: Live, now: number, width: number): Scene => {
+  const { all, kids } = treeOf(lv)
+  const depthOf = (p: RunningAgent | null, d: number): number => Math.max(d, ...kids(p).map(c => depthOf(c, d + 1)))
+  const D = depthOf(null, 0)
+  const inner = Math.max(22, Math.min(40, Math.floor((width - GAP * D) / (D + 1)) - 2))
+  const w = inner + 2
+  const boxes: NodeBox[] = []
+  const cells = new Map<number, Map<number, { ch: string; color?: string }>>()
+  const put = (y: number, x: number, ch: string, color?: string) => {
+    if (!cells.has(y)) cells.set(y, new Map())
+    cells.get(y)!.set(x, { ch, color })
+  }
+  const fit = (t: string) => (t.length > inner ? t.slice(0, inner - 1) + '…' : t)
+  // Layout: a leaf at the cursor; a parent centred on its children, which follow one another.
+  const place = (a: RunningAgent | null, depth: number, cursor: number): { row: number; height: number } => {
+    const children = kids(a)
+    const x = depth * (w + GAP)
+    let row = cursor
+    let height = PITCH
+    const childRows: { c: RunningAgent; row: number }[] = []
+    if (children.length) {
+      let cur = cursor
+      for (const c of children) {
+        const r = place(c, depth + 1, cur)
+        childRows.push({ c, row: r.row })
+        cur += r.height
+      }
+      height = cur - cursor
+      row = Math.round((childRows[0].row + childRows[childRows.length - 1].row) / 2)
+    }
+    if (a === null) {
+      const t = lv.turns
+      boxes.push({ a, x, y: row, w, color: 'cyan', title: '00 main session', state: `${t.length} turn${t.length === 1 ? '' : 's'} · ${money(t.reduce((n, z) => n + z.cost, 0))}`, figures: '', desc: fit(`${all.length} agent${all.length === 1 ? '' : 's'} spawned`) })
+    } else {
+      const { state, color } = stateOf(a, now)
+      const parts = [`${shortModel(a.model)} ${a.effort}`.trim(), secs((a.done ?? now) - a.startedAt), `${a.steps} step${a.steps === 1 ? '' : 's'}`, ...(a.cost !== null ? [money(a.cost)] : [])]
+      let figures = parts.join('  ')
+      // Too long for the box: drop the step count, then the cost, then the elapsed time; the model stays.
+      while (`${state}  ${figures}`.length > inner && parts.length > 1) { if (parts.length > 2) parts.splice(2, 1); else parts.pop(); figures = parts.join('  ') }
+      boxes.push({ a, x, y: row, w, color, title: fit(`${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''}`), state, figures, desc: fit(a.description) })
+    }
+    // Arrows: a stub out of the box's middle, a trunk two columns on, a branch into each child's middle with the label.
+    if (childRows.length) {
+      const y0 = row + 2
+      const x0 = x + w
+      const x1 = x0 + 2
+      const trunk = childRows.map(k => weightFor(k.c.ctx)).reduce((m, k) => (k === HEAVY || m === HEAVY ? HEAVY : k === LIGHT || m === LIGHT ? LIGHT : DASHED))
+      const ys = childRows.map(k => k.row + 2)
+      const ymin = Math.min(y0, ...ys)
+      const ymax = Math.max(y0, ...ys)
+      put(y0, x0, trunk.h); put(y0, x0 + 1, trunk.h)
+      for (let r = ymin; r <= ymax; r++) {
+        const key = (r === y0 ? 'l' : '') + (ys.includes(r) ? 'r' : '') + (r > ymin ? 'u' : '') + (r < ymax ? 'd' : '')
+        const order = ['l', 'r', 'u', 'd'].filter(k => key.includes(k)).join('')
+        const sorted = ['lrud', 'lrd', 'lru', 'lud', 'udr', 'lr', 'ud', 'ur', 'dr', 'ld', 'lu', 'r', 'l', 'u', 'd'].find(k => k.split('').sort().join('') === order.split('').sort().join(''))
+        put(r, x1, (sorted && trunk.j[sorted]) || trunk.v)
+      }
+      for (const k of childRows) {
+        const wgt = weightFor(k.c.ctx)
+        const y1 = k.row + 2
+        const label = ` ~${kilo(k.c.ctx)} `
+        const from = x1 + 1
+        const to = (depth + 1) * (w + GAP) - 1   // the column before the child's box
+        for (let c = from; c <= to; c++) put(y1, c, wgt.h)
+        for (let i = 0; i < label.length && from + 1 + i < to; i++) put(y1, from + 1 + i, label[i])
+        put(y1, to, '▶')
+      }
+    }
+    return { row, height }
+  }
+  const total = place(null, 0, 0)
+  const rows = new Map<number, Seg[]>()
+  for (const [y, line] of cells) {
+    const xs = [...line.keys()].sort((p, q) => p - q)
+    const segs: Seg[] = []
+    for (const x of xs) {
+      const c = line.get(x)!
+      const last = segs[segs.length - 1]
+      if (last && last.x + last.text.length === x && last.color === c.color) last.text += c.ch
+      else segs.push({ x, text: c.ch, color: c.color })
+    }
+    rows.set(y, segs)
+  }
+  return { boxes, rows, width: (D + 1) * (w + GAP) - GAP, height: Math.max(BOX_H, total.height - 1) }
 }
 
 const liveLines = (lv: Live, ctxNow: number | null, modelNow: string, s: StatusJson | null, mode: MainEffortMode): Line[] => {
@@ -925,7 +1034,7 @@ export const register: Register = (on, options) => {
         const { [id]: _gone, ...rest } = v.agents
         const ev: RunEvent = done.failed
           ? { at: now, text: `${String(a.n).padStart(2, '0')} ${a.type} failed (${e.reason}) after ${secs(now - a.startedAt)}`, color: 'red' }
-          : { at: now, text: `${String(a.n).padStart(2, '0')} ${a.type} done in ${secs(now - a.startedAt)}${done.cost !== null ? `, ${money(done.cost)}` : ''}` }
+          : { at: now, text: `${String(a.n).padStart(2, '0')} ${a.type} done in ${secs(now - a.startedAt)}${done.cost !== null ? `, ${money(done.cost)}` : ''}`, color: 'green' }
         return { ...v, agents: rest, finished: [...v.finished, done].slice(-12), doneN: v.doneN + 1, doneCost: v.doneCost + (done.cost ?? 0), failedN: v.failedN + (done.failed ? 1 : 0), events: [...v.events, ev].slice(-30) }
       })
     }
@@ -1209,18 +1318,105 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  // The run monitor: its own pane, the graph of the agents and their live tails, redrawn with the second tick while any runs.
+  // The run monitor: its own pane. The graph view draws the scene (boxes with a border in the state's colour, the arrows
+  // between them) beside the live panels when the pane is wide, under them when it is not; the list view is the text.
   on('ui.render', { component: 'Pane', requestId: MONITOR }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const lv = await read($, live)
+    const view = await read($, monitorView)
     await read($, tick)
-    const width = Math.max(40, (e.viewport?.columns ?? 100) - 1)
-    const cut = (t: string) => (t.length > width ? t.slice(0, width - 1) + '…' : t)
+    const now = await $.clock.now()
+    const width = Math.max(40, (e.props as { bodyColumns?: number }).bodyColumns ?? (e.viewport?.columns ?? 100) - 1)
+    const running = Object.values(lv.agents)
+    const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
+    const footer = (
+      <Box flexDirection="row" gap={1}>
+        <Button key="view" hotkey="g" onPress={() => { void update($, monitorView, v => (v === 'graph' ? 'list' : 'graph')) }}>{view === 'graph' ? 'List' : 'Graph'}</Button>
+        <Button key="main" hotkey="m" onPress={() => { void $.ui.open({ id: PANE, title: 'Model router' }) }}>Model router</Button>
+      </Box>
+    )
+    if (view === 'list') {
+      const cut = (t: string) => (t.length > width ? t.slice(0, width - 1) + '…' : t)
+      return (
+        <Box flexDirection="column">
+          {monitorLines(lv, now).map(l => (
+            <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text === '' ? ' ' : cut(l.text)}</Text>
+          ))}
+          {footer}
+        </Box>
+      )
+    }
+    const twoCol = width >= 130
+    const rightW = 50
+    const graphW = (twoCol ? width - rightW - 1 : width) - 4
+    const scene = sceneOf(lv, now, graphW)
+    const { all } = treeOf(lv)
+    const tails = [...[...running].sort((x, y) => y.lastStepAt - x.lastStepAt).slice(0, 2)]
+    tails.push(...[...lv.finished].sort((x, y) => Number(y.failed) - Number(x.failed) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - tails.length))
+    const panel = (a: RunningAgent) => {
+      const { color } = stateOf(a, now)
+      const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : a.failed ? 'FAILED' : 'DONE'
+      return (
+        <Box borderStyle="round" borderColor={color} borderDimColor={!color} flexDirection="column" paddingX={1}>
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text color={color} bold>{`● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''} / ${a.done === null ? 'live' : 'stopped'}`}</Text>
+            <Text color={color}>{`[${state}]`}</Text>
+          </Box>
+          {a.recent.length === 0 && <Text dimColor>no tool call yet</Text>}
+          {a.recent.slice(-5).map(r => (
+            <Text><Text dimColor>{clockS(r.at)}  </Text><Text color={r.err ? 'red' : undefined}>{`${r.err ? 'ERROR ' : ''}${r.text}`}</Text></Text>
+          ))}
+          {a.done === null && <Text color="cyan">{`$ ${Math.floor(now / 1000) % 2 ? '▌' : ' '}`}</Text>}
+        </Box>
+      )
+    }
+    const graph = (
+      <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
+        <Text color="cyan" bold>[ Run graph ]</Text>
+        <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · graph: live · ${running.length ? 'at work' : 'idle'}`}</Text>
+        {all.length === 0 ? <Text dimColor>no agent has run in this session yet; the graph draws as Agent calls spawn them</Text> : (
+          <Box position="relative" width={scene.width} height={scene.height}>
+            {[...scene.rows].flatMap(([y, segs]) => segs.map(s => (
+              <Box position="absolute" top={y} left={s.x}><Text color={s.color} dimColor={!s.color}>{s.text}</Text></Box>
+            )))}
+            {scene.boxes.map(b => (
+              <Box position="absolute" top={b.y} left={b.x} width={b.w} borderStyle="round" borderColor={b.color} borderDimColor={!b.color} flexDirection="column">
+                <Text bold wrap="truncate">{b.title}</Text>
+                <Text wrap="truncate"><Text color={b.color}>{b.state}</Text><Text>{b.figures ? `  ${b.figures}` : ''}</Text></Text>
+                <Text dimColor wrap="truncate">{b.desc}</Text>
+              </Box>
+            ))}
+          </Box>
+        )}
+        <Text dimColor>arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ &lt;4k</Text>
+      </Box>
+    )
+    const events = (
+      <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
+        <Text color="cyan" bold>[ Event log ]</Text>
+        {lv.events.length === 0 && <Text dimColor>none yet</Text>}
+        {lv.events.slice(-8).map(ev => <Text><Text dimColor>{clockS(ev.at)}  </Text><Text color={ev.color}>{ev.text}</Text></Text>)}
+      </Box>
+    )
+    const header = (
+      <Box borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="row" justifyContent="space-between">
+        <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Agent run</Text></Text>
+        <Text dimColor>{`${spin}${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}) · ${clockS(now)}`}</Text>
+      </Box>
+    )
+    const right = <Box flexDirection="column" width={twoCol ? rightW : undefined}>{tails.map(panel)}</Box>
     return (
       <Box flexDirection="column">
-        {monitorLines(lv, await $.clock.now()).map(l => (
-          <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text === '' ? ' ' : cut(l.text)}</Text>
-        ))}
+        {header}
+        {twoCol ? (
+          <Box flexDirection="row" gap={1}>
+            <Box flexDirection="column" flexGrow={1}>{graph}{events}</Box>
+            {right}
+          </Box>
+        ) : (
+          <Box flexDirection="column">{graph}{right}{events}</Box>
+        )}
+        {footer}
       </Box>
     )
   })

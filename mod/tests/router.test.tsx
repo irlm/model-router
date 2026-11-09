@@ -612,6 +612,47 @@ test('the run monitor: the main session at the root, each agent a box under its 
   await settled()
 })
 
+const MONITOR_PANE = { plugin: 'model-router', component: 'Pane', requestId: 'model-router-monitor', props: { title: 'Agent run', isFocused: false, bodyColumns: 150, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } } as const
+
+test('the run monitor pane draws the graph: a box per agent in its state colour, the arrow label between spawner and child, the live panel of the agent at work, the event log; the list view is the text; a narrow pane stacks', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, 'Bash')
+  let n = 0
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `p${++n}` }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const SPAWN = { tool_use_id: 'tp1', prompt: 'Find where the config file is parsed and report the function. ' + 'x'.repeat(70000), description: 'find the parser', subagentType: 'Explore', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1', model: 'claude-haiku-5-5' } as const
+  await $.agent.spawn(SPAWN)
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tp2', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'What is the RFC number of TLS 1.3?', parentAgentId: 'p1' })
+  await drain($.turn.step({ turnId: 'tp1', index: 0, model: 'claude-haiku-5-5', effort: 'low', messageCount: 1, agentId: 'p1' }))
+  await $.tool.call({ tool: 'Grep', pattern: 'parse_config', path: 'tools', agentId: 'p1' })
+  await $.turn.complete({ answer: '', durationMs: 1000, isAborted: false, turnId: 'tp2', reason: 'error', agentId: 'p2' })
+  // wide: graph and panels side by side
+  let ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^Agent run$/ }))?.text).toBe('Agent run')
+  expect((await ui.find({ type: 'Text', text: /^00 main session$/ }))?.text).toBe('00 main session')
+  expect((await ui.find({ type: 'Text', text: /^01 Explore$/ }))?.text).toBe('01 Explore')
+  expect((await ui.find({ type: 'Text', text: /^02 Web Researcher$/ }))?.text).toBe('02 Web Researcher')
+  expect((await ui.find({ type: 'Text', text: /● RUNNING/ }))?.text).toContain('● RUNNING')
+  expect((await ui.find({ type: 'Text', text: /● FAILED/ }))?.text).toContain('● FAILED')
+  expect((await ui.find({ type: 'Text', text: /~18k/ }))?.text).toContain('~18k')                       // the arrow's label, on the branch
+  expect((await ui.find({ type: 'Text', text: /^● 01 Explore \/ live$/ }))?.text).toBe('● 01 Explore / live')   // the live panel of the agent at work
+  expect((await ui.find({ type: 'Text', text: /Grep "parse_config" tools/ }))?.text).toContain('Grep "parse_config" tools')
+  expect((await ui.find({ type: 'Text', text: /^\[ Event log \]$/ }))?.text).toBe('[ Event log ]')
+  expect((await ui.find({ type: 'Text', text: /02 Web Researcher failed \(error\)/ }))?.text).toContain('02 Web Researcher failed (error)')
+  await ui.unmount()
+  // narrow: the same parts, stacked
+  ui = await $.ui.mount({ ...MONITOR_PANE, props: { ...MONITOR_PANE.props, bodyColumns: 90 }, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^01 Explore$/ }))?.text).toBe('01 Explore')
+  expect((await ui.find({ type: 'Text', text: /^● 01 Explore \/ live$/ }))?.text).toBe('● 01 Explore / live')
+  // the g button switches to the list view: the text drawing
+  await ui.press({ key: 'view' })
+  expect((await ui.find({ type: 'Text', text: /┗━━ ~18k ━━▶ ┌ 01 Explore/ }))?.text).toContain('┌ 01 Explore')
+  await ui.unmount()
+  await settled()
+})
+
 test('the agents block before any agent ran: the full pane names the block in one dim line, the glance shows nothing', { options: { routing: 'auto' } }, async ($, on) => {
   LIVE_MOCKS(on, [], [], null)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })

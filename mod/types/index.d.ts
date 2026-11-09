@@ -199,6 +199,6 @@ export type Job = { name: string; lines: string[]; isRunning: boolean; exitCode:
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live>; tick: Shaped<number> }
+    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live>; tick: Shaped<number>; monitorView: Shaped<'graph' | 'list'> }
   }
 }

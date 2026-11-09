@@ -3,6 +3,11 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.18.1 — 2026-11-08
+
+- An agent stopped before it answered (aborted by the person or the session) was drawn as DONE; it is now
+  STOPPED, in red like a failure, counted apart in the header ("1 failed, 1 stopped"), with its own event line.
+
 ## 0.18.0 — 2026-11-08
 
 - The run monitor is drawn: a header bar, the graph as real boxes with a border in the state's colour (cyan

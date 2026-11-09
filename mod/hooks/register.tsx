@@ -17,8 +17,8 @@ const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Ro
 const details = atom({ plugin: 'model-router', key: 'details' } as const, false, { shape: 'details-1' })
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
-const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, events: [], nextN: 1 }
-const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-5' })
+const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, stoppedN: 0, events: [], nextN: 1 }
+const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-6' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 /** The run monitor's view: the drawn graph, or the same run as text lines. */
@@ -102,7 +102,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.18.0'
+const WIDGET_VERSION = '0.18.1'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -352,16 +352,16 @@ const agentsLines = (lv: Live, now: number, full: boolean): Line[] => {
   // Nothing has run yet: the full pane (and /router check) still names the block so a dev knows where agents will appear; the glance stays short.
   if (running.length === 0 && lv.doneN === 0) return full ? [line('agents  none running yet this session; subagents appear here as rows: type, model effort, family, task, requests, elapsed', { dim: true })] : []
   const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
-  const head = `${spin}agents running ${running.length}` + (lv.doneN ? ` · done ${lv.doneN} (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''})` : '')
+  const head = `${spin}agents running ${running.length}` + (lv.doneN ? ` · done ${lv.doneN} (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''})` : '')
   const lines = [line(head + (full ? ' · graph: /router monitor' : ''), { bold: true, color: running.length ? 'cyan' : undefined })]
   const row = (a: RunningAgent, depth: number) => {
     const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
-    const mark = a.done === null ? '|' : a.failed ? '✗' : '✓'
+    const mark = a.done === null ? '|' : bad(a) ? '✗' : '✓'
     const lead = depth ? '  '.repeat(depth) + '└ ' : '  '
     const who = `${lead}${mark} ${a.type}`.padEnd(26)
     const what = `${shortModel(a.model)} ${a.effort || ''}`.trim().padEnd(12) + (a.family ?? 'unmeasured').padEnd(15) + a.description.slice(0, 34).padEnd(35)
     const tail = `${String(a.steps).padStart(3)} step${a.steps === 1 ? ' ' : 's'} ${secs((a.done ?? now) - a.startedAt).padStart(6)}` + (a.cost !== null ? `  ${money(a.cost)}` : quiet ? '  quiet' : '')
-    return line(`${who}${what}${tail}`, { dim: a.done !== null && !a.failed, color: a.failed ? 'red' : quiet ? 'yellow' : undefined })
+    return line(`${who}${what}${tail}`, { dim: a.done !== null && !bad(a), color: bad(a) ? 'red' : quiet ? 'yellow' : undefined })
   }
   const rows: Line[] = []
   const tree = (parent: string | null, depth: number) => {
@@ -467,7 +467,7 @@ const monitorLines = (lv: Live, now: number): Line[] => {
   const running = Object.values(lv.agents)
   const { all, kids } = treeOf(lv)
   const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
-  const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''})`
+  const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''})`
   const out: Line[] = [line(head, { bold: true, color: running.length ? 'cyan' : undefined })]
   if (all.length === 0) return [...out, line('no agent has run in this session yet; the graph draws as Agent calls spawn them', { dim: true })]
   // Every line of a box is BOX_W + 2 columns: ┌ title ─┐ / │ text │ / └──┘.
@@ -486,10 +486,8 @@ const monitorLines = (lv: Live, now: number): Line[] => {
       drawn.push(line(inner(`${t.length} turn${t.length === 1 ? '' : 's'} · ${money(t.reduce((n, x) => n + x.cost, 0))} · ${all.length} agent${all.length === 1 ? '' : 's'} spawned`)))
       drawn.push(line(bottom(children.length > 0)))
     } else {
-      const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
-      const state = a.done === null ? (quiet ? '● QUIET' : '● RUNNING') : a.failed ? '● FAILED' : '● DONE'
-      // The whole box carries the state's colour: green at work, yellow quiet, red failed; a finished box in the default colour.
-      const color = a.done === null ? (quiet ? 'yellow' : 'green') : a.failed ? 'red' : undefined
+      // The whole box carries the state's colour: green at work, yellow quiet, red failed or stopped; a finished box in the default colour.
+      const { state, color } = stateOf(a, now)
       const figures = `${shortModel(a.model)} ${a.effort}`.trim() + `  ${secs((a.done ?? now) - a.startedAt)}  ${a.steps} step${a.steps === 1 ? '' : 's'}` + (a.cost !== null ? `  ${money(a.cost)}` : '')
       const title = `${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''}`
       drawn.push(line(`${prefix}${arrow}${top(title)}`, { color }))
@@ -510,12 +508,12 @@ const monitorLines = (lv: Live, now: number): Line[] => {
   // Live: the agents at work, the most recent call first; a failed one keeps its tail while it is among the last finished.
   // Live: the agents at work, the most recent call first; when fewer than two run, the last finished (a failed one first) keep their tail.
   const live = [...running].sort((x, y) => y.lastStepAt - x.lastStepAt).slice(0, 2)
-  const rest = [...lv.finished].sort((x, y) => Number(y.failed) - Number(x.failed) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - live.length)
+  const rest = [...lv.finished].sort((x, y) => Number(bad(y)) - Number(bad(x)) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - live.length)
   for (const a of [...live, ...rest]) {
-    const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : a.failed ? `FAILED after ${secs((a.done ?? now) - a.startedAt)}` : `DONE in ${secs((a.done ?? now) - a.startedAt)}`
+    const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : `${endWord(a)} ${bad(a) ? 'after' : 'in'} ${secs((a.done ?? now) - a.startedAt)}`
     const title = `● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''} / ${a.done === null ? 'live' : 'stopped'}`
     out.push(BLANK)
-    out.push(line(`${title}${' '.repeat(Math.max(1, 62 - title.length))}[${state}]`, { bold: true, color: a.done === null ? 'green' : a.failed ? 'red' : undefined }))
+    out.push(line(`${title}${' '.repeat(Math.max(1, 62 - title.length))}[${state}]`, { bold: true, color: a.done === null ? 'green' : bad(a) ? 'red' : undefined }))
     if (a.recent.length === 0) out.push(line('  no tool call yet', { dim: true }))
     for (const r of a.recent.slice(-5)) out.push(line(`  ${clockS(r.at)}  ${r.err ? 'ERROR ' : ''}${r.text}`, { color: r.err ? 'red' : undefined, dim: !r.err }))
   }
@@ -539,9 +537,12 @@ const HEAVY: Weight = { h: '━', v: '┃', j: { ud: '┃', ur: '┗', dr: '┏'
 const LIGHT: Weight = { h: '─', v: '│', j: { ud: '│', ur: '└', dr: '┌', udr: '├', lr: '─', lrd: '┬', lru: '┴', lrud: '┼', lud: '┤', ld: '┐', lu: '┘', r: '─', l: '─', u: '│', d: '│' } }
 const DASHED: Weight = { ...LIGHT, h: '┄', v: '┆' }
 const weightFor = (ctx: number): Weight => (ctx >= 16000 ? HEAVY : ctx >= 4000 ? LIGHT : DASHED)
+/** How a finished run ended: STOPPED (aborted), FAILED (an error or a refusal) or DONE. */
+const endWord = (a: RunningAgent) => (a.stopped ? 'STOPPED' : a.failed ? 'FAILED' : 'DONE')
+const bad = (a: RunningAgent) => a.failed || a.stopped
 const stateOf = (a: RunningAgent, now: number) => {
   const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
-  return { state: a.done === null ? (quiet ? '● QUIET' : '● RUNNING') : a.failed ? '● FAILED' : '● DONE', color: a.done === null ? (quiet ? 'yellow' : 'green') : a.failed ? 'red' : undefined }
+  return { state: a.done === null ? (quiet ? '● QUIET' : '● RUNNING') : `● ${endWord(a)}`, color: a.done === null ? (quiet ? 'yellow' : 'green') : bad(a) ? 'red' : undefined }
 }
 /** The tree of a run: every record (running and finished), and a child's parent as the run of that id active at the child's spawn. */
 const treeOf = (lv: Live) => {
@@ -1030,12 +1031,16 @@ export const register: Register = (on, options) => {
         const a = v.agents[id]
         if (!a) return v
         const u = e.usage
-        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, failed: e.reason === 'error' || e.reason === 'refusal', model: u?.model ?? a.model }
+        const stopped = e.reason === 'aborted' || e.isAborted
+        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, failed: e.reason === 'error' || e.reason === 'refusal', stopped, model: u?.model ?? a.model }
         const { [id]: _gone, ...rest } = v.agents
-        const ev: RunEvent = done.failed
-          ? { at: now, text: `${String(a.n).padStart(2, '0')} ${a.type} failed (${e.reason}) after ${secs(now - a.startedAt)}`, color: 'red' }
-          : { at: now, text: `${String(a.n).padStart(2, '0')} ${a.type} done in ${secs(now - a.startedAt)}${done.cost !== null ? `, ${money(done.cost)}` : ''}`, color: 'green' }
-        return { ...v, agents: rest, finished: [...v.finished, done].slice(-12), doneN: v.doneN + 1, doneCost: v.doneCost + (done.cost ?? 0), failedN: v.failedN + (done.failed ? 1 : 0), events: [...v.events, ev].slice(-30) }
+        const nn = String(a.n).padStart(2, '0')
+        const ev: RunEvent = done.stopped
+          ? { at: now, text: `${nn} ${a.type} stopped after ${secs(now - a.startedAt)}`, color: 'red' }
+          : done.failed
+            ? { at: now, text: `${nn} ${a.type} failed (${e.reason}) after ${secs(now - a.startedAt)}`, color: 'red' }
+            : { at: now, text: `${nn} ${a.type} done in ${secs(now - a.startedAt)}${done.cost !== null ? `, ${money(done.cost)}` : ''}`, color: 'green' }
+        return { ...v, agents: rest, finished: [...v.finished, done].slice(-12), doneN: v.doneN + 1, doneCost: v.doneCost + (done.cost ?? 0), failedN: v.failedN + (done.failed ? 1 : 0), stoppedN: v.stoppedN + (done.stopped ? 1 : 0), events: [...v.events, ev].slice(-30) }
       })
     }
     if (e.agentId === undefined) {
@@ -1177,7 +1182,7 @@ export const register: Register = (on, options) => {
     const r = await next(want ? { ...e, model: want.model as 'haiku' | 'sonnet' | 'opus' | 'fable', ...(want.family === 'repo_fix' ? { prompt: e.prompt + RUNNER_NOTE } : {}) } : e)
     if (r.agentId) {
       const a: RunningAgent = { id: r.agentId, parent: e.parentAgentId ?? null, type: e.subagentType, description: e.description, model: r.model, effort: want?.effort ?? '', wantEffort: want?.effort ?? null,
-        family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false,
+        family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false, stopped: false,
         ctx: Math.round(e.prompt.length / 4), n: 0, run: 1, recent: [] }
       a.startedAt = a.lastStepAt = now
       await update($, live, v => {
@@ -1352,10 +1357,10 @@ export const register: Register = (on, options) => {
     const scene = sceneOf(lv, now, graphW)
     const { all } = treeOf(lv)
     const tails = [...[...running].sort((x, y) => y.lastStepAt - x.lastStepAt).slice(0, 2)]
-    tails.push(...[...lv.finished].sort((x, y) => Number(y.failed) - Number(x.failed) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - tails.length))
+    tails.push(...[...lv.finished].sort((x, y) => Number(bad(y)) - Number(bad(x)) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - tails.length))
     const panel = (a: RunningAgent) => {
       const { color } = stateOf(a, now)
-      const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : a.failed ? 'FAILED' : 'DONE'
+      const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : endWord(a)
       return (
         <Box borderStyle="round" borderColor={color} borderDimColor={!color} flexDirection="column" paddingX={1}>
           <Box flexDirection="row" justifyContent="space-between">
@@ -1401,7 +1406,7 @@ export const register: Register = (on, options) => {
     const header = (
       <Box borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="row" justifyContent="space-between">
         <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Agent run</Text></Text>
-        <Text dimColor>{`${spin}${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}) · ${clockS(now)}`}</Text>
+        <Text dimColor>{`${spin}${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''}) · ${clockS(now)}`}</Text>
       </Box>
     )
     const right = <Box flexDirection="column" width={twoCol ? rightW : undefined}>{tails.map(panel)}</Box>

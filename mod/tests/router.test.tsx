@@ -642,13 +642,21 @@ test('the run monitor pane draws the graph: a box per agent in its state colour,
   expect((await ui.find({ type: 'Text', text: /^\[ Event log \]$/ }))?.text).toBe('[ Event log ]')
   expect((await ui.find({ type: 'Text', text: /02 Web Researcher failed \(error\)/ }))?.text).toContain('02 Web Researcher failed (error)')
   await ui.unmount()
+  // an agent aborted before its answer is STOPPED, red, counted apart
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tp3', description: 'a long check', subagentType: 'general-purpose', prompt: 'Run the whole suite and wait.' })
+  await $.turn.complete({ answer: '', durationMs: 1000, isAborted: true, turnId: 'tp3', reason: 'aborted', agentId: 'p3' })
+  ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /● STOPPED/ }))?.text).toContain('● STOPPED')
+  expect((await ui.find({ type: 'Text', text: /03 general-purpose stopped after/ }))?.text).toContain('03 general-purpose stopped after')
+  expect((await ui.find({ type: 'Text', text: /2 done \(\$0\.00, 1 failed, 1 stopped\)/ }))?.text).toContain('1 failed, 1 stopped')
+  await ui.unmount()
   // narrow: the same parts, stacked
   ui = await $.ui.mount({ ...MONITOR_PANE, props: { ...MONITOR_PANE.props, bodyColumns: 90 }, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /^01 Explore$/ }))?.text).toBe('01 Explore')
   expect((await ui.find({ type: 'Text', text: /^● 01 Explore \/ live$/ }))?.text).toBe('● 01 Explore / live')
   // the g button switches to the list view: the text drawing
   await ui.press({ key: 'view' })
-  expect((await ui.find({ type: 'Text', text: /┗━━ ~18k ━━▶ ┌ 01 Explore/ }))?.text).toContain('┌ 01 Explore')
+  expect((await ui.find({ type: 'Text', text: /[┣┗]━━ ~18k ━━▶ ┌ 01 Explore/ }))?.text).toContain('┌ 01 Explore')
   await ui.unmount()
   await settled()
 })

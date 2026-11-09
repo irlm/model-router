@@ -98,6 +98,14 @@ const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: Statu
 type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?: boolean }
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
+/** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
+const WIDGET_VERSION = '0.15.1'
+/** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
+const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
+  const have = s?.widget?.version ?? null
+  if (have && have !== WIDGET_VERSION) return [line(`widget ${WIDGET_VERSION} loaded; the checkout has ${have}: /reload-plugins loads it`, { color: 'yellow' })]
+  return full ? [line(`widget ${WIDGET_VERSION} loaded`, { dim: true })] : []
+}
 
 const BLOCKS = '▁▂▃▄▅▆▇█'
 /** A sparkline: one block per value, scaled to the largest. */
@@ -578,12 +586,19 @@ async function recordChange($: Dollar, kind: string, detail: string, projected?:
 }
 
 /** One line in this machine's routed log (tools/routed_log.py), so the weekly slots can count what the router did. */
+let routedLogWarned = false
+/** A hook failure as one line of text, whatever shape the engine gives it. */
+const failureText = (err: unknown) => typeof err === 'string' ? err : (err as { message?: string } | null)?.message ?? JSON.stringify(err)
 async function logRouted($: Dollar, family: string, agent: string, from: string, to: string, decision: string) {
   try {
     const py = await findPython($)
-    await $.process.run([py, 'tools/routed_log.py', 'add', family, agent, from, to, decision, '--project', projectKey], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
-  } catch {
-    // the log is a convenience; a failure to write it changes nothing else
+    const r = await $.process.run([py, 'tools/routed_log.py', 'add', family, agent, from, to, decision, '--project', projectKey], { cwd: repo, env: pyEnv(), timeoutMs: 20000 })
+    if (r.exitCode !== 0) throw new Error(r.stderr.trim().split('\n').pop() || `exit ${r.exitCode}`)
+  } catch (err) {
+    // the log is a convenience: routing stands without it; the first failure of the session is said, with its reason
+    if (routedLogWarned) return
+    routedLogWarned = true
+    $.ui.toast(`router: the routed log was not written (${failureText(err)}); routing itself is unaffected`)
   }
 }
 
@@ -843,7 +858,7 @@ export const register: Register = (on, options) => {
       const ctx = await contextTokens($)
       const modelNow = await $.session.model().catch(() => '')
       const lv = await read($, live)
-      return { text: [...liveLines(lv, ctx?.tokens ?? null, modelNow, s?.json ?? null, mainEffortMode), ...agentsLines(lv, await $.clock.now(), true), BLANK, ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, modelNow) : [line(s?.error ?? 'no status')])].map(l => l.text).join('\n') }
+      return { text: [...liveLines(lv, ctx?.tokens ?? null, modelNow, s?.json ?? null, mainEffortMode), ...agentsLines(lv, await $.clock.now(), true), ...versionLines(s?.json ?? null, true), BLANK, ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, modelNow) : [line(s?.error ?? 'no status')])].map(l => l.text).join('\n') }
     }
     if (verb === 'prefer') {
       const words = e.args.trim().split(/\s+/).slice(1)
@@ -955,6 +970,9 @@ export const register: Register = (on, options) => {
       await update($, live, v => ({ ...v, agents: { ...v.agents, [a.id]: a } }))
     }
     return r
+  }).catch(($, e, next) => {
+    $.ui.toast(`router: the spawn hook failed (${failureText(next.error)}); ${e.subagentType} runs as asked`)
+    return next(e)
   })
 
   // The main loop's turn begins: what its prompt reads as decides the effort its requests may run at.
@@ -1065,7 +1083,10 @@ export const register: Register = (on, options) => {
       $.ui.toast(`router: the ${c.family} call on ${c.model} ${c.effort} failed; the next ones run as asked`)
     }
     return r
-  }).catch(($, e, next) => next(e))
+  }).catch(($, e, next) => {
+    $.ui.toast(`router: the routing hook failed (${failureText(next.error)}); the Agent call runs as asked`)
+    return next(e)
+  })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
@@ -1081,6 +1102,7 @@ export const register: Register = (on, options) => {
       : [
           ...liveLines(await read($, live), (await contextTokens($))?.tokens ?? null, await $.session.model().catch(() => ''), s?.json ?? null, mainEffortMode),
           ...agentsLines(await read($, live), await $.clock.now(), full),
+          ...versionLines(s?.json ?? null, full),
           BLANK,
           ...limitLines(limits),
           ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, full, await read($, switches), (await contextTokens($))?.tokens ?? null, await $.session.model().catch(() => '')) : [line(s?.error ?? 'reading the checkout…', { color: s?.error ? 'yellow' : undefined, wrap: true })]),

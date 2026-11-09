@@ -30,7 +30,13 @@ def changelog_top(text=None):
     return m.group(1) if m else None
 
 
-def problems(ver=None, top=None, dirty=None, tags=None):
+def loaded_version():
+    """The WIDGET_VERSION constant in mod/hooks/register.tsx: what a loaded widget says it is."""
+    m = re.search(r"const WIDGET_VERSION = '([^']+)'", (ROOT / 'mod' / 'hooks' / 'register.tsx').read_text(encoding='utf-8'))
+    return m.group(1) if m else None
+
+
+def problems(ver=None, top=None, dirty=None, tags=None, loaded=None):
     """What stands between HEAD and a tag; empty when nothing does. Arguments are for the tests; default: this checkout."""
     git = shutil.which('git')
     ver = ver if ver is not None else version()
@@ -40,8 +46,11 @@ def problems(ver=None, top=None, dirty=None, tags=None):
     if tags is None:
         tags = subprocess.run([git, 'tag', '--list'], cwd=ROOT, capture_output=True, text=True).stdout.split() if git else []
     out = []
+    loaded = loaded if loaded is not None else loaded_version()
     if top != ver:
         out.append(f"plugin.json says {ver} but the newest CHANGELOG.md entry is {top}: add the entry or fix the version")
+    if loaded != ver:
+        out.append(f"plugin.json says {ver} but WIDGET_VERSION in mod/hooks/register.tsx is {loaded}: the loaded widget must name its version")
     if dirty:
         out.append(f"{len(dirty.splitlines())} uncommitted change(s): commit first, the tag names a commit")
     if f'v{ver}' in tags:

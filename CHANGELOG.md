@@ -3,6 +3,14 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.15.1 — 2026-11-08
+
+- The pane says which widget version is loaded, and in yellow when the checkout already has another
+  (`/reload-plugins` loads it): a pane that looks unchanged after a release no longer leaves the question open.
+  `tools/release.py` refuses a tag while the module's version constant and plugin.json differ.
+- Failures that were silent now say so: a spawn or routing hook that fails toasts its reason and lets the call
+  run as asked; the routed log's first write failure of the session is toasted with its reason (routing stands).
+
 ## 0.15.0 — 2026-11-08
 
 - Routing no longer rewrites the Agent tool's input. The decision is kept for the spawn the call makes

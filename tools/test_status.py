@@ -596,8 +596,10 @@ class Release(unittest.TestCase):
         self.assertEqual(release.changelog_top(), release.version())                      # the repository's own state
 
     def test_problems_name_each_gap(self):
-        self.assertEqual(release.problems('0.12.0', '0.12.0', '', ['v0.11.0']), [])
-        probs = release.problems('0.12.0', '0.11.0', 'M a.py', ['v0.12.0'])
+        self.assertEqual(release.problems('0.12.0', '0.12.0', '', ['v0.11.0'], '0.12.0'), [])
+        self.assertIn('WIDGET_VERSION', release.problems('0.12.0', '0.12.0', '', ['v0.11.0'], '0.11.0')[0])
+        self.assertEqual(release.loaded_version(), release.version())                       # the repository's own state
+        probs = release.problems('0.12.0', '0.11.0', 'M a.py', ['v0.12.0'], '0.12.0')
         self.assertEqual(len(probs), 3)
         self.assertIn('newest CHANGELOG.md entry is 0.11.0', probs[0])
         self.assertIn('1 uncommitted change', probs[1])

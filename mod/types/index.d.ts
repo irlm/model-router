@@ -21,6 +21,8 @@ export type StatusJson = {
   families: Family[]
   agents: { files: number; unused: number; routed: RoutedAgent[] }
   catalog: { verified_oldest: string | null; age_days: number | null }
+  /** the checkout's widget version (mod/.claude-plugin/plugin.json) and whether tag v<version> exists */
+  widget?: { version: string | null; tagged: boolean | null }
   ledger: { usage_last: string | null; regress_last: { date: string | null; claude: string | null } | null }
   timer: { kind: string; installed?: boolean; next?: string; note?: string }
   advice: string[]

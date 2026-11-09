@@ -538,6 +538,28 @@ test('an Agent call re-issued within minutes of a routed one, with the same word
   await settled()   // the detached work (log writes, the change record) ends inside the test
 })
 
+test('the pane names the loaded widget version, and warns when the checkout has another', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  let have = '0.9.0'
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify({ ...STATUS, widget: { version: have, tagged: true } }) } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return { result: {} } })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toMatch(/widget \d+\.\d+\.\d+ loaded; the checkout has 0\.9\.0: \/reload-plugins loads it/)
+  have = text.match(/widget (\d+\.\d+\.\d+) loaded/)![1]
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).toMatch(/widget \d+\.\d+\.\d+ loaded$/m)
+  expect(text).not.toContain('/reload-plugins')
+  await settled()
+})
+
 test('the agents block before any agent ran: the full pane names the block in one dim line, the glance shows nothing', { options: { routing: 'auto' } }, async ($, on) => {
   LIVE_MOCKS(on, [], [], null)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })

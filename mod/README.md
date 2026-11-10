@@ -186,6 +186,13 @@ was active when it spawned. Beside the graph, when the pane is 130 columns or wi
 the live panels of the agents at work: their last tool calls as the engine saw them (a command, a file read, a
 search), an error in red, a blinking cursor while the agent runs; when fewer than two run, the last finished
 keep their panel. Then the run's event log (spawned on what by whom, done in how long for how much, failed why).
+Between the graph and the events, `[ Routing ]` says what the routing did to this run: one line per agent, what the
+call asked for → what it ran on (`inherit → haiku low`), the family, the decision and its evidence (`measured 214/216,
+$0.0046/success`, or why it was left alone: no measured family, a family not decided yet, escalated); the main session's
+effort gear within the run; and, once every agent has ended, `run on the decisions: $0.21 · as asked, est: $0.38` — the
+same tokens re-priced at catalog prices, an estimate by construction, since the as-asked run never happened. A long
+run shows the five lines that moved the most (escalations first, then the routed calls by what the routing changed) and
+"N more"; `r` shows every line (`/router monitor top` prints the five, `/router monitor` all).
 `g` switches to the same run as text lines, one line one row, which `/router monitor` also prints; `m` opens the
 main pane. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
 `● IDLE` after, with the turns and cost so far, and a panel of its own lists the main session's last tool calls

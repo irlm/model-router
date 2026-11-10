@@ -18,8 +18,8 @@ const details = atom({ plugin: 'model-router', key: 'details' } as const, false,
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
 const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, stoppedN: 0, events: [], nextN: 1, runs: [], task: null, main: { busy: false, since: 0, lastAt: 0, recent: [] } }
-// live-8: `main`, the main session's own state and tool tail, so the monitor has something to draw before any agent runs
-const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-8' })
+// live-9: an agent carries what its call asked for, the decision and its tokens, for the monitor's Routing frame
+const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-9' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 /** The run monitor's view: the drawn graph, or the same run as text lines. */
@@ -27,6 +27,8 @@ const monitorView = atom({ plugin: 'model-router', key: 'monitorView' } as const
 /** The run the monitor shows: null is the current one (the latest with an agent at work, else the latest). */
 const monitorRun = atom({ plugin: 'model-router', key: 'monitorRun' } as const, null as string | null, { shape: 'monitorRun-1' })
 const monitorHistory = atom({ plugin: 'model-router', key: 'monitorHistory' } as const, false, { shape: 'monitorHistory-1' })
+/** The monitor's Routing frame: every line, or the five that moved the most (the default for a long run). */
+const monitorRouting = atom({ plugin: 'model-router', key: 'monitorRouting' } as const, false, { shape: 'monitorRouting-1' })
 /** The runs saved on this machine, as last listed (tools/runs.py list --json). */
 const savedRuns = atom({ plugin: 'model-router', key: 'savedRuns' } as const, [] as SavedRun[], { shape: 'savedRuns-1' })
 
@@ -108,7 +110,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.22.0'
+const WIDGET_VERSION = '0.23.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -474,7 +476,7 @@ const toolText = (e: Record<string, unknown>): string => {
  * context it was sent; below, the live tail of the agents at work and the run's event log. All of it text, one line one row. */
 const BOX_W = 48
 const weightOf = (ctx: number) => (ctx >= 16000 ? '━' : ctx >= 4000 ? '─' : '┄')
-const monitorLines = (lvAll: Live, now: number, runId: string | null = null): Line[] => {
+const monitorLines = (lvAll: Live, now: number, runId: string | null = null, routingFull = true): Line[] => {
   const lv = scopeOf(lvAll, runId)
   const running = Object.values(lv.agents)
   const { all, kids } = treeOf(lv)
@@ -535,6 +537,8 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null): Li
   // The main session's own tail when there is room for it: always before any agent, beside a lone agent after.
   // The main session's own tail whenever fewer than two agents are at work; finished agents do not take its place.
   if (live.length < 2) tail('● 00 main session / live', mainWord(lv.main, now), lv.main.recent, 'cyan')
+  out.push(BLANK)
+  out.push(...routingLines(lvAll, runId, now, routingFull))
   out.push(BLANK)
   out.push(line('[ Events ]', { bold: true }))
   if (lv.events.length === 0) out.push(line('  none yet', { dim: true }))
@@ -600,6 +604,70 @@ const runLine = (lv: Live, id: string | null): string => {
   const i = lv.runs.findIndex(r => r.id === m.id) + 1
   return `run ${i}/${lv.runs.length} this session · ${m.name ? `task "${m.name}"` : `"${m.prompt.slice(0, 50)}${m.prompt.length > 50 ? '…' : ''}"`} · ${m.agentN} agent${m.agentN === 1 ? '' : 's'} · ${money(m.cost)} · ${m.endedAt ? `ended ${clock(m.endedAt)}` : 'running'}${m.saved ? ' · saved' : ''}`
 }
+/** The families of the last status read: the evidence behind a routed call (rate, $/success) in the Routing frame. */
+let familiesNow: StatusJson['families'] = []
+/** What the agent's tokens would have cost on the model and effort the call asked for, at catalog prices: the same tokens
+ * re-priced (effort moves the output part by the cell8 ratio). An estimate, since the as-asked run never happened. */
+const costAsAsked = (a: RunningAgent): number | null => {
+  if (!a.usage || !a.askedModel) return null
+  const base = turnCost({ ...a.usage, model: a.askedModel })
+  const from = EFFORT_RATIO[a.askedEffort] ?? EFFORT_RATIO[a.effort] ?? 1, to = EFFORT_RATIO[a.effort] ?? 1
+  return base + ((a.usage.output_tokens * priceOf(a.askedModel).out) / 1e6) * (from / to - 1)
+}
+/** The Routing frame of the monitor: one line per agent of the run, what the call asked for → what it ran on, the family,
+ * the decision and its evidence; the main session's effort gear within the run; the run's cost against the as-asked estimate. */
+const ROUTING_TOP = 5
+const routingLines = (lvAll: Live, runId: string | null, now: number, full = true): Line[] => {
+  const lv = scopeOf(lvAll, runId)
+  const { all } = treeOf(lv)
+  const out: Line[] = [line('[ Routing ]', { bold: true, color: 'cyan' })]
+  const m = runOf(lvAll, runId ?? latestRunId(lvAll))
+  const i0 = m ? lvAll.runs.findIndex(r => r.id === m.id) : -1
+  const from = m?.startedAt ?? 0, until = (i0 >= 0 ? lvAll.runs[i0 + 1]?.startedAt : undefined) ?? now + 1
+  // the main session's own turns within the run, when the effort gear moved
+  const gears = lvAll.turns.map((t, i) => ({ t, i })).filter(({ t }) => t.at >= from && t.at < until && t.gear !== 'same')
+  if (all.length === 0 && gears.length === 0) {
+    out.push(line('  no Agent call in this run yet: each one shows here as asked → ran on, with the decision and its evidence', { dim: true }))
+    return out
+  }
+  let actual = 0, asked = 0, estimable = true, moved = 0
+  // Each agent's line with its weight: an escalation first, then the routed calls by what the routing moved, then the rest.
+  const rows: { l: Line; cls: number; delta: number; n: number }[] = []
+  for (const a of all) {
+    const ran = `${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''}`.trim()
+    const routed = a.decision === 'auto' || a.decision === 'routed'
+    const fam = familiesNow.find(f => f.name === a.family)
+    const why = a.decision === 'escalated' ? (lvAll.escalated[a.family ?? ''] ?? 'a routed call failed or was re-issued') + ': runs as asked for the rest of the session'
+      : routed ? (fam ? `measured ${fam.rate}, $${fam.cost_per_success.toFixed(4)}/success` : 'measured')
+      : a.decision === 'kept' ? 'kept as asked'
+      : !a.family ? 'no measured family covers it'
+      : fam ? 'already on the routed model' : 'family not decided yet: runs as asked'
+    const arrow = routed ? `${a.asked} → ${ran}` : a.asked === 'inherit' ? `inherit (${ran})` : a.asked
+    const est = a.cost !== null ? (routed ? costAsAsked(a) : a.cost) : null
+    rows.push({ l: line(`  ${String(a.n).padStart(2, '0')} ${a.type.padEnd(18).slice(0, 18)} ${arrow.padEnd(28)} ${(a.family ?? 'unmeasured').padEnd(19)} ${(a.decision ?? 'kept').padEnd(10)} ${why}`, { color: routed ? 'cyan' : a.decision === 'escalated' ? 'yellow' : undefined, dim: !routed && a.decision !== 'escalated' }),
+      cls: a.decision === 'escalated' ? 3 : routed ? 2 : a.decision === 'kept' ? 1 : 0, delta: est !== null && a.cost !== null ? est - a.cost : routed ? Infinity : 0, n: a.n })
+    if (a.cost !== null) { actual += a.cost; if (est === null) estimable = false; else asked += est }
+    if (routed) moved++
+  }
+  if (full || rows.length <= ROUTING_TOP) out.push(...rows.map(r => r.l))
+  else {
+    const top = [...rows].sort((x, y) => y.cls - x.cls || y.delta - x.delta || x.n - y.n).slice(0, ROUTING_TOP)
+    out.push(...top.map(r => r.l))
+    out.push(line(`  ${rows.length - ROUTING_TOP} more: the ${ROUTING_TOP} above moved the most (escalations first, then by what the routing changed); r shows every line`, { dim: true }))
+  }
+  for (const { t, i } of gears) {
+    const low = familiesNow.find(f => f.name === t.family)?.effort ?? 'the measured effort'
+    out.push(line(t.gear === 'down'
+      ? `  main session       effort ${t.sessionEffort || '?'} → ${t.effort} on turn ${i + 1}${t.family ? ` (${t.family}, measured there)` : ''}`
+      : `  main session       effort ${t.sessionEffort || '?'} → ${low}${t.family ? ` (${t.family})` : ''}, then back to ${t.effort} after 3 tool errors on turn ${i + 1}`, { color: 'cyan' }))
+  }
+  const ended = all.filter(a => a.done !== null && a.cost !== null).length
+  if (moved > 0 && ended > 0) {
+    const sofar = ended < all.length ? ` so far (${ended} of ${all.length} agents ended)` : ''
+    out.push(line(`  run on the decisions: ${money(actual)}${sofar} · as asked, est: ${estimable ? money(asked) : 'unknown'} (the same tokens at catalog prices; the as-asked run never happened)`, { dim: true }))
+  }
+  return out
+}
 /** The run as a markdown report: what was asked, the agents with what they ran on and what they cost, their answers, the events. */
 const runReport = (lvAll: Live, id: string, now: number): string => {
   const m = runOf(lvAll, id)
@@ -611,6 +679,7 @@ const runReport = (lvAll: Live, id: string, now: number): string => {
   if (m) out.push(`started ${d(m.startedAt)}${m.endedAt ? `, ended ${d(m.endedAt)}` : ', still running'} · ${m.agentN} agent${m.agentN === 1 ? '' : 's'} · ${money(m.cost)}${m.failedN ? ` · ${m.failedN} failed` : ''}${m.stoppedN ? ` · ${m.stoppedN} stopped` : ''}`, '')
   if (m?.prompt && !m.name) out.push('## Asked', '', m.prompt, '')
   out.push('## Graph', '', '```text', ...monitorLines(lvAll, now, id).map(l => l.text), '```', '')
+  out.push('## Routing', '', '```text', ...routingLines(lvAll, id, now).slice(1).map(l => l.text), '```', '')
   out.push('## Agents', '', '| # | agent | model effort | family | steps | elapsed | cost | outcome | task |', '|---|---|---|---|---|---|---|---|---|')
   for (const a of agents) out.push(`| ${String(a.n).padStart(2, '0')}${a.run > 1 ? ` · run ${a.run}` : ''} | ${a.type} | ${`${shortModel(a.model)} ${a.effort}`.trim()} | ${a.family ?? 'unmeasured'} | ${a.steps} | ${secs((a.done ?? now) - a.startedAt)} | ${a.cost !== null ? money(a.cost) : '-'} | ${a.done === null ? 'running' : endWord(a).toLowerCase()} | ${a.description.replace(/\|/g, '/')} |`)
   out.push('', '## Answers', '')
@@ -839,6 +908,7 @@ async function refresh($: Dollar, fetch = false) {
     const r = await $.process.run(argv, { cwd: repo, env: pyEnv(), timeoutMs: 180000 })
     if (r.exitCode !== 0) throw new Error(`status.py exit ${r.exitCode}: ${r.stderr.trim().split('\n').pop() ?? ''}`)
     const json = JSON.parse(r.stdout) as StatusJson
+    familiesNow = json.families ?? []
     const rateLimits = await readLimits($)
     await update($, status, () => ({ at, json, error: null, rateLimits, where }))
     const ctx = await contextTokens($)
@@ -1190,7 +1260,7 @@ export const register: Register = (on, options) => {
         if (!a) return v
         const u = e.usage
         const stopped = e.reason === 'aborted' || e.isAborted
-        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, failed: e.reason === 'error' || e.reason === 'refusal', stopped, model: u?.model ?? a.model, answer: (e.answer ?? '').slice(0, 2000) }
+        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, usage: u ? { input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_input_tokens: u.cache_read_input_tokens, cache_creation_input_tokens: u.cache_creation_input_tokens } : null, failed: e.reason === 'error' || e.reason === 'refusal', stopped, model: u?.model ?? a.model, answer: (e.answer ?? '').slice(0, 2000) }
         const { [id]: _gone, ...rest } = v.agents
         const nn = String(a.n).padStart(2, '0')
         const ev: RunEvent = done.stopped
@@ -1229,7 +1299,7 @@ export const register: Register = (on, options) => {
       if (arg === 'save') return { text: await saveReport($, tail.split(/\s+/)[1] ?? null) }
       const opened = await $.ui.open({ id: MONITOR, title: 'Agent run' })
       const lv = await read($, live)
-      const text = monitorLines(lv, await $.clock.now(), await read($, monitorRun)).map(l => l.text).join('\n')
+      const text = monitorLines(lv, await $.clock.now(), await read($, monitorRun), arg !== 'top').map(l => l.text).join('\n')   // `monitor top`: the five routing lines that moved the most
       return { text: (opened.isPlaced ? 'Agent run pane opened.' : `The pane waits for room: ${opened.reason}`) + '\n' + text + (lv.runs.length > 1 ? `\n(${lv.runs.length} runs this session: h in the pane lists them; /router runs lists the saved ones)` : '') }
     }
     // A named task: every agent from now joins one run, until it is ended; the run is saved then.
@@ -1377,9 +1447,13 @@ export const register: Register = (on, options) => {
     if (key !== undefined) pendingRoutes.delete(key)
     const r = await next(want ? { ...e, model: want.model as 'haiku' | 'sonnet' | 'opus' | 'fable', ...(want.family === 'repo_fix' ? { prompt: e.prompt + RUNNER_NOTE } : {}) } : e)
     if (r.agentId) {
+      // The decision the Agent call got (the routed log's row for it, minutes old at most): what was asked, what was decided.
+      const rt = [...(await read($, routed))].reverse().find(x => x.agent === e.subagentType && x.description === e.description && now - x.at < PENDING_MS)
+      const askedEffort = (e as { effort?: string }).effort ?? ''
       const a: RunningAgent = { id: r.agentId, parent: e.parentAgentId ?? null, type: e.subagentType, description: e.description, model: r.model, effort: want?.effort ?? '', wantEffort: want?.effort ?? null,
         family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false, stopped: false,
-        ctx: Math.round(e.prompt.length / 4), n: 0, run: 1, recent: [], runId: '', answer: '' }
+        ctx: Math.round(e.prompt.length / 4), n: 0, run: 1, recent: [], runId: '', answer: '',
+        asked: rt?.from ?? (e.model ? `${e.model}${askedEffort ? ' ' + askedEffort : ''}` : 'inherit'), askedModel: e.model ?? e.parentModel ?? '', askedEffort, decision: rt?.decision ?? null, usage: null }
       a.startedAt = a.lastStepAt = now
       await update($, live, v => {
         // The engine resumes an agent under the same id (a hand-back, a follow-up message): that is a new run of the same box, not a new agent.
@@ -1394,7 +1468,8 @@ export const register: Register = (on, options) => {
         const have = v.runs.find(r => r.id === runId)
         const meta: RunMeta = have ? { ...have, endedAt: null, agentN: have.agentN + 1 } : { id: runId, startedAt: now, endedAt: null, prompt: (v.task ?? lastPrompt).slice(0, 120), name: v.task, agentN: 1, cost: 0, failedN: 0, stoppedN: 0, saved: null }
         const ev: RunEvent = { at: now, runId, text: run > 1 ? `${nn} ${a.type} resumed (run ${run}, ~${kilo(a.ctx)} ctx)` : `${nn} ${a.type} spawned on ${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''} (~${kilo(a.ctx)} ctx)${by}` }
-        return { ...v, nextN: prior.length ? v.nextN : n + 1, agents: { ...v.agents, [a.id]: { ...a, n, run, runId } }, events: [...v.events, ev].slice(-400), runs: have ? v.runs.map(r => (r.id === runId ? meta : r)) : [...v.runs, meta] }
+        // an inherited call runs at the session's effort: the last turn's, when one has been reported
+        return { ...v, nextN: prior.length ? v.nextN : n + 1, agents: { ...v.agents, [a.id]: { ...a, n, run, runId, askedEffort: a.askedEffort || v.turns[v.turns.length - 1]?.sessionEffort || '' } }, events: [...v.events, ev].slice(-400), runs: have ? v.runs.map(r => (r.id === runId ? meta : r)) : [...v.runs, meta] }
       })
     }
     return r
@@ -1538,6 +1613,7 @@ export const register: Register = (on, options) => {
     const view = await read($, monitorView)
     const picked = await read($, monitorRun)
     const history = await read($, monitorHistory)
+    const routingFull = await read($, monitorRouting)
     const saved = await read($, savedRuns)
     await read($, tick)
     const now = await $.clock.now()
@@ -1551,6 +1627,7 @@ export const register: Register = (on, options) => {
         <Button key="view" hotkey="g" onPress={() => { void update($, monitorView, v => (v === 'graph' ? 'list' : 'graph')) }}>{view === 'graph' ? 'List' : 'Graph'}</Button>
         <Button key="history" hotkey="h" onPress={() => { void update($, monitorHistory, v => !v); void listSavedRuns($) }}>{history ? 'Back' : `History (${lvAll.runs.length})`}</Button>
         <Button key="save" hotkey="s" onPress={() => { void saveReport($, shownId).then(t => $.ui.toast(`router: ${t}`)) }}>Save report</Button>
+        <Button key="routing" hotkey="r" onPress={() => { void update($, monitorRouting, v => !v) }}>{routingFull ? 'Routing: top 5' : 'Routing: all'}</Button>
         {picked !== null && <Button key="current" hotkey="c" onPress={() => { void update($, monitorRun, () => null) }}>Current run</Button>}
         <Button key="main" hotkey="m" onPress={() => { void $.ui.open({ id: PANE, title: 'Model router' }) }}>Model router</Button>
       </Box>
@@ -1580,7 +1657,7 @@ export const register: Register = (on, options) => {
       const cut = (t: string) => (t.length > width ? t.slice(0, width - 1) + '…' : t)
       return (
         <Box flexDirection="column">
-          {monitorLines(lvAll, now, picked).map(l => (
+          {monitorLines(lvAll, now, picked, routingFull).map(l => (
             <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text === '' ? ' ' : cut(l.text)}</Text>
           ))}
           {footer}
@@ -1631,6 +1708,11 @@ export const register: Register = (on, options) => {
         <Text dimColor>arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ &lt;4k</Text>
       </Box>
     )
+    const routingFrame = (
+      <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
+        {routingLines(lvAll, picked, now, routingFull).map(l => <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text}</Text>)}
+      </Box>
+    )
     const events = (
       <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
         <Text color="cyan" bold>[ Event log ]</Text>
@@ -1668,11 +1750,11 @@ export const register: Register = (on, options) => {
         {header}
         {twoCol ? (
           <Box flexDirection="row" gap={1}>
-            <Box flexDirection="column" flexGrow={1}>{graph}{events}</Box>
+            <Box flexDirection="column" flexGrow={1}>{graph}{routingFrame}{events}</Box>
             {right}
           </Box>
         ) : (
-          <Box flexDirection="column">{graph}{right}{events}</Box>
+          <Box flexDirection="column">{graph}{routingFrame}{right}{events}</Box>
         )}
         {footer}
       </Box>

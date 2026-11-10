@@ -3,6 +3,21 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.23.0 — 2026-11-10
+
+- The monitor has a `[ Routing ]` frame, between the graph and the events: one line per agent of the run with what
+  the Agent call asked for → what it ran on (`inherit → haiku low`), the family, the decision (auto, routed, kept,
+  escalated) and its evidence (`measured 214/216, $0.0046/success`; "family not decided yet"; "no measured family
+  covers it"); the main session's effort gear within the run (down to the measured effort, back up after tool
+  errors); and, once every agent has ended, the run's cost on the decisions against the as-asked figure — the same
+  tokens re-priced at catalog prices and labelled `est`, since the as-asked run never happened. The text view and
+  the saved report (`## Routing`) carry the same lines. A long run shows the five lines that moved the most
+  (escalations first, then by what the routing changed) with "N more"; `r` in the pane, or `/router monitor top` against
+  `/router monitor`, switches between the five and every line. While agents still run the cost line says "so far". An
+  agent now keeps what its call asked for, the decision and its tokens (state shape `live-9`).
+- Tests: the paths the engine hands back on Windows (`D:\home\me\…`) are compared in POSIX form, which is what made the
+  widget's first CI run on the Windows runner fail (two tests).
+
 ## 0.22.0 — 2026-11-09
 
 An audit of the repository, fixed in one pass:

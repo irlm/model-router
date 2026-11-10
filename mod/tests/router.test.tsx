@@ -212,9 +212,9 @@ test('no checkout at the configured path: the clone the plugin install made serv
   mock.clock(on, { now: 1_762_000_000_000 })
   mock.env(on, { HOME: '/home/me' })
   const CLONE = '/home/me/.claude/plugins/marketplaces/model-router'
-  on('fs.exists', (_, e) => ({ value: e.path.startsWith(CLONE) }))
+  on('fs.exists', (_, e) => ({ value: posix(e.path).startsWith(CLONE) }))
   on('fs.read', (_, e) => ({
-    value: e.path === '/home/me/.claude/plugins/known_marketplaces.json' ? JSON.stringify({ 'model-router': { installLocation: CLONE } }) : '{}',
+    value: posix(e.path) === '/home/me/.claude/plugins/known_marketplaces.json' ? JSON.stringify({ 'model-router': { installLocation: CLONE } }) : '{}',
   }))
   const runs: { argv: readonly string[]; cwd?: string }[] = []
   on('process.run', (_, e) => {
@@ -398,6 +398,8 @@ const SPAWN_MOCKS = (on: On, seen: Record<string, unknown>[]) => {
 /** The spawn an Agent call makes, as the engine reports it. */
 const spawnOf = (call: { tool_use_id?: string; prompt: string; description: string; subagent_type?: string }) =>
   ({ tool_use_id: call.tool_use_id ?? 'tu', prompt: call.prompt, description: call.description, subagentType: call.subagent_type ?? 'general-purpose', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1' } as const)
+/** A path as the test wrote it: the engine on Windows resolves it to D:\\home\\me\\... before the mocks see it. */
+const posix = (p: string) => p.replace(/\\/g, '/').replace(/^[A-Za-z]:/, '')
 const spawnSeen = (seen: Record<string, unknown>[]) => seen.filter(x => x.tool === '$spawn').at(-1) as { model?: string } | undefined
 
 const EXPLORE = { tool: 'Agent', tool_use_id: 'tu-explore', description: 'find the parser', prompt: 'Find where the config file is parsed and report the function.', subagent_type: 'Explore' } as const
@@ -774,7 +776,7 @@ test('runs: the agents a prompt spawned are one run, saved when its last agent e
   expect(writes.length).toBe(0)                                                    // one agent still runs: not saved yet
   await $.turn.complete({ answer: 'RFC 8446', durationMs: 1000, isAborted: false, turnId: 'tr2', reason: 'answer', agentId: 'r2' })
   expect(writes.length).toBe(1)
-  expect(writes[0].path).toMatch(/^\/home\/me\/\.claude\/model-router\/runs\/\d{4}-\d\d-\d\d\/\d{6}-find-where-the-parser-loads-the-schema\.json$/)
+  expect(posix(writes[0].path)).toMatch(/^\/home\/me\/\.claude\/model-router\/runs\/\d{4}-\d\d-\d\d\/\d{6}-find-where-the-parser-loads-the-schema\.json$/)
   const saved = JSON.parse(writes[0].text) as { source: string; meta: { id: string; agentN: number; endedAt: number | null }; agents: { answer: string }[] }
   expect(saved.source).toBe('live')
   expect(saved.meta.id).toBe('turn:t1')
@@ -865,3 +867,54 @@ test('the agents block: a spawned agent is one row with its model, family and st
   await settled()
 })
 
+
+test("the monitor's Routing frame: each agent as asked -> ran on with the decision and its evidence, and the run's cost against the as-asked estimate", { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  ROUTING_MOCKS(on, seen, 'deny')
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  const writes: { path: string; text: string }[] = []
+  on('fs.write', (_, e) => { writes.push(e as { path: string; text: string }); return { value: undefined } })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'find where the parser loads the schema, and compare the queues', turnId: 'rq1' })
+  await $.tool.call(EXPLORE)
+  const sp = await $.agent.spawn(spawnOf(EXPLORE))                                      // routed: inherit -> haiku low
+  const NOTE = { tool: 'Agent', tool_use_id: 'tu-note', description: 'compare options', prompt: 'Research and compare three message queues; write up a report.', subagent_type: 'general-purpose' } as const
+  await $.tool.call(NOTE)
+  const sp2 = await $.agent.spawn(spawnOf(NOTE))                                        // a family not decided in this status: runs as asked
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
+  expect(text).toContain('[ Routing ]')
+  expect(text).toMatch(/01 Explore\s+inherit → haiku low\s+find_feature\s+auto\s+measured 214\/216, \$0\.0046\/success/)
+  expect(text).toMatch(/02 general-purpose\s+inherit \(fable\)\s+research_synthesis\s+kept\s+family not decided yet: runs as asked/)
+  expect(text).not.toContain('run on the decisions')                                   // still running: no cost yet
+  const usage = { input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 10000, cache_creation_input_tokens: 0 }
+  await $.turn.complete({ answer: 'the parser', durationMs: 1000, isAborted: false, turnId: 'ta', reason: 'answer', agentId: sp.agentId, usage: { model: 'claude-haiku-5-5', ...usage } })
+  await $.turn.complete({ answer: 'a report', durationMs: 1000, isAborted: false, turnId: 'tb', reason: 'answer', agentId: sp2.agentId, usage: { model: 'claude-fable-5-1', ...usage } })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  // haiku: $0.0012 for these tokens; the same tokens on fable, as asked: $0.1125; the note on fable: $0.1125
+  expect(text).toMatch(/run on the decisions: \$0\.11 · as asked, est: \$0\.2[23] \(the same tokens at catalog prices/)
+  const ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^\[ Routing \]$/ }))?.text).toBe('[ Routing ]')
+  expect((await ui.find({ type: 'Text', text: /inherit → haiku low/ }))?.text).toContain('find_feature')
+  await ui.unmount()
+  // the report carries the same frame
+  await $.command.run({ ...RUN, command: 'router', args: 'monitor save' })
+  expect(writes.some(w => w.text.includes('## Routing') && w.text.includes('inherit → haiku low'))).toBe(true)
+  // a long run: `monitor top` (r in the pane) keeps the five lines that moved the most, the routed one first; `monitor` lists all
+  for (let i = 3; i <= 8; i++) {
+    const call = { tool: 'Agent', tool_use_id: `tu-plain-${i}`, description: `chore ${i}`, prompt: `Tidy the changelog entry number ${i}.`, subagent_type: 'general-purpose' } as const
+    await $.tool.call(call)
+    await $.agent.spawn(spawnOf(call))
+  }
+  const routing = (t: string) => t.slice(t.indexOf('[ Routing ]'), t.indexOf('[ Events ]'))
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor top' }))
+  expect(routing(text)).toContain('3 more: the 5 above moved the most')
+  expect(routing(text).indexOf('01 Explore')).toBeLessThan(routing(text).indexOf('02 general-purpose'))
+  expect(routing(text)).not.toContain('08 general-purpose')
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(routing(text)).toContain('08 general-purpose')
+  expect(routing(text)).not.toContain('more: the 5 above')
+  await settled()
+})

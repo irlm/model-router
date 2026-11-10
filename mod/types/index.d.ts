@@ -187,6 +187,14 @@ export type RunningAgent = {
   recent: Recent[]
   /** the run (task) this agent belongs to: turn:<id> for the prompt that spawned it, task:<slug> under a named task */
   runId: string
+  /** what the Agent call asked for ("inherit", "opus high", as the routed log says it), the model and effort behind it: the Routing frame and its as-asked estimate */
+  asked: string
+  askedModel: string
+  askedEffort: string
+  /** the router's decision on the call; null when nothing measured covered it */
+  decision: 'auto' | 'routed' | 'kept' | 'escalated' | null
+  /** its tokens when the run ended, so the as-asked cost can be estimated at catalog prices */
+  usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number } | null
   /** its final answer, the first 2000 characters, kept for the run's report */
   answer: string
 }
@@ -225,6 +233,6 @@ export type Job = { name: string; lines: string[]; isRunning: boolean; exitCode:
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live>; tick: Shaped<number>; monitorView: Shaped<'graph' | 'list'>; monitorRun: Shaped<string | null>; monitorHistory: Shaped<boolean>; savedRuns: Shaped<SavedRun[]> }
+    'model-router': { status: Shaped<Status | null>; job: Shaped<Job | null>; routed: Shaped<Routed[]>; details: Shaped<boolean>; switches: Shaped<Switch[]>; live: Shaped<Live>; tick: Shaped<number>; monitorView: Shaped<'graph' | 'list'>; monitorRun: Shaped<string | null>; monitorHistory: Shaped<boolean>; monitorRouting: Shaped<boolean>; savedRuns: Shaped<SavedRun[]> }
   }
 }

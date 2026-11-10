@@ -141,7 +141,9 @@ an error in red; then the run's event log. A sketch:
  List (g)  History (3) (h)  Save report (s)  Model router (m)
 ```
 
-Before any agent has run, the main session is drawn alone: its box says `● WORKING` while a turn runs
+A `[ Routing ]` frame under the graph says what the routing did to the run: per agent, what the call asked for →
+what it ran on, the family, the decision and its evidence, and at the end the run's cost on the decisions against
+the as-asked figure, labelled `est` (the same tokens re-priced; that run never happened). Before any agent has run, the main session is drawn alone: its box says `● WORKING` while a turn runs
 and `● IDLE` after, with the turns and cost so far, and its own live panel lists the main session's tool
 calls; agents hang under it as they spawn. An agent the engine resumes under the same id (a hand-back, a
 follow-up) is a new run of the same box, "02 Web Researcher · run 2"; a child hangs under the run active

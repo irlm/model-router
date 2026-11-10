@@ -3,6 +3,30 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.22.0 — 2026-11-09
+
+An audit of the repository, fixed in one pass:
+
+- The classifier is one rule in two places, kept identical by a test: the widget's `matchFamily` and the ledger's
+  `classify` now check in the same order (browser, lookup, research, fix) and a prompt that asks for a code change
+  (`fix`, `bug`, `implement`, …) is never a research note, in both; the ledger no longer counts a `Plan` agent as
+  code-explore work, since the widget does not route it (what is counted and what is acted on agree again).
+- Every tool resolves `<CLAUDE_CONFIG_DIR or ~/.claude>` through `tools/claude_home.py`; `tools/usage_scan.py`,
+  which the ledger runs, read `~/.claude/projects` whatever `CLAUDE_CONFIG_DIR` said.
+- Transcripts last written before the window began are skipped unread (the 30-day figures cannot be in them), so a
+  years-old `~/.claude/projects` is not parsed on every refresh; the files that are read are closed (the
+  ResourceWarning in the tests, and a handle that blocks a move or delete on Windows).
+- What could not be read is said: Details lists `not read: rate limits (…)`, `context size`, `marketplace file`,
+  `saved runs` with the reason, instead of a pane that shows no limits and looks healthy.
+- The second tick also runs while the main session's own turn runs, so its elapsed time and cursor in the monitor
+  move between tool calls. A Python that failed is probed again at the next refresh instead of being kept for the
+  session. `known_marketplaces.json` with a byte-order mark parses. A report asked before `session.start` named
+  the folder no longer targets `/docs/runs`. The command's argument hint lists every verb.
+- Tests: the overrides and the routed log under a Windows working directory (`C:\Users\me\proj` → `C--Users-me-proj`);
+  the keyword lists of the widget and the ledger compared; the widget's tests run on Windows and macOS in CI, not
+  only Ubuntu. `GAPS.md` rewritten as the list of what is still open; what the 2026-10-31 plan asked for and has been
+  done is summarised under it.
+
 ## 0.21.2 — 2026-11-09
 
 - The main session's panel in the monitor shows whenever fewer than two agents are *at work*. 0.21.0 counted the

@@ -291,6 +291,33 @@ test('an override for this project routes before the family default, and prefer 
   expect((await $.command.run({ ...RUN, command: 'router', args: 'prefer nope' })).text).toContain('prefer needs')
 })
 
+test('a Windows working directory keys its overrides and its routed log the way Claude Code names the transcript folder', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const argvs: string[] = []
+  // C:\Users\me\proj -> C--Users-me-proj: every character that is not a letter or a digit is a dash
+  const withOverride = { ...STATUS, overrides: { 'C--Users-me-proj': { 'code-explore': { model: 'opus', effort: 'low', since: '2026-11-03T10:00Z' } } } }
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { USERPROFILE: 'C:\\Users\\me', OS: 'Windows_NT' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => {
+    argvs.push(e.argv.join(' '))
+    return { value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: e.argv[1] === 'tools/status.py' ? JSON.stringify(withOverride) : '{}' } }
+  })
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return { result: {} } })
+  SPAWN_MOCKS(on, seen)
+  await $.session.start({ cwd: 'C:\\Users\\me\\proj', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBe('opus')                                                       // the project's override found under its Windows key
+  expect(argvs.some(a => a.includes('tools/routed_log.py add find_feature Explore inherit opus low auto --project=C--Users-me-proj'))).toBe(true)
+  expect(argvs.some(a => a.startsWith('python3 tools/status.py') || a.startsWith('python tools/status.py'))).toBe(true)   // the first Python 3 found serves
+})
+
 const PAST = [
   'Find where the config parser loads the yaml schema and reports validation errors with line numbers',
   'The include directive in the parser should resolve relative paths from the document root, not the cwd',

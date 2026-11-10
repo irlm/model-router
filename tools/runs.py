@@ -20,8 +20,10 @@ import re
 import sys
 from pathlib import Path
 
+import claude_home  # the one resolver of <CLAUDE_CONFIG_DIR or ~/.claude>
+
 HERE = Path(__file__).resolve().parent
-RUNS = Path(os.environ.get('CLAUDE_CONFIG_DIR') or (Path.home() / '.claude')) / 'model-router' / 'runs'
+RUNS = claude_home.config_dir() / 'model-router' / 'runs'
 GAP_MIN = 15   # Agent calls of one session this far apart begin a new run, when rebuilt from transcripts
 
 

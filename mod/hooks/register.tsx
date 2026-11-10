@@ -108,7 +108,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.21.2'
+const WIDGET_VERSION = '0.22.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -753,12 +753,18 @@ async function seedVocab($: Dollar) {
     // no transcript to seed from: the vocabulary grows from here
   }
 }
+/** What could not be read from the host or the disk, by source, with the reason: Details lists it, so a pane with
+ * no limits or no context says why instead of looking healthy. A source that reads again drops out. */
+const unavailable = new Map<string, string>()
+const unread = (what: string, err: unknown) => { unavailable.set(what, failureText(err).slice(0, 120)) }
 /** The live context size in tokens, or null when the host does not say. */
 async function contextTokens($: Dollar) {
   try {
     const u = await $.session.usage()
+    unavailable.delete('context size')
     return { tokens: u.context.tokens ?? null, window: u.context.window }
-  } catch {
+  } catch (err) {
+    unread('context size', err)
     return null
   }
 }
@@ -776,14 +782,17 @@ async function resolveRepo($: Dollar) {
   if (await $.fs.exists(`${repo}/routing.json`)) return
   const configDir = (await $.env.get('CLAUDE_CONFIG_DIR')) || `${home}/.claude`
   try {
-    const known = JSON.parse(await $.fs.read(`${configDir}/plugins/known_marketplaces.json`)) as Record<string, { installLocation?: string }>
+    // a byte-order mark (a file written by a Windows editor) is not JSON: stripped before parsing
+    const known = JSON.parse((await $.fs.read(`${configDir}/plugins/known_marketplaces.json`)).replace(/^﻿/, '')) as Record<string, { installLocation?: string }>
     const clone = known['model-router']?.installLocation
     if (clone && (await $.fs.exists(`${clone}/routing.json`))) {
       repo = clone
       where = 'marketplace clone'
     }
-  } catch {
-    // no marketplace file, or not readable: the configured path stands, and refresh says it is missing
+    unavailable.delete('marketplace file')
+  } catch (err) {
+    // no marketplace file, or not readable: the configured path stands, refresh says it is missing, Details says why
+    unread('marketplace file', err)
   }
 }
 
@@ -810,8 +819,10 @@ async function findPython($: Dollar) {
 async function readLimits($: Dollar): Promise<RateLimit[]> {
   try {
     const u = await $.session.usage()
+    unavailable.delete('rate limits')
     return u.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
-  } catch {
+  } catch (err) {
+    unread('rate limits', err)
     return []
   }
 }
@@ -834,6 +845,7 @@ async function refresh($: Dollar, fetch = false) {
     $.ui.status(statusMode === 'off' ? undefined : statusLine(json, rateLimits, (await read($, routed)).length, statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
+    python = ''   // probed again next time: a Python installed or removed since (the Store stub on Windows) is seen then
     const rateLimits = await readLimits($)
     await update($, status, () => ({ at, json: null, error, rateLimits, where }))
     $.ui.status(statusMode === 'off' ? undefined : error)
@@ -905,6 +917,7 @@ async function saveReport($: Dollar, id: string | null): Promise<string> {
   const lv = await read($, live)
   const pick = id ?? latestRunId(lv)
   if (!pick) return 'no run to report yet'
+  if (!sessionCwd) return 'no session folder yet: the report goes into the project, which session.start names'   // never /docs/runs at the root
   const now = await $.clock.now()
   const m = runOf(lv, pick)
   if (m) {
@@ -927,9 +940,11 @@ async function listSavedRuns($: Dollar): Promise<SavedRun[]> {
     const py = await findPython($)
     const r = await $.process.run([py, 'tools/runs.py', 'list', '--json'], { cwd: repo, env: pyEnv(), timeoutMs: 60000 })
     const rows = r.exitCode === 0 ? (JSON.parse(r.stdout || '[]') as SavedRun[]) : []
+    if (r.exitCode !== 0) unread('saved runs', r.stderr.trim().split('\n').pop() ?? `exit ${r.exitCode}`); else unavailable.delete('saved runs')
     await update($, savedRuns, () => rows)
     return rows
-  } catch {
+  } catch (err) {
+    unread('saved runs', err)
     return []
   }
 }
@@ -1013,12 +1028,15 @@ const matchFamily = (agent: string, prompt: string): Match | null => {
   if (EXPLORE_TYPES.has(agent)) return { family: 'find_feature', why: `${agent}: read-only code search` }
   if (agent === 'Web Researcher') return { family: 'web_research', why: 'the lookup agent' }
   if (agent === 'Evidence Collector') return { family: 'browser_flow', why: 'the browser agent' }
-  if (p.length < 900 && LOOKUP.some(k => p.includes(k))) return { family: 'web_research', why: 'a short fact lookup' }
-  // A prompt that runs a test command is not a research note, whatever else it says ("run pytest and report the failures").
-  const runs = RUNNER.some(k => p.includes(k))
-  if (!runs && SYNTHESIS.some(k => p.includes(k))) return { family: 'research_synthesis', why: 'a research note' }   // acts only once the family is decided
+  // The same order as tools/consumption.py's classify, so what the ledger counts and what is routed agree.
   if (BROWSER.filter(k => p.includes(k)).length >= 2) return { family: 'browser_flow', why: 'a browser flow' }
-  if (runs && CODE.some(k => p.includes(k))) return { family: 'repo_fix', why: 'a fix with the test runner in the loop' }
+  if (p.length < 900 && LOOKUP.some(k => p.includes(k))) return { family: 'web_research', why: 'a short fact lookup' }
+  // A prompt that runs a test command, or asks for a code change, is not a research note, whatever else it says
+  // ("run pytest and report the failures", "compare the two parsers and fix the bug").
+  const runs = RUNNER.some(k => p.includes(k))
+  const code = CODE.some(k => p.includes(k))
+  if (!runs && !code && SYNTHESIS.some(k => p.includes(k))) return { family: 'research_synthesis', why: 'a research note' }   // acts only once the family is decided
+  if (runs && code) return { family: 'repo_fix', why: 'a fix with the test runner in the loop' }
   return null
 }
 
@@ -1084,11 +1102,13 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'router',
       description: 'Model router: the session live, where the routing stands, first-run setup, installation check, re-check it, ledger, apply, prune, pinned agent sources, pull',
-      argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import|show <id>] | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file]|list | pull | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>',
+      argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import [--days N] [--rebuild]|show <id>] | setup | doctor | check | fetch | update | ledger | apply | pull | prune [move|revert] | agents pin <url>|check|update [file]|list | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class> | dismiss <n|id> | undismiss <id>',
     })
     void refresh($)
+    // The second tick while any agent runs, or while the main session's own turn runs: its elapsed time and cursor move too.
     $.clock.every(1000, async () => {
-      if (Object.keys((await read($, live)).agents).length > 0) await update($, tick, n => n + 1)
+      const lv = await read($, live)
+      if (Object.keys(lv.agents).length > 0 || lv.main.busy) await update($, tick, n => n + 1)
     })
     if (refreshMinutes > 0) {
       $.clock.every(Math.max(1, refreshMinutes) * 60000, () => {
@@ -1741,6 +1761,7 @@ export const register: Register = (on, options) => {
           <Text dimColor>{liveAll[0]?.text.replace(/^this session · /, '') ?? ''}</Text>
         </Box>
         {ver ? <Text color={ver.color} dimColor={ver.dim}>{ver.text}</Text> : null}
+        {full && [...unavailable].map(([what, why]) => <Text key={what} color="yellow" dimColor>{`not read: ${what} (${why})`}</Text>)}
         {quick.map(row)}
       </Box>
     )

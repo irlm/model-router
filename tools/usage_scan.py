@@ -15,8 +15,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'catalog'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'bench/common'))
 import price
 import local
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import claude_home  # noqa: E402
 CAT = price.catalog(Path(__file__).resolve().parents[1] / 'catalog/models.json')
-ROOT = Path.home() / '.claude/projects'
+ROOT = claude_home.projects_dir()   # CLAUDE_CONFIG_DIR moves it, as everywhere else
 BENCH = local.skip_projects()   # benchmark sessions on this machine (local/config.json), not the user's own work
 agent_calls = collections.Counter(); agent_by_proj = collections.Counter(); agent_by_month = collections.Counter()
 tok = collections.defaultdict(lambda: collections.Counter()); cost = collections.Counter(); msgs = collections.Counter()

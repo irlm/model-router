@@ -65,7 +65,8 @@ call once more"; the Agent call here stays as the model wrote it, so auto mode's
 - `off`: nothing.
 
 Nothing unmeasured is touched: a research report, a design, a review, a plan keep their model
-(no blind downgrade). A call to an agent whose file already carries the routed model and effort is
+(no blind downgrade). A prompt that names a test runner or asks for a code change is never read as a
+research note, however it is worded ("run pytest and report", "compare the parsers and fix the bug"). A call to an agent whose file already carries the routed model and effort is
 left alone. For a fix with a runner the prompt gets one line asking the agent to run the test
 command before finishing, since the 72/72 was measured with the runner in the loop. The pane and
 `/router check` list the calls routed this session with their decision; `/router routing

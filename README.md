@@ -104,7 +104,9 @@ routed this session 2
   model and effort, the measured family the prompt read as, the task, requests so far, elapsed; a child
   under the agent that spawned it; a row a minute without a request turns yellow; a finished agent shows
   its cost and folds into the `done` count, failed and stopped counted apart.
-- *Limits* are the rate-limit windows as bars. *To check* are things to do, not failures. *Suggestions*
+- *Limits* are the rate-limit windows as bars. *To check* are things to do, not failures. What the widget
+  could not read (the limits, the context size, the marketplace file, the saved runs) is listed under Details
+  as `not read: … (reason)` rather than left blank. *Suggestions*
   say where the same work could consume less, each with its estimate and its kind of evidence:
   `measured`, `extrapolated` or `unmeasured`, with the cell its number comes from.
 
@@ -162,7 +164,9 @@ acts by the "Route Agent calls" option: `ask` (the default) puts the question in
 evidence (`haiku low (measured 214/216, $0.005/success)`), `auto` routes and toasts, `off` does nothing.
 The decision is applied on the subagent itself (the model at the spawn, the effort on each of its
 requests), never by rewriting the Agent tool's input, so auto mode's own review of the call stands.
-Nothing unmeasured is touched: a research report, a design, a review, a plan keep their model. A routed
+Nothing unmeasured is touched: a research report, a design, a review, a plan keep their model; a prompt
+that names a test runner or asks for a code change is never read as a research note, however it is worded.
+The same keyword rule classifies the ledger, and a test keeps the two copies identical. A routed
 call that fails, or that the main model re-issues within ten minutes, escalates its family for the rest
 of the session. `/router effort advise|auto|off` extends the same rule to the main session's own
 requests: a prompt that reads as a measured family runs at that family's measured effort, back up after
@@ -263,7 +267,7 @@ the local transcripts, where every ratio is a named constant with the cell it ca
 lists that classify a prompt are the same for the router and the ledger, so what is counted and what
 is acted on agree. `claude plugin validate mod` and `claude plugin test mod` check the mod,
 `python3 tools/test_status.py` the data side (classifier, suggestions, per-change savings),
-`python3 bench/common/test_harness.py` the runners.
+`python3 bench/common/test_harness.py` the runners. CI runs the Python tests and the widget's tests on Ubuntu, macOS and Windows.
 
 - **Receipts hold tokens, not dollars.** A price change is a catalog edit plus `report.py`; nothing
   is re-run. `report.py --prices other.json` prices everything under a what-if catalog.

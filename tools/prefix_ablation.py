@@ -18,9 +18,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+import claude_home  # the one resolver of <CLAUDE_CONFIG_DIR or ~/.claude>
+
 HERE = Path(__file__).resolve().parents[1]
 CLAUDE = shutil.which('claude') or 'claude'
-AGENTS = Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude') / 'agents'
+AGENTS = claude_home.config_dir() / 'agents'
 
 
 def call(extra, cwd):

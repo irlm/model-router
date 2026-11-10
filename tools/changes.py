@@ -12,7 +12,9 @@ import os
 import sys
 from pathlib import Path
 
-LOG = Path(os.environ.get('CLAUDE_CONFIG_DIR') or (Path.home() / '.claude')) / 'model-router' / 'changes.jsonl'
+import claude_home  # the one resolver of <CLAUDE_CONFIG_DIR or ~/.claude>
+
+LOG = claude_home.config_dir() / 'model-router' / 'changes.jsonl'
 
 
 def read():

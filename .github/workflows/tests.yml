@@ -27,7 +27,12 @@ jobs:
   mod:
     # The widget itself: `claude plugin validate` reads the manifest and hooks the way the engine will; `claude plugin test`
     # runs mod/tests in the engine's own harness. Needs the Claude Code CLI; neither command signs in.
-    runs-on: ubuntu-latest
+    # On the three systems the widget is used on: the home directory, the project key and the Python probe differ.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,4 +48,5 @@ jobs:
       - name: Widget tests
         run: claude plugin test mod
       - name: Release check (version = newest CHANGELOG entry)
+        shell: bash
         run: python tools/release.py --check || test $? -eq 1

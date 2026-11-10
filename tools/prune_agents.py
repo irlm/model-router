@@ -32,21 +32,22 @@ TRANSCRIPTS = claude_home.projects_dir()
 def called_agents():
     names = {}
     for f in TRANSCRIPTS.glob('**/*.jsonl'):
-        for line in f.open(encoding='utf-8', errors='replace'):
-            if '"subagent_type"' not in line:
-                continue
-            try:
-                r = json.loads(line)
-            except ValueError:
-                continue
-            m = r.get('message') or {}
-            if r.get('type') != 'assistant' or not isinstance(m.get('content'), list):
-                continue
-            for it in m['content']:
-                if isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') in ('Agent', 'Task'):
-                    st = (it.get('input') or {}).get('subagent_type')
-                    if st:
-                        names[st] = names.get(st, 0) + 1
+        with f.open(encoding='utf-8', errors='replace') as fh:
+            for line in fh:
+                if '"subagent_type"' not in line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                m = r.get('message') or {}
+                if r.get('type') != 'assistant' or not isinstance(m.get('content'), list):
+                    continue
+                for it in m['content']:
+                    if isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') in ('Agent', 'Task'):
+                        st = (it.get('input') or {}).get('subagent_type')
+                        if st:
+                            names[st] = names.get(st, 0) + 1
     return names
 
 

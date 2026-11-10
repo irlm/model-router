@@ -54,7 +54,7 @@ def classify(subagent_type, prompt):
     t = (subagent_type or '').lower()
     if subagent_type == 'Web Researcher':
         return 'fact-lookup'
-    if subagent_type in ('Explore', 'Plan', 'Codebase Onboarding Engineer'):
+    if subagent_type in ('Explore', 'Codebase Onboarding Engineer'):   # the types the widget routes as find_feature; a Plan agent is not measured
         return 'code-explore'
     if 'browser' in t or subagent_type == 'Evidence Collector' or sum(k in p for k in BROWSER) >= 2:
         return 'browser-flow'
@@ -62,8 +62,8 @@ def classify(subagent_type, prompt):
         return 'code-review'
     if len(p) < 900 and any(k in p for k in LOOKUP):
         return 'fact-lookup'
-    if any(k in p for k in SYNTHESIS) and not any(k in p for k in RUNNER):
-        return 'research-synthesis'
+    if any(k in p for k in SYNTHESIS) and not any(k in p for k in RUNNER) and not any(k in p for k in CODE):
+        return 'research-synthesis'   # a test run or a code change is not a research note, as in the widget's matchFamily
     if any(k in p for k in CODE):
         return 'code-change'
     return 'other'
@@ -150,115 +150,124 @@ def collect(days=30, now=None, splits=None):
     seen = set()
     fixed = collections.defaultdict(fixed_text.Session)       # main transcript -> the lists and skill bodies it carries
     files = 0
+    # A transcript last written before the earlier window began holds nothing inside it (its lines are no newer
+    # than the file): skipped unread, which keeps a years-old ~/.claude/projects from being parsed on every refresh.
+    too_old = (now - datetime.timedelta(days=2 * days + 1)).timestamp()
     for f in ROOT.glob('**/*.jsonl'):
         proj = f.relative_to(ROOT).parts[0]
         if any(b in proj for b in BENCH):
             continue
+        try:
+            if f.stat().st_mtime < too_old:
+                continue
+        except OSError:
+            continue
         files += 1
         is_sub = 'subagents' in f.parts
         effort = None
-        for line in f.open(encoding='utf-8', errors='replace'):
-            if not ('"api-request"' in line or '"assistant"' in line or 'agentId' in line or '"tool_use"' in line
-                    or '"compact_boundary"' in line or '"is_error":true' in line or '"attachment"' in line or fixed_text.BODY_START in line):
-                continue
-            try:
-                r = json.loads(line)
-            except ValueError:
-                continue
-            t = r.get('type')
-            if t == 'api-request':
-                effort = ((r.get('params') or {}).get('output_config') or {}).get('effort') or effort
-                continue
-            ts = r.get('timestamp') or ''
-            window = 'cur' if ts >= since_cur else 'prev' if ts >= since_prev else None
-            m = r.get('message') or {}
-            if not is_sub:
-                # What the session carries whatever the task (tools/fixed_text.py): read in order, from its first row
-                if t == 'attachment':
-                    fixed[str(f)].attachment(r.get('attachment') or {})
+        with f.open(encoding='utf-8', errors='replace') as fh:
+            for line in fh:
+                if not ('"api-request"' in line or '"assistant"' in line or 'agentId' in line or '"tool_use"' in line
+                        or '"compact_boundary"' in line or '"is_error":true' in line or '"attachment"' in line or fixed_text.BODY_START in line):
                     continue
-                if t == 'system' and r.get('subtype') == 'compact_boundary':
-                    fixed[str(f)].compact()
-                elif t == 'user' and fixed_text.BODY_START in line:
-                    c = m.get('content')
-                    body = c if isinstance(c, str) else ''.join(it.get('text', '') for it in c or [] if isinstance(it, dict) and it.get('type') == 'text')
-                    if body.startswith(fixed_text.BODY_START):
-                        fixed[str(f)].body(body, r.get('sourceToolUseID'), window == 'cur')
-            if is_sub and r.get('agentId') and '"is_error":true' in line:
-                agent_errors[r['agentId']] += sum(1 for it in (m.get('content') or []) if isinstance(it, dict) and it.get('is_error'))
-            if not is_sub and window == 'cur':
-                s = sessions[str(f)]; s['project'] = proj
-                if t == 'system' and r.get('subtype') == 'compact_boundary':
-                    s['compactions'] += 1
-                elif t == 'user' and '"is_error":true' in line:
-                    for it in (m.get('content') or []):
-                        if isinstance(it, dict) and it.get('type') == 'tool_result' and it.get('is_error'):
-                            s['errors'] += 1
-                            if it.get('tool_use_id') in calls:
-                                calls[it['tool_use_id']]['failed'] = True
-            if t == 'assistant' and isinstance(m.get('content'), list):
-                u, model, mid = m.get('usage') or {}, m.get('model') or '?', m.get('id')
-                if u and model != '<synthetic>' and (mid, u.get('output_tokens')) not in seen:
-                    if mid:
-                        seen.add((mid, u.get('output_tokens')))
-                    entry = price.model_entry(model, CAT)
-                    if not entry:
-                        model = model + ' (no price)'
-                    c = (price.price_usage(u, entry) or 0) if entry else 0
-                    oc = u.get('output_tokens', 0) * price.rates(entry)['out'] if entry else 0
-                    if not is_sub:
-                        fixed[str(f)].request(u, price.rates(entry) if entry else None, ts, window == 'cur')
-                    if window == 'cur' and not is_sub:
-                        s = sessions[str(f)]
-                        s['msgs'] += 1
-                        # The cache: what this turn re-read, what it wrote, and whether it came back after an idle hour
-                        rt = price.rates(entry) if entry else None
-                        rd, wr = u.get('cache_read_input_tokens', 0) or 0, u.get('cache_creation_input_tokens', 0) or 0
-                        s['ctx_tokens'] += (u.get('input_tokens', 0) or 0) + rd + wr
-                        if rt:
-                            s['read_cost'] += rd * rt['cache_read']; s['write_cost'] += wr * rt['write_5m']
-                        gap = (datetime.datetime.fromisoformat(ts.replace('Z', '+00:00')) - s['prev_ts']).total_seconds() / 60 if s['prev_ts'] and ts else None
-                        if gap is not None and gap > 60 and wr > 50000:
-                            s['idle_returns'] += 1; s['idle_cost'] += wr * rt['write_5m'] if rt else 0.0
-                        if ts:
-                            s['prev_ts'] = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                    if window:
-                        key = (window, 'sub' if is_sub else 'main', model, effort or '?')
-                        for k in TOKENS:
-                            tok[key][k] += u.get(k, 0) or 0
-                        msgs[key] += 1; cost[key] += c; out_cost[key] += oc
-                        if window == 'cur':
-                            daily[ts[:10]] += c
-                            if splits:
-                                pk = (sum(1 for sp in splits if ts >= sp), 'sub' if is_sub else 'main', model, effort or '?')
-                                pmsgs[pk] += 1; pcost[pk] += c
-                                for k in TOKENS:
-                                    ptok[pk][k] += u.get(k, 0) or 0
-                    if is_sub and r.get('agentId'):
-                        agent_cost[r['agentId']] += c; agent_model[r['agentId']] = model
-                        for k in TOKENS:
-                            agent_tok[r['agentId']][k] += u.get(k, 0) or 0
-                for it in m['content']:
-                    if not is_sub and isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') == 'Skill':
-                        fixed[str(f)].skill_call(it.get('id'), (it.get('input') or {}).get('skill'))
-                    if isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') in ('Agent', 'Task') and window:
-                        inp = it.get('input') or {}
-                        st = inp.get('subagent_type') or 'general-purpose'
-                        calls[it.get('id')] = {'ts': ts[:16], 'session': str(f), 'window': window, 'project': proj, 'type': st, 'model_asked': inp.get('model'),
-                                               'description': (inp.get('description') or '')[:60], 'prompt_chars': len(inp.get('prompt') or ''),
-                                               'prompt_text': (inp.get('prompt') or '')[:2000],
-                                               'class': classify(st, inp.get('prompt'))}
-            elif t == 'user' and 'agentId' in line and isinstance(m.get('content'), list):
-                # one user row can hold several tool_results (parallel Agent calls): match each by its own text
-                results = [it for it in m['content'] if isinstance(it, dict) and it.get('type') == 'tool_result']
-                tur = r.get('toolUseResult') if isinstance(r.get('toolUseResult'), dict) else {}
-                for it in results:
-                    text = json.dumps(it.get('content'))
-                    found = next((mm.group(1) for rx in AGENT_IDS for mm in [rx.search(text)] if mm), None)
-                    if not found and len(results) == 1 and tur.get('agentId'):
-                        found = tur['agentId']
-                    if found:
-                        agent_of[it.get('tool_use_id')] = found
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                t = r.get('type')
+                if t == 'api-request':
+                    effort = ((r.get('params') or {}).get('output_config') or {}).get('effort') or effort
+                    continue
+                ts = r.get('timestamp') or ''
+                window = 'cur' if ts >= since_cur else 'prev' if ts >= since_prev else None
+                m = r.get('message') or {}
+                if not is_sub:
+                    # What the session carries whatever the task (tools/fixed_text.py): read in order, from its first row
+                    if t == 'attachment':
+                        fixed[str(f)].attachment(r.get('attachment') or {})
+                        continue
+                    if t == 'system' and r.get('subtype') == 'compact_boundary':
+                        fixed[str(f)].compact()
+                    elif t == 'user' and fixed_text.BODY_START in line:
+                        c = m.get('content')
+                        body = c if isinstance(c, str) else ''.join(it.get('text', '') for it in c or [] if isinstance(it, dict) and it.get('type') == 'text')
+                        if body.startswith(fixed_text.BODY_START):
+                            fixed[str(f)].body(body, r.get('sourceToolUseID'), window == 'cur')
+                if is_sub and r.get('agentId') and '"is_error":true' in line:
+                    agent_errors[r['agentId']] += sum(1 for it in (m.get('content') or []) if isinstance(it, dict) and it.get('is_error'))
+                if not is_sub and window == 'cur':
+                    s = sessions[str(f)]; s['project'] = proj
+                    if t == 'system' and r.get('subtype') == 'compact_boundary':
+                        s['compactions'] += 1
+                    elif t == 'user' and '"is_error":true' in line:
+                        for it in (m.get('content') or []):
+                            if isinstance(it, dict) and it.get('type') == 'tool_result' and it.get('is_error'):
+                                s['errors'] += 1
+                                if it.get('tool_use_id') in calls:
+                                    calls[it['tool_use_id']]['failed'] = True
+                if t == 'assistant' and isinstance(m.get('content'), list):
+                    u, model, mid = m.get('usage') or {}, m.get('model') or '?', m.get('id')
+                    if u and model != '<synthetic>' and (mid, u.get('output_tokens')) not in seen:
+                        if mid:
+                            seen.add((mid, u.get('output_tokens')))
+                        entry = price.model_entry(model, CAT)
+                        if not entry:
+                            model = model + ' (no price)'
+                        c = (price.price_usage(u, entry) or 0) if entry else 0
+                        oc = u.get('output_tokens', 0) * price.rates(entry)['out'] if entry else 0
+                        if not is_sub:
+                            fixed[str(f)].request(u, price.rates(entry) if entry else None, ts, window == 'cur')
+                        if window == 'cur' and not is_sub:
+                            s = sessions[str(f)]
+                            s['msgs'] += 1
+                            # The cache: what this turn re-read, what it wrote, and whether it came back after an idle hour
+                            rt = price.rates(entry) if entry else None
+                            rd, wr = u.get('cache_read_input_tokens', 0) or 0, u.get('cache_creation_input_tokens', 0) or 0
+                            s['ctx_tokens'] += (u.get('input_tokens', 0) or 0) + rd + wr
+                            if rt:
+                                s['read_cost'] += rd * rt['cache_read']; s['write_cost'] += wr * rt['write_5m']
+                            gap = (datetime.datetime.fromisoformat(ts.replace('Z', '+00:00')) - s['prev_ts']).total_seconds() / 60 if s['prev_ts'] and ts else None
+                            if gap is not None and gap > 60 and wr > 50000:
+                                s['idle_returns'] += 1; s['idle_cost'] += wr * rt['write_5m'] if rt else 0.0
+                            if ts:
+                                s['prev_ts'] = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                        if window:
+                            key = (window, 'sub' if is_sub else 'main', model, effort or '?')
+                            for k in TOKENS:
+                                tok[key][k] += u.get(k, 0) or 0
+                            msgs[key] += 1; cost[key] += c; out_cost[key] += oc
+                            if window == 'cur':
+                                daily[ts[:10]] += c
+                                if splits:
+                                    pk = (sum(1 for sp in splits if ts >= sp), 'sub' if is_sub else 'main', model, effort or '?')
+                                    pmsgs[pk] += 1; pcost[pk] += c
+                                    for k in TOKENS:
+                                        ptok[pk][k] += u.get(k, 0) or 0
+                        if is_sub and r.get('agentId'):
+                            agent_cost[r['agentId']] += c; agent_model[r['agentId']] = model
+                            for k in TOKENS:
+                                agent_tok[r['agentId']][k] += u.get(k, 0) or 0
+                    for it in m['content']:
+                        if not is_sub and isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') == 'Skill':
+                            fixed[str(f)].skill_call(it.get('id'), (it.get('input') or {}).get('skill'))
+                        if isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') in ('Agent', 'Task') and window:
+                            inp = it.get('input') or {}
+                            st = inp.get('subagent_type') or 'general-purpose'
+                            calls[it.get('id')] = {'ts': ts[:16], 'session': str(f), 'window': window, 'project': proj, 'type': st, 'model_asked': inp.get('model'),
+                                                   'description': (inp.get('description') or '')[:60], 'prompt_chars': len(inp.get('prompt') or ''),
+                                                   'prompt_text': (inp.get('prompt') or '')[:2000],
+                                                   'class': classify(st, inp.get('prompt'))}
+                elif t == 'user' and 'agentId' in line and isinstance(m.get('content'), list):
+                    # one user row can hold several tool_results (parallel Agent calls): match each by its own text
+                    results = [it for it in m['content'] if isinstance(it, dict) and it.get('type') == 'tool_result']
+                    tur = r.get('toolUseResult') if isinstance(r.get('toolUseResult'), dict) else {}
+                    for it in results:
+                        text = json.dumps(it.get('content'))
+                        found = next((mm.group(1) for rx in AGENT_IDS for mm in [rx.search(text)] if mm), None)
+                        if not found and len(results) == 1 and tur.get('agentId'):
+                            found = tur['agentId']
+                        if found:
+                            agent_of[it.get('tool_use_id')] = found
     for cid, c in calls.items():
         aid = agent_of.get(cid)
         c['agent'] = aid; c['cost'] = round(agent_cost.get(aid, 0.0), 4) if aid else None; c['model'] = agent_model.get(aid)

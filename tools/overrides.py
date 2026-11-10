@@ -15,7 +15,9 @@ import os
 import sys
 from pathlib import Path
 
-FILE = Path(os.environ.get('CLAUDE_CONFIG_DIR') or (Path.home() / '.claude')) / 'model-router' / 'overrides.json'
+import claude_home  # the one resolver of <CLAUDE_CONFIG_DIR or ~/.claude>
+
+FILE = claude_home.config_dir() / 'model-router' / 'overrides.json'
 MODELS = ('haiku', 'sonnet', 'opus', 'fable')
 EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
 

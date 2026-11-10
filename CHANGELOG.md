@@ -3,6 +3,16 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.24.0 — 2026-11-10
+
+- `/router prune skills`: the skills nothing on this machine loaded in the window are listed name-only (Claude Code's
+  `skillOverrides` in `~/.claude/settings.json`: the name stays, `/name` works, the description leaves every request —
+  here 42 skills, about 4k tokens a request). A dry run lists them; `move` writes it; `revert` removes exactly what
+  was written (`<config>/model-router/skills-pruned.json` keeps the record), and a skill you overrode by hand is never
+  touched. A plugin's skills are left alone, since they leave the list only with their plugin. `/router prune all
+  [move|revert]` does the agents and the skills in one (`tools/prune_skills.py --agents`). The skills suggestion in the
+  pane names this first. `tools/fixed_text.py` reports every unused entry, not only the eight largest.
+
 ## 0.23.0 — 2026-11-10
 
 - The monitor has a `[ Routing ]` frame, between the graph and the events: one line per agent of the run with what

@@ -417,7 +417,7 @@ def suggest_fixed(fx, days=USAGE_DAYS, parked=0):
                     'title': f"skill list: {k['unused_n']} of {k['n']} never loaded, ${k['cost']:.2f} to carry (about {k['tokens'] // 1000}k tokens in every request)",
                     'basis': f"the skill names and descriptions are {how}: ${k['cost']:.2f} {over}. Not loaded in the last {days} days, by where they come from: {src}. "
                              "The saving is an upper bound: a plugin's skills leave the list only with the plugin",
-                    'action': "/skill-doctor (Claude Code 2.1.261+) lists the unused skills with what each costs; then /skills: Space takes a skill of your own to "
+                    'action': "/router prune skills lists them, /router prune skills move sets them name-only in settings.json (reversible; /router prune all does agents and skills in one); by hand: /skill-doctor (Claude Code 2.1.261+) lists the unused skills with what each costs; then /skills: Space takes a skill of your own to "
                               "name-only or off (saved as skillOverrides in .claude/settings.local.json); a plugin's skills go with the plugin: claude plugin disable "
                               '<plugin>@<marketplace> --scope project in the projects that do not use it; in a skill you wrote, disable-model-invocation: true keeps '
                               '/name and drops the description'})

@@ -153,7 +153,8 @@ def summary(sessions, called_agents=()):
             fixed = newest.builtin if p == 'agents' else set()
             idle = {n: c for n, c in entries.items() if n not in inuse and n not in fixed}
             part.update({'n': len(entries), 'unused_n': len(idle), 'unused_tokens': tokens(sum(idle.values())),
-                         'largest_unused': [{'name': n, 'tokens': tokens(c)} for n, c in sorted(idle.items(), key=lambda kv: -kv[1])[:8]]})
+                         'largest_unused': [{'name': n, 'tokens': tokens(c)} for n, c in sorted(idle.items(), key=lambda kv: -kv[1])[:8]],
+                         'unused': [{'name': n, 'tokens': tokens(c)} for n, c in sorted(idle.items(), key=lambda kv: -kv[1])]})   # all of them: what prune_skills.py acts on
             if p == 'skills':   # plugin:skill names say which plugin a skill goes with; '' is the person's own and the bundled ones
                 src = collections.defaultdict(lambda: [0, 0])
                 for n, c in idle.items():

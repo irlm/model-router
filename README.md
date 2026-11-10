@@ -244,6 +244,7 @@ apply_agents.py          writes the decision into the agent files you have in ~/
 regress.py               after a Claude Code update or monthly: each default on a small sample, binomial check
 tools/ledger.py          monthly: what this machine actually ran (subagent calls, tokens, cost), from the transcripts
 tools/prune_agents.py    moves the agent files no transcript ever called out of the prefix, in whatever folder they sit (reversible)
+tools/prune_skills.py    lists the skills nothing loaded name-only in settings.json (skillOverrides; reversible); --agents does both lists
 tools/fixed_text.py      what every request carries whatever the task (agent list, skill list, hook text, loaded skill bodies) and what it cost, from the transcripts
 tools/agent_sources.py pinned third-party agent files: diff with flags before an update lands
 tools/release.py       tag a version (v<plugin.json version>) after the CHANGELOG and tree checks

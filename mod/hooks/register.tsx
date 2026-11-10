@@ -43,6 +43,13 @@ const JOBS: Record<string, { title: string; argv: (python: string, clone: boolea
   prune: { title: 'prune agents (dry run)', argv: py => [py, 'tools/prune_agents.py', '--dry-run'] },
   'prune-move': { title: 'prune agents', argv: py => [py, 'tools/prune_agents.py'] },
   'prune-revert': { title: 'restore the pruned agents', argv: py => [py, 'tools/prune_agents.py', '--revert'] },
+  // The skills nothing loaded: listed name-only through skillOverrides in settings.json; `all` does the agents first.
+  'prune-skills': { title: 'prune skills (dry run)', argv: py => [py, 'tools/prune_skills.py', '--dry-run'] },
+  'prune-skills-move': { title: 'prune skills', argv: py => [py, 'tools/prune_skills.py'] },
+  'prune-skills-revert': { title: 'restore the pruned skills', argv: py => [py, 'tools/prune_skills.py', '--revert'] },
+  'prune-all': { title: 'prune agents and skills (dry run)', argv: py => [py, 'tools/prune_skills.py', '--agents', '--dry-run'] },
+  'prune-all-move': { title: 'prune agents and skills', argv: py => [py, 'tools/prune_skills.py', '--agents'] },
+  'prune-all-revert': { title: 'restore the pruned agents and skills', argv: py => [py, 'tools/prune_skills.py', '--agents', '--revert'] },
   // Agent files from outside this repository: pinned to their source commit; a change there is shown with flags and taken only by name.
   'agents-pin': { title: 'pin the agent sources', argv: py => [py, 'tools/agent_sources.py', 'pin', '--repo'] },
   'agents-check': { title: 'check the agent sources', argv: py => [py, 'tools/agent_sources.py', 'check'] },
@@ -50,8 +57,15 @@ const JOBS: Record<string, { title: string; argv: (python: string, clone: boolea
   'agents-list': { title: 'pinned agent sources', argv: py => [py, 'tools/agent_sources.py', 'list'] },
   doctor: { title: 'installation check', argv: py => [py, 'tools/status.py', '--doctor'] },
 }
-/** What /router prune <arg> runs: nothing or dry-run lists, move moves, revert restores; anything else is not a job. */
-const pruneJob = (arg: string) => (arg === '' || arg === 'dry-run' ? 'prune' : arg === 'move' ? 'prune-move' : arg === 'revert' ? 'prune-revert' : null)
+/** What /router prune [skills|all] [move|revert] runs: nothing or dry-run lists, move does it, revert undoes it; anything else is not a job. */
+const pruneJob = (arg: string) => {
+  const [what = '', mode = ''] = arg.split(/\s+/).filter(Boolean)
+  const list = what === 'skills' || what === 'all' ? what : ''
+  const m = list ? mode : what
+  const suffix = m === '' || m === 'dry-run' ? '' : m === 'move' ? '-move' : m === 'revert' ? '-revert' : null
+  if (suffix === null || (list && mode && suffix === '' && mode !== 'dry-run')) return null
+  return list ? `prune-${list}${suffix}` : `prune${suffix}`
+}
 /** What /router agents <args> runs: pin <url>, check, update [file...] [--accept-flags], list; null when it is none of them. */
 const agentsJob = (arg: string): { name: string; extra: string[] } | null => {
   const [sub, ...rest] = arg.split(/\s+/).filter(Boolean)
@@ -110,7 +124,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.23.0'
+const WIDGET_VERSION = '0.24.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -1172,7 +1186,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'router',
       description: 'Model router: the session live, where the routing stands, first-run setup, installation check, re-check it, ledger, apply, prune, pinned agent sources, pull',
-      argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import [--days N] [--rebuild]|show <id>] | setup | doctor | check | fetch | update | ledger | apply | pull | prune [move|revert] | agents pin <url>|check|update [file]|list | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class> | dismiss <n|id> | undismiss <id>',
+      argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import [--days N] [--rebuild]|show <id>] | setup | doctor | check | fetch | update | ledger | apply | pull | prune [skills|all] [move|revert] | agents pin <url>|check|update [file]|list | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class> | dismiss <n|id> | undismiss <id>',
     })
     void refresh($)
     // The second tick while any agent runs, or while the main session's own turn runs: its elapsed time and cursor move too.
@@ -1421,11 +1435,13 @@ export const register: Register = (on, options) => {
       return { text: started ? `${JOBS[j.name].title} started; the pane shows its output${j.name === 'agents-check' ? '; /router agents update takes the unflagged changes, /router agents update <file> --accept-flags a flagged one you have read' : j.name === 'agents-update' ? '; /router apply then puts the routed model and effort back' : ''}.` : 'Not started.' }
     }
     if (verb === 'prune') {
-      const name = pruneJob(arg)
-      if (!name) return { text: 'prune takes nothing (dry run), move or revert: /router prune | /router prune move | /router prune revert' }
+      const name = pruneJob(tail)   // every word after the verb: skills move, all revert
+      if (!name) return { text: 'prune takes nothing (dry run), move or revert, for the agents, the skills or all: /router prune [skills|all] | /router prune [skills|all] move | /router prune [skills|all] revert' }
       await $.ui.open({ id: PANE, title: 'Model router' })
       const started = await runJob($, name)
-      return { text: started ? `${JOBS[name].title} started; the pane shows its output${name === 'prune' ? '; /router prune move does it, /router prune revert undoes it' : name === 'prune-move' ? '; /router prune revert undoes it' : ''}.` : 'Not started.' }
+      const verbWords = name.startsWith('prune-skills') ? 'prune skills' : name.startsWith('prune-all') ? 'prune all' : 'prune'
+      const hint = name.endsWith('-move') ? `; /router ${verbWords} revert undoes it` : name.endsWith('-revert') ? '' : `; /router ${verbWords} move does it, /router ${verbWords} revert undoes it`
+      return { text: started ? `${JOBS[name].title} started; the pane shows its output${hint}` : 'a job is still running; try again when it ends' }
     }
     const spec = JOBS[verb]
     if (spec) {

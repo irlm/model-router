@@ -439,7 +439,7 @@ class FixedSuggestions(unittest.TestCase):
         self.assertIn('170 of 178', out['fixed:agents']['title'])
         self.assertEqual(out['fixed:skills']['saving'], [0.0, 2.0])                       # an upper bound: a plugin's skills go only with the plugin
         self.assertIn('impeccable 21', out['fixed:skills']['basis'])
-        self.assertTrue(out['fixed:skills']['action'].startswith('/skill-doctor'))          # Claude Code 2.1.261+ has the per-skill report itself
+        self.assertTrue(out['fixed:skills']['action'].startswith('/router prune skills'))   # one command, reversible; /skill-doctor named after it
         self.assertIn('main-session', out['fixed:agents']['basis'])                        # the cost is a floor: side requests are not in the transcript
         self.assertTrue(out['fixed:agents']['action'].startswith('/router prune'))
         parked = {g['id']: g for g in status.suggest_fixed(self.FX, parked=168)}['fixed:agents']
@@ -717,3 +717,51 @@ class Release(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PruneSkills(unittest.TestCase):
+    FX = {'requests': 100, 'sessions': 3, 'skills_used': {'herdr': 1}, 'bodies': [],
+          'parts': {'skills': {'tokens': 900, 'cost': 1.0, 'n': 5, 'unused_n': 4, 'unused_tokens': 800, 'largest_unused': [],
+                               'unused': [{'name': 'dataviz', 'tokens': 362}, {'name': 'code-review', 'tokens': 302},
+                                          {'name': 'anthropic-skills:docs', 'tokens': 258}, {'name': 'init', 'tokens': 40}]}}}
+
+    def run_tool(self, d, *args):
+        return subprocess.run([sys.executable, str(Path(__file__).resolve().parent / 'prune_skills.py'), '--fixed-json', str(d / 'fixed.json'),
+                               '--settings', str(d / 'settings.json'), '--state', str(d / 'state.json'), *args], capture_output=True, text=True)
+
+    def test_unused_skills_go_name_only_and_come_back(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            (d / 'fixed.json').write_text(json.dumps(self.FX), encoding='utf-8')
+            (d / 'settings.json').write_text(json.dumps({'model': 'opus', 'skillOverrides': {'init': 'off'}}), encoding='utf-8')
+            r = self.run_tool(d, '--dry-run')
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('would set  dataviz: name-only (362 tokens)', r.stdout)
+            self.assertIn('keep  init: already off in settings.json', r.stdout)
+            self.assertIn('1 plugin skills left alone', r.stdout)
+            self.assertIn('2 skills would be listed name-only', r.stdout)
+            self.assertEqual(json.loads((d / 'settings.json').read_text())['skillOverrides'], {'init': 'off'})   # a dry run writes nothing
+            r = self.run_tool(d, '--keep', 'code-review')
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('keep  code-review: --keep', r.stdout)
+            s = json.loads((d / 'settings.json').read_text())
+            self.assertEqual(s['skillOverrides'], {'init': 'off', 'dataviz': 'name-only'})    # the hand-set value and the other keys stay
+            self.assertEqual(s['model'], 'opus')
+            self.assertEqual(json.loads((d / 'state.json').read_text()), ['dataviz'])
+            r = self.run_tool(d)                                                              # a second run adds the rest, keeps the record whole
+            self.assertEqual(json.loads((d / 'state.json').read_text()), ['code-review', 'dataviz'])
+            r = self.run_tool(d, '--revert')
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('2 skills listed with their description again', r.stdout)
+            self.assertEqual(json.loads((d / 'settings.json').read_text())['skillOverrides'], {'init': 'off'})   # only what this wrote goes
+            self.assertFalse((d / 'state.json').exists())
+
+    def test_no_listing_in_the_transcripts_is_said_not_pruned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            (d / 'fixed.json').write_text('null', encoding='utf-8')
+            r = self.run_tool(d)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('nothing to prune', r.stdout)
+            self.assertFalse((d / 'settings.json').exists())
+

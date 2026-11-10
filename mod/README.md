@@ -359,7 +359,10 @@ each costs in context, in the `/plugin` manager's Stats tab. The skill-list sugg
 first; what it adds is the grouping by plugin, and the agent list, the hook text and the MCP
 instructions, which `/skill-doctor` does not cover. Pruning agents: `/router prune` lists the files
 nothing on this machine has called, `/router prune move` parks them in `~/.claude/agents.unused`
-(folders kept), `/router prune revert` brings them back.
+(folders kept), `/router prune revert` brings them back. Pruning skills: `/router prune skills` lists the skills nothing here
+loaded in the window, `/router prune skills move` sets them name-only in `~/.claude/settings.json` (`skillOverrides`: the name
+and `/name` stay, the description leaves every request), `/router prune skills revert` removes exactly what it wrote; a
+skill overridden by hand and a plugin's skills are left alone. `/router prune all [move|revert]` does both lists in one.
 
 When the transcripts carry none of the listing rows (a Claude Code version that writes them
 differently), the pane says so under "to check" instead of showing zeros. The rows as each version

@@ -124,7 +124,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.27.1'
+const WIDGET_VERSION = '0.28.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -490,20 +490,14 @@ const toolText = (e: Record<string, unknown>): string => {
  * context it was sent; below, the live tail of the agents at work and the run's event log. All of it text, one line one row. */
 const BOX_W = 48
 const weightOf = (ctx: number) => (ctx >= 16000 ? '━' : ctx >= 4000 ? '─' : '┄')
-const monitorLines = (lvAll: Live, now: number, runId: string | null = null, routingFull = true): Line[] => {
-  const lv = scopeOf(lvAll, runId)
-  const running = Object.values(lv.agents)
-  const { all, kids } = treeOf(lv)
-  const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
-  const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''})`
-  const out: Line[] = [line(head, { bold: true, color: running.length ? 'cyan' : undefined }), line(runLine(lvAll, runId), { dim: true })]
-  // Before any agent: the main session is drawn alone, with its state and its own tool tail; agents hang under it as they spawn.
-  if (all.length === 0) out.push(line('no agent spawned yet; Agent calls hang under the session box as they spawn', { dim: true }))
-  // Every line of a box is BOX_W + 2 columns: ┌ title ─┐ / │ text │ / └──┘.
-  const inner = (t: string) => `│ ${t.slice(0, BOX_W - 2).padEnd(BOX_W - 2)} │`
-  const top = (title: string) => { const t = title.slice(0, BOX_W - 3); return `┌ ${t} ${'─'.repeat(BOX_W - 2 - t.length)}┐` }
-  const bottom = (hasChildren: boolean) => (hasChildren ? `└${'─'.repeat(9)}┬${'─'.repeat(BOX_W - 10)}┘` : `└${'─'.repeat(BOX_W)}┘`)   // the ┬ sits over the children's trunk, 10 columns in
-  out.push(line('[ Run graph ]', { bold: true }))
+/** The run as a staircase of boxes: each child one step to the right of its spawner, under it, the arrow weighted by the
+ * context sent with the label on the branch. About 13 columns per level, so a deep hierarchy keeps its boxes. The text
+ * view draws it always; the pane draws it when the grid would be wider than the pane. */
+const stairLines = (lv: Live, now: number, all: RunningAgent[], kids: (p: RunningAgent | null) => RunningAgent[], boxW = BOX_W): Line[] => {
+  // Every line of a box is boxW + 2 columns: ┌ title ─┐ / │ text │ / └──┘.
+  const inner = (t: string) => `│ ${t.slice(0, boxW - 2).padEnd(boxW - 2)} │`
+  const top = (title: string) => { const t = title.slice(0, boxW - 3); return `┌ ${t} ${'─'.repeat(boxW - 2 - t.length)}┐` }
+  const bottom = (hasChildren: boolean) => (hasChildren ? `└${'─'.repeat(9)}┬${'─'.repeat(boxW - 10)}┘` : `└${'─'.repeat(boxW)}┘`)   // the ┬ sits over the children's trunk, 10 columns in
   // Draw with a trunk: lines of a child's box after the first carry the trunk mark when siblings follow.
   const drawn: Line[] = []
   const draw = (a: RunningAgent | null, prefix: string, arrow: string, trunk: boolean) => {
@@ -532,7 +526,19 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null, rou
     })
   }
   draw(null, '', '', false)
-  out.push(...drawn)
+  return drawn
+}
+const monitorLines = (lvAll: Live, now: number, runId: string | null = null, routingFull = true): Line[] => {
+  const lv = scopeOf(lvAll, runId)
+  const running = Object.values(lv.agents)
+  const { all, kids } = treeOf(lv)
+  const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
+  const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''})`
+  const out: Line[] = [line(head, { bold: true, color: running.length ? 'cyan' : undefined }), line(runLine(lvAll, runId), { dim: true })]
+  // Before any agent: the main session is drawn alone, with its state and its own tool tail; agents hang under it as they spawn.
+  if (all.length === 0) out.push(line('no agent spawned yet; Agent calls hang under the session box as they spawn', { dim: true }))
+  out.push(line('[ Run graph ]', { bold: true }))
+  out.push(...stairLines(lv, now, all, kids))
   out.push(line('arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ <4k', { dim: true }))
   // Live: the agents at work, the most recent call first; a failed one keeps its tail while it is among the last finished.
   // Live: the agents at work, the most recent call first; when fewer than two run, the last finished (a failed one first) keep their tail.
@@ -1709,11 +1715,13 @@ export const register: Register = (on, options) => {
     // (`o` asks for the outline outright, or for the boxes however wide: 'boxes').
     const depth = (p: RunningAgent | null, d: number): number => Math.max(d, ...treeOf(lv).kids(p).map(c => depth(c, d + 1)))
     const tooDeep = depth(null, 0) > 3
-    const outline = view === 'outline' || (view === 'graph' && tooDeep)
+    // graph: the grid up to three levels, the staircase beyond; outline and boxes are the person's own choices (o cycles).
+    const layout: 'grid' | 'stairs' | 'outline' = view === 'outline' ? 'outline' : view === 'boxes' ? 'grid' : tooDeep ? 'stairs' : 'grid'
+    const outline = layout === 'outline'
     const footer = (
       <Box flexDirection="row" gap={1} flexWrap="wrap">
         <Button key="view" hotkey="g" onPress={() => { void update($, monitorView, v => (v === 'graph' ? 'list' : 'graph')) }}>{view === 'graph' ? 'List' : 'Graph'}</Button>
-        <Button key="outline" hotkey="o" onPress={() => { void update($, monitorView, v => (v === 'outline' || (v === 'graph' && tooDeep) ? 'boxes' : 'outline')) }}>{outline ? 'Boxes' : 'Outline'}</Button>
+        <Button key="outline" hotkey="o" onPress={() => { void update($, monitorView, v => (v === 'graph' ? 'outline' : v === 'outline' ? 'boxes' : 'graph')) }}>{view === 'graph' ? 'Outline' : view === 'outline' ? 'Boxes' : 'Auto layout'}</Button>
         <Button key="history" hotkey="h" onPress={() => { void update($, monitorHistory, v => !v); void listSavedRuns($) }}>{history ? 'Back' : `History (${lvAll.runs.length})`}</Button>
         <Button key="save" hotkey="s" onPress={() => { void saveReport($, shownId).then(t => $.ui.toast(`router: ${t}`)) }}>Save report</Button>
         <Button key="routing" hotkey="r" onPress={() => { void update($, monitorRouting, v => !v) }}>{routingFull ? 'Routing: top 5' : 'Routing: all'}</Button>
@@ -1787,10 +1795,17 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
+    const stairs = stairLines(lv, now, all, treeOf(lv).kids, Math.max(24, Math.min(BOX_W, graphW - depth(null, 0) * 13 - 2)))
     const graph = outline ? (
       <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
         {outlineLines(lvAll, now, picked).map(l => <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim} wrap="truncate">{l.text}</Text>)}
-        {view !== 'outline' && <Text dimColor>{`four levels or more: drawn as an outline (the boxes would be ${Math.round(scene.width)} columns wide); o toggles`}</Text>}
+      </Box>
+    ) : layout === 'stairs' ? (
+      <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
+        <Text color="cyan" bold>[ Run graph ]</Text>
+        <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · four levels or more: drawn as a staircase (the grid would be ${Math.round(scene.width)} columns wide); o shows an outline`}</Text>
+        {stairs.map(l => <Text color={l.color} dimColor={l.dim} wrap="truncate">{l.text}</Text>)}
+        <Text dimColor>arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ &lt;4k</Text>
       </Box>
     ) : (
       <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>

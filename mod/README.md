@@ -197,9 +197,10 @@ same tokens re-priced at catalog prices, an estimate by construction, since the 
 run shows the five lines that moved the most (escalations first, then the routed calls by what the routing changed) and
 "N more"; `r` shows every line (`/router monitor top` prints the five, `/router monitor` all).
 `g` switches to the same run as text lines, one line one row, which `/router monitor` also prints; `m`, the `↑ Model router`
-control under the monitor's header, goes back up to the main pane. A run deeper than three levels under the session is drawn as an outline instead of boxes (one line per agent,
-indented by level, with state, model and effort, elapsed, steps, cost, task), since each level of boxes is 62 columns;
-`o` asks for the outline, or for the boxes however wide; `/router monitor outline` prints it. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
+control under the monitor's header, goes back up to the main pane. A run deeper than three levels under the session keeps its boxes as a staircase (each child one step to the right
+of its spawner, under it; about 13 columns per level) instead of the grid, whose levels are 62 columns each; `o` cycles
+an outline (one indented line per agent with state, model and effort, elapsed, steps, cost, task), the grid however
+wide, and the automatic choice; `/router monitor outline` prints the outline. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
 `● IDLE` after, with the turns and cost so far, and a panel of its own lists the main session's last tool calls
 (shown whenever fewer than two agents are at work); agents hang under the box as they spawn. Nothing here is a dependency graph of the task: the engine reports who spawned whom, not who waits
 on whom, so no box is marked blocked and no waiting arrow is drawn.

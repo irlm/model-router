@@ -995,7 +995,7 @@ test('a forked skill (/code-review runs as a fork of the session, not an Agent c
   await settled()
 })
 
-test('a deep tree: the pane draws an outline when the boxes would not fit its width, o toggles, and /router monitor outline prints it', { options: { routing: 'auto' } }, async ($, on) => {
+test('a deep tree: the pane keeps the boxes as a staircase when the grid would not fit, o cycles outline, boxes and auto, and /router monitor outline prints the outline', { options: { routing: 'auto' } }, async ($, on) => {
   const seen: Record<string, unknown>[] = []
   const steps: unknown[] = []
   LIVE_MOCKS(on, seen, steps, null)
@@ -1017,15 +1017,19 @@ test('a deep tree: the pane draws an outline when the boxes would not fit its wi
   expect(text).toMatch(/^    ● RUNNING  02 general-purpose/m)
   expect(text).toMatch(/^      ● RUNNING  03 Explore/m)
   expect(text).toMatch(/^        ● RUNNING  04 Web Researcher/m)
-  // 150 columns cannot hold four levels of boxes: the pane shows the outline by itself and says so
+  // four levels: the pane keeps the boxes as a staircase (the grid would not fit) and says so; o cycles outline, boxes, auto
   let ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
-  expect((await ui.find({ type: 'Text', text: /^\[ Run outline \]$/ }))?.text).toBe('[ Run outline ]')
-  expect((await ui.find({ type: 'Text', text: /drawn as an outline .*o toggles/ }))?.text).toContain('o toggles')
-  await ui.press({ key: 'outline' })                                                      // o: the boxes, however wide
   expect((await ui.find({ type: 'Text', text: /^\[ Run graph \]$/ }))?.text).toBe('[ Run graph ]')
-  await ui.press({ key: 'outline' })                                                      // o again: the outline, asked for outright (no note)
+  expect((await ui.find({ type: 'Text', text: /drawn as a staircase .*o shows an outline/ }))?.text).toContain('staircase')
+  expect((await ui.find({ type: 'Text', text: /[┣┗][━─┄]{2} ~\d+k? [━─┄]{2}▶ ┌ 01 general-purpose/ }))?.text).toContain('┌ 01 general-purpose')
+  expect((await ui.find({ type: 'Text', text: /┌ 04 Web Researcher/ }))?.text).toContain('04 Web Researcher')      // the fourth level, still a box
+  await ui.press({ key: 'outline' })                                                      // o: the outline
   expect((await ui.find({ type: 'Text', text: /^\[ Run outline \]$/ }))?.text).toBe('[ Run outline ]')
-  expect(await ui.find({ type: 'Text', text: /o toggles/ })).toBeUndefined()
+  await ui.press({ key: 'outline' })                                                      // o: the grid, however wide
+  expect((await ui.find({ type: 'Text', text: /^01 general-purpose$/ }))?.text).toBe('01 general-purpose')        // a grid box's own title
+  expect(await ui.find({ type: 'Text', text: /staircase/ })).toBeUndefined()
+  await ui.press({ key: 'outline' })                                                      // o: back to the automatic choice
+  expect((await ui.find({ type: 'Text', text: /drawn as a staircase/ }))?.text).toContain('staircase')
   await ui.unmount()
   await settled()
 })

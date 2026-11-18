@@ -3,6 +3,13 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.28.0 — 2026-11-17
+
+- The boxes stay for deep hierarchies. A run of four levels or more is drawn as a staircase of boxes (each child one
+  step to the right of its spawner, under it, the arrow weighted as in the grid; about 13 columns per level, the boxes
+  narrowed to fit) instead of the outline: the text view's drawing, now in the pane too. `o` cycles the outline, the
+  grid however wide, and the automatic choice; `/router monitor outline` still prints the outline.
+
 ## 0.27.1 — 2026-11-17
 
 - The buttons are back at the bottom of both panes, as before 0.27.0; what the top gets is one way up: the monitor's

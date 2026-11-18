@@ -124,7 +124,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.26.1'
+const WIDGET_VERSION = '0.26.2'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -1029,12 +1029,13 @@ async function admit($: Dollar, a: RunningAgent, now: number, verb: 'spawned' | 
       return { ...v, nextN: prior.length ? v.nextN : n + 1, agents: { ...v.agents, [a.id]: { ...a, n, run, runId, askedEffort: a.askedEffort || v.turns[v.turns.length - 1]?.sessionEffort || '' } }, events: [...v.events, ev].slice(-400), runs: have ? v.runs.map(r => (r.id === runId ? meta : r)) : [...v.runs, meta] }
   })
 }
-/** Open a pane, or bring it to the front when it is already open behind another: the engine keeps several panes open
- * and shows one, and ui.open on an open pane leaves the shown one as it is (the Monitor button did nothing after m). */
+/** Show one of the widget's panes. The engine keeps every open pane and shows one; a pane opened while another holds
+ * the focus (a button selected in it) stays behind, and opening an open pane changes nothing. So the widget keeps one
+ * pane at a time: the other one is closed first, and the open takes the front. g and m swap them. */
+const PANES = [PANE, MONITOR]
 async function showPane($: Dollar, id: string, title: string) {
-  const opened = await $.ui.open({ id, title })
-  try { await $.ui.place({ id }) } catch { /* a host without placement: the open stands */ }
-  return opened
+  for (const other of PANES) if (other !== id) await $.ui.close({ id: other }).catch(() => undefined)
+  return $.ui.open({ id, title })
 }
 /** A run with no agent left at work has ended (a named task ends only by /router task end): mark it and save it. */
 async function closeIdleRuns($: Dollar) {

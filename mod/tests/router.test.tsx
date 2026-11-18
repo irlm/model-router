@@ -62,7 +62,7 @@ test('/router check prints the table and the status line counts the advice', asy
   const pinned: (string | undefined)[] = []
   on('ui.status', (_, e) => { pinned.push(e.text); return { value: undefined } })
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
@@ -129,7 +129,7 @@ test('/router setup installs the agents and says what the pane means; /router pr
   })
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
@@ -183,7 +183,7 @@ test('/router doctor runs the installation check; /router agents pins, checks an
   })
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
@@ -628,7 +628,7 @@ test('the run monitor: the main session at the root, each agent a box under its 
   let n = 0
   on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `m${++n}` }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   const SPAWN = { tool_use_id: 'tm1', prompt: 'Find where the config file is parsed and report the function. ' + 'x'.repeat(70000), description: 'find the parser', subagentType: 'Explore', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1', model: 'claude-haiku-5-5' } as const
@@ -680,7 +680,7 @@ test('the run monitor before any agent: the main session drawn alone, WORKING wh
   const steps: unknown[] = []
   LIVE_MOCKS(on, seen, steps, 'Bash')
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   let n = 0
   on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `mm${++n}` }))
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
@@ -735,7 +735,7 @@ test('the run monitor pane draws the graph: a box per agent in its state colour,
   let n = 0
   on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `p${++n}` }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   const SPAWN = { tool_use_id: 'tp1', prompt: 'Find where the config file is parsed and report the function. ' + 'x'.repeat(70000), description: 'find the parser', subagentType: 'Explore', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1', model: 'claude-haiku-5-5' } as const
   await $.agent.spawn(SPAWN)
@@ -785,7 +785,7 @@ test('runs: the agents a prompt spawned are one run, saved when its last agent e
   let n = 0
   on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `r${++n}` }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   on('fs.write', (_, e) => { writes.push(e as { path: string; text: string }); return { value: undefined } })
   await $.session.start({ cwd: '/work/proj', surface: 'terminal', isInteractive: true })
   // run 1: a prompt spawns two agents; the run ends and is saved when the second one ends
@@ -895,7 +895,7 @@ test("the monitor's Routing frame: each agent as asked -> ran on with the decisi
   const seen: Record<string, unknown>[] = []
   ROUTING_MOCKS(on, seen, 'deny')
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
   const writes: { path: string; text: string }[] = []
@@ -955,7 +955,7 @@ test('a forked skill (/code-review runs as a fork of the session, not an Agent c
   on('ui.status', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   on('session.model', () => ({ value: 'claude-fable-5-1' }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.step', async function* (_, e) { steps.push(e.effort); return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } })
@@ -1002,7 +1002,7 @@ test('a deep tree: the pane draws an outline when the boxes would not fit its wi
   let n = 0
   on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `d${++n}` }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.place', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   const base = { provider: { kind: 'model' }, parentModel: 'claude-fable-5-1' } as const

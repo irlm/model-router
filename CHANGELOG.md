@@ -3,11 +3,18 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.26.2 — 2026-11-17
+
+- 0.26.1's fix was wrong: `$.ui.place` places a pane as a row in the conversation, not in front. The rule in the engine
+  is that a pane opened while another holds the focus (a button selected in it) stays behind, and opening an open pane
+  changes nothing. The widget now keeps one pane at a time: opening the monitor closes the main pane and the other way
+  round, so `g` and `m` swap them whatever holds the focus.
+
 ## 0.26.1 — 2026-11-17
 
 - The Monitor button (`g`) did nothing after `m` had brought the main pane to the front, and the other way round: the
-  engine keeps both panes open and shows one, and opening an open pane leaves the shown one as it is. Every pane open
-  now places the pane as well (`$.ui.place`), so a button or a verb brings an open pane back to the front.
+  engine keeps both panes open and shows one, and opening an open pane leaves the shown one as it is. (Fix replaced in
+  0.26.2.)
 
 ## 0.26.0 — 2026-11-17
 

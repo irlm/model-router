@@ -63,11 +63,11 @@ def main():
     args = ap.parse_args()
     if args.agents:
         argv = [sys.executable, str(HERE / 'prune_agents.py')] + (['--revert'] if args.revert else []) + (['--dry-run'] if args.dry_run else [])
-        print('── agents ──')
+        print('── agents ──', flush=True)
         r = subprocess.run(argv, text=True)
         if r.returncode != 0:
             return r.returncode
-        print('── skills ──')
+        print('── skills ──', flush=True)
     settings = read_json(args.settings, {})
     overrides = settings.get('skillOverrides') or {}
     if args.revert:

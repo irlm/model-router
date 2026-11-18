@@ -3,6 +3,30 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.26.0 — 2026-11-17
+
+- The monitor draws a deep run as an outline: one line per agent, two spaces of indent per level, with the state,
+  model and effort, elapsed, steps, cost and task, under the session's own line. The boxes stay for runs up to three
+  levels under the session; from four levels (each level of boxes is 62 columns) the pane switches to the outline by
+  itself and says so; `o` asks for the outline outright, or for the boxes however wide; `/router monitor outline`
+  prints it. Depth comes from forks that spawn agents, workflows and teams; a plain Agent call's subagent has no Agent
+  tool, so most runs are two levels.
+- Forks, after a review of 0.25.0 by a forked `/code-review` (the first run the widget tracked as one): a fork is
+  pending from the Skill call, not from its answer, since the fork's first request can arrive first; the answer's wording
+  confirms it (both forms the engine uses) or drops it; stale entries are swept; a fork launched from inside an agent
+  hangs under that agent; an unnamed skill is `fork /skill`, not `fork /`; one state read instead of three.
+
+## 0.25.0 — 2026-11-17
+
+- A forked skill shows in the monitor. `/code-review` and the other skills that run "as a fork of the session" never go
+  through the Agent tool, so no `agent.spawn` reaches the widget and the run looked empty while they worked. The Skill
+  tool's own answer ("launched (forked execution, running in the background)") now marks a fork as pending, and the
+  first request under an agent id nothing announced, within minutes, is admitted as `fork /<skill>`: a box in the
+  graph, its live tail, its end with cost, an event line, and a Routing line saying why the router left it alone (a
+  fork runs on the session's model; there is no Agent call to route). A request under an unknown id with no fork
+  pending is not invented. The agent admission the spawn hook did inline is one function now (`admit`).
+- `prune_skills.py --agents` prints its section headers before the child's output, not after.
+
 ## 0.24.0 — 2026-11-10
 
 - `/router prune skills`: the skills nothing on this machine loaded in the window are listed name-only (Claude Code's

@@ -143,9 +143,12 @@ an error in red; then the run's event log. A sketch:
 
 A `[ Routing ]` frame under the graph says what the routing did to the run: per agent, what the call asked for →
 what it ran on, the family, the decision and its evidence, and at the end the run's cost on the decisions against
-the as-asked figure, labelled `est` (the same tokens re-priced; that run never happened). Before any agent has run, the main session is drawn alone: its box says `● WORKING` while a turn runs
+the as-asked figure, labelled `est` (the same tokens re-priced; that run never happened). A skill that runs as a fork of the
+session (`/code-review`) is shown too, as `fork /<skill>`, under whatever launched it, with a note that nothing spawned
+it for the router to route. Before any agent has run, the main session is drawn alone: its box says `● WORKING` while a turn runs
 and `● IDLE` after, with the turns and cost so far, and its own live panel lists the main session's tool
-calls; agents hang under it as they spawn. An agent the engine resumes under the same id (a hand-back, a
+calls; agents hang under it as they spawn. A run deeper than three levels is drawn as an outline (one indented line per agent; `o` toggles, `/router monitor
+outline` prints it). An agent the engine resumes under the same id (a hand-back, a
 follow-up) is a new run of the same box, "02 Web Researcher · run 2"; a child hangs under the run active
 when it spawned. Nothing here is a dependency graph: the engine reports who spawned whom, not who waits
 on whom, so no box is marked blocked.

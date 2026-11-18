@@ -23,7 +23,7 @@ const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { sha
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 /** The run monitor's view: the drawn graph, or the same run as text lines. */
-const monitorView = atom({ plugin: 'model-router', key: 'monitorView' } as const, 'graph' as 'graph' | 'list', { shape: 'monitorView-1' })
+const monitorView = atom({ plugin: 'model-router', key: 'monitorView' } as const, 'graph' as 'graph' | 'list' | 'outline' | 'boxes', { shape: 'monitorView-2' })
 /** The run the monitor shows: null is the current one (the latest with an agent at work, else the latest). */
 const monitorRun = atom({ plugin: 'model-router', key: 'monitorRun' } as const, null as string | null, { shape: 'monitorRun-1' })
 const monitorHistory = atom({ plugin: 'model-router', key: 'monitorHistory' } as const, false, { shape: 'monitorHistory-1' })
@@ -124,7 +124,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.24.0'
+const WIDGET_VERSION = '0.26.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -560,6 +560,27 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null, rou
   return out
 }
 
+/** The run as an outline: one line per agent, two spaces of indent per level, so a tree of any depth fits the pane
+ * (the graph is 62 columns per level). The state word, the model and effort, elapsed, steps, cost, the task. */
+const outlineLines = (lvAll: Live, now: number, runId: string | null = null): Line[] => {
+  const lv = scopeOf(lvAll, runId)
+  const { all, kids } = treeOf(lv)
+  const out: Line[] = [line('[ Run outline ]', { bold: true, color: 'cyan' })]
+  const t = lv.turns
+  out.push(line(`${mainState(lv.main)}  00 main session  ${t.length} turn${t.length === 1 ? '' : 's'} · ${money(t.reduce((n, x) => n + x.cost, 0))} · ${all.length} agent${all.length === 1 ? '' : 's'} spawned`, { color: 'cyan', bold: true }))
+  const walk = (p: RunningAgent | null, depth: number) => {
+    for (const a of kids(p)) {
+      const { state, color } = stateOf(a, now)
+      const label = `${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''}`
+      const figures = [`${shortModel(a.model)} ${a.effort}`.trim(), secs((a.done ?? now) - a.startedAt), `${a.steps} step${a.steps === 1 ? '' : 's'}`, ...(a.cost !== null ? [money(a.cost)] : [])].join('  ')
+      out.push(line(`${'  '.repeat(depth)}${state.padEnd(9)}  ${label.padEnd(Math.max(0, 26 - depth * 2))} ${figures.padEnd(30)} ${a.description}`, { color, dim: a.done !== null && !bad(a) }))
+      walk(a, depth + 1)
+    }
+  }
+  walk(null, 1)
+  if (all.length === 0) out.push(line('  no agent spawned yet', { dim: true }))
+  return out
+}
 /** The run as a drawing: every agent a box on a grid (a column per depth, rows by a centred tree layout), the arrow from its
  * spawner weighted by the context sent. Pure: the pane draws the scene with positioned elements, nothing is measured on screen. */
 type Seg = { x: number; text: string; color?: string }
@@ -654,6 +675,7 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
     const why = a.decision === 'escalated' ? (lvAll.escalated[a.family ?? ''] ?? 'a routed call failed or was re-issued') + ': runs as asked for the rest of the session'
       : routed ? (fam ? `measured ${fam.rate}, $${fam.cost_per_success.toFixed(4)}/success` : 'measured')
       : a.decision === 'kept' ? 'kept as asked'
+      : a.type.startsWith('fork /') ? 'a fork of this session: runs on its model, no Agent call to route'
       : !a.family ? 'no measured family covers it'
       : fam ? 'already on the routed model' : 'family not decided yet: runs as asked'
     const arrow = routed ? `${a.asked} → ${ran}` : a.asked === 'inherit' ? `inherit (${ran})` : a.asked
@@ -986,6 +1008,27 @@ async function saveRun($: Dollar, id: string) {
     return null
   }
 }
+/** An agent joins the live state: its number, its run (a resume is a new run of the same box), the run's meta, the event line.
+ * `verb` is 'spawned' for an Agent call's subagent, 'started' for a fork of the session. */
+async function admit($: Dollar, a: RunningAgent, now: number, verb: 'spawned' | 'started') {
+  a.startedAt = a.lastStepAt = now
+  await update($, live, v => {
+      // The engine resumes an agent under the same id (a hand-back, a follow-up message): that is a new run of the same box, not a new agent.
+      const prior = v.finished.filter(x => x.id === a.id)
+      const n = prior.length ? prior[0].n : v.nextN
+      const run = prior.length + 1
+      const nn = String(n).padStart(2, '0')
+      const parentRec = a.parent ? (v.agents[a.parent] ?? [...v.finished].reverse().find(x => x.id === a.parent)) : undefined
+      const by = a.parent ? ` by ${String(parentRec?.n ?? 0).padStart(2, '0')}` : ''
+      // The run it joins: the open named task; else the run of its earlier self (a resume) or of its spawner; else this prompt's.
+      const runId = v.task ? `task:${slug(v.task)}` : prior.length ? prior[prior.length - 1].runId : parentRec ? parentRec.runId : `turn:${currentTurn || 'start'}`
+      const have = v.runs.find(r => r.id === runId)
+      const meta: RunMeta = have ? { ...have, endedAt: null, agentN: have.agentN + 1 } : { id: runId, startedAt: now, endedAt: null, prompt: (v.task ?? lastPrompt).slice(0, 120), name: v.task, agentN: 1, cost: 0, failedN: 0, stoppedN: 0, saved: null }
+      const ev: RunEvent = { at: now, runId, text: run > 1 ? `${nn} ${a.type} resumed (run ${run}, ~${kilo(a.ctx)} ctx)` : `${nn} ${a.type} ${verb} on ${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''} (~${kilo(a.ctx)} ctx)${by}` }
+      // an inherited call runs at the session's effort: the last turn's, when one has been reported
+      return { ...v, nextN: prior.length ? v.nextN : n + 1, agents: { ...v.agents, [a.id]: { ...a, n, run, runId, askedEffort: a.askedEffort || v.turns[v.turns.length - 1]?.sessionEffort || '' } }, events: [...v.events, ev].slice(-400), runs: have ? v.runs.map(r => (r.id === runId ? meta : r)) : [...v.runs, meta] }
+  })
+}
 /** A run with no agent left at work has ended (a named task ends only by /router task end): mark it and save it. */
 async function closeIdleRuns($: Dollar) {
   const lv = await read($, live)
@@ -1097,6 +1140,9 @@ const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max'])
 /** A routing decision waiting for its spawn: the Agent call's id (and its words, for a spawn whose id is not known) → what the subagent runs on. */
 type PendingRoute = { at: number; description: string; prompt: string; model: string; effort: string; family: string }
 const pendingRoutes = new Map<string, PendingRoute>()
+/** Forked skill runs the Skill tool launched ("forked execution, running in the background"): the next request under an
+ * unknown agent id within minutes is that fork. No agent.spawn fires for a fork, and it runs on the session's model. */
+const pendingForks: { at: number; skill: string; parent: string | null; sure: boolean }[] = []
 const PENDING_MS = 10 * 60000
 /** The last prompt the person sent: the run a spawn belongs to takes its words. */
 let lastPrompt = ''
@@ -1313,7 +1359,7 @@ export const register: Register = (on, options) => {
       if (arg === 'save') return { text: await saveReport($, tail.split(/\s+/)[1] ?? null) }
       const opened = await $.ui.open({ id: MONITOR, title: 'Agent run' })
       const lv = await read($, live)
-      const text = monitorLines(lv, await $.clock.now(), await read($, monitorRun), arg !== 'top').map(l => l.text).join('\n')   // `monitor top`: the five routing lines that moved the most
+      const text = (arg === 'outline' ? outlineLines(lv, await $.clock.now(), await read($, monitorRun)) : monitorLines(lv, await $.clock.now(), await read($, monitorRun), arg !== 'top')).map(l => l.text).join('\n')   // `monitor top`: the five routing lines that moved the most; `monitor outline`: one line per agent
       return { text: (opened.isPlaced ? 'Agent run pane opened.' : `The pane waits for room: ${opened.reason}`) + '\n' + text + (lv.runs.length > 1 ? `\n(${lv.runs.length} runs this session: h in the pane lists them; /router runs lists the saved ones)` : '') }
     }
     // A named task: every agent from now joins one run, until it is ended; the run is saved then.
@@ -1470,23 +1516,7 @@ export const register: Register = (on, options) => {
         family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false, stopped: false,
         ctx: Math.round(e.prompt.length / 4), n: 0, run: 1, recent: [], runId: '', answer: '',
         asked: rt?.from ?? (e.model ? `${e.model}${askedEffort ? ' ' + askedEffort : ''}` : 'inherit'), askedModel: e.model ?? e.parentModel ?? '', askedEffort, decision: rt?.decision ?? null, usage: null }
-      a.startedAt = a.lastStepAt = now
-      await update($, live, v => {
-        // The engine resumes an agent under the same id (a hand-back, a follow-up message): that is a new run of the same box, not a new agent.
-        const prior = v.finished.filter(x => x.id === a.id)
-        const n = prior.length ? prior[0].n : v.nextN
-        const run = prior.length + 1
-        const nn = String(n).padStart(2, '0')
-        const parentRec = a.parent ? (v.agents[a.parent] ?? [...v.finished].reverse().find(x => x.id === a.parent)) : undefined
-        const by = a.parent ? ` by ${String(parentRec?.n ?? 0).padStart(2, '0')}` : ''
-        // The run it joins: the open named task; else the run of its earlier self (a resume) or of its spawner; else this prompt's.
-        const runId = v.task ? `task:${slug(v.task)}` : prior.length ? prior[prior.length - 1].runId : parentRec ? parentRec.runId : `turn:${currentTurn || 'start'}`
-        const have = v.runs.find(r => r.id === runId)
-        const meta: RunMeta = have ? { ...have, endedAt: null, agentN: have.agentN + 1 } : { id: runId, startedAt: now, endedAt: null, prompt: (v.task ?? lastPrompt).slice(0, 120), name: v.task, agentN: 1, cost: 0, failedN: 0, stoppedN: 0, saved: null }
-        const ev: RunEvent = { at: now, runId, text: run > 1 ? `${nn} ${a.type} resumed (run ${run}, ~${kilo(a.ctx)} ctx)` : `${nn} ${a.type} spawned on ${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''} (~${kilo(a.ctx)} ctx)${by}` }
-        // an inherited call runs at the session's effort: the last turn's, when one has been reported
-        return { ...v, nextN: prior.length ? v.nextN : n + 1, agents: { ...v.agents, [a.id]: { ...a, n, run, runId, askedEffort: a.askedEffort || v.turns[v.turns.length - 1]?.sessionEffort || '' } }, events: [...v.events, ev].slice(-400), runs: have ? v.runs.map(r => (r.id === runId ? meta : r)) : [...v.runs, meta] }
-      })
+      await admit($, a, now, 'spawned')
     }
     return r
   }).catch(($, e, next) => {
@@ -1514,7 +1544,25 @@ export const register: Register = (on, options) => {
   on('turn.step', async function* ($, e, next) {
     if (e.agentId !== undefined) {
       const id = e.agentId
-      const a0 = (await read($, live)).agents[id]
+      const lv0 = await read($, live)
+      let a0 = lv0.agents[id]
+      if (!a0 && !lv0.finished.some(x => x.id === id)) {
+        // No spawn announced this id: a fork the Skill tool launched moments ago, if one is pending (a confirmed one first).
+        // A subagent whose spawn hook failed would be taken for it: that hook toasts its failure, so the mislabel is not silent.
+        const now0 = await $.clock.now()
+        for (let k = pendingForks.length - 1; k >= 0; k--) if (now0 - pendingForks[k].at > PENDING_MS) pendingForks.splice(k, 1)
+        const i = pendingForks.findIndex(f => f.sure) >= 0 ? pendingForks.findIndex(f => f.sure) : pendingForks.length ? 0 : -1
+        if (i >= 0) {
+          const [f] = pendingForks.splice(i, 1)
+          const model = e.model || (await $.session.model().catch(() => '')) || ''
+          const ctx = (await contextTokens($))?.tokens ?? 0   // a fork carries the whole session: the arrow is as heavy as the context is
+          const fork: RunningAgent = { id, parent: f.parent, type: `fork /${f.skill}`, description: `/${f.skill}: a fork of ${f.parent ? 'its launcher' : 'this session'}, in the background`, model, effort: typeof e.effort === 'string' ? e.effort : '', wantEffort: null,
+            family: null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false, stopped: false, ctx, n: 0, run: 1, recent: [], runId: '', answer: '',
+            asked: 'inherit', askedModel: model, askedEffort: '', decision: null, usage: null }
+          await admit($, fork, now0, 'started')
+          a0 = (await read($, live)).agents[id]
+        }
+      }
       const want = a0?.wantEffort && EFFORTS.has(a0.wantEffort) ? a0.wantEffort as 'low' | 'medium' | 'high' | 'xhigh' | 'max' : null
       if (a0) {
         const at = await $.clock.now()
@@ -1544,8 +1592,18 @@ export const register: Register = (on, options) => {
 
   // What every main-loop tool call came to: the errors and Agent calls of the turn in progress.
   on('tool.call', async ($, e, next) => {
-    const r = await next(e)
     const agentId = (e as { agentId?: string }).agentId
+    // A Skill call may launch a fork, whose first request can arrive before this hook sees the tool's answer: the
+    // candidate is pending from the call, confirmed by the answer's wording (two forms the engine uses), dropped otherwise.
+    const candidate = e.tool === 'Skill' ? { at: await $.clock.now(), skill: String((e as { skill?: string }).skill ?? '') || 'skill', parent: agentId ?? null, sure: false } : null
+    if (candidate) { pendingForks.push(candidate); if (pendingForks.length > 10) pendingForks.shift() }
+    const r = await next(e)
+    if (candidate) {
+      const forked = /forked execution|running in the background as @/i.test(JSON.stringify(r))
+      const i = pendingForks.indexOf(candidate)
+      if (forked) candidate.sure = true
+      else if (i >= 0) pendingForks.splice(i, 1)
+    }
     if (agentId !== undefined && (await read($, live)).agents[agentId]) {
       const rec: Recent = { at: await $.clock.now(), text: toolText(e as unknown as Record<string, unknown>), err: (r as { isError?: boolean }).isError === true }
       await update($, live, v => {
@@ -1559,6 +1617,7 @@ export const register: Register = (on, options) => {
         if (e.tool === 'Agent') p.agentCalls++
         if ((r as { isError?: boolean }).isError) p.errors++
       }
+
       // The main session's own tail, for the monitor's root panel.
       const rec: Recent = { at: await $.clock.now(), text: toolText(e as unknown as Record<string, unknown>), err: (r as { isError?: boolean }).isError === true }
       await update($, live, v => ({ ...v, main: { ...v.main, recent: [...v.main.recent, rec].slice(-8) } }))
@@ -1638,9 +1697,15 @@ export const register: Register = (on, options) => {
     const lv = scopeOf(lvAll, picked)
     const running = Object.values(lv.agents)
     const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
+    // Boxes draw up to three levels under the session; a deeper tree is an outline by itself, since each level is 62 columns
+    // (`o` asks for the outline outright, or for the boxes however wide: 'boxes').
+    const depth = (p: RunningAgent | null, d: number): number => Math.max(d, ...treeOf(lv).kids(p).map(c => depth(c, d + 1)))
+    const tooDeep = depth(null, 0) > 3
+    const outline = view === 'outline' || (view === 'graph' && tooDeep)
     const footer = (
       <Box flexDirection="row" gap={1} flexWrap="wrap">
         <Button key="view" hotkey="g" onPress={() => { void update($, monitorView, v => (v === 'graph' ? 'list' : 'graph')) }}>{view === 'graph' ? 'List' : 'Graph'}</Button>
+        <Button key="outline" hotkey="o" onPress={() => { void update($, monitorView, v => (v === 'outline' || (v === 'graph' && tooDeep) ? 'boxes' : 'outline')) }}>{outline ? 'Boxes' : 'Outline'}</Button>
         <Button key="history" hotkey="h" onPress={() => { void update($, monitorHistory, v => !v); void listSavedRuns($) }}>{history ? 'Back' : `History (${lvAll.runs.length})`}</Button>
         <Button key="save" hotkey="s" onPress={() => { void saveReport($, shownId).then(t => $.ui.toast(`router: ${t}`)) }}>Save report</Button>
         <Button key="routing" hotkey="r" onPress={() => { void update($, monitorRouting, v => !v) }}>{routingFull ? 'Routing: top 5' : 'Routing: all'}</Button>
@@ -1704,7 +1769,12 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const graph = (
+    const graph = outline ? (
+      <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
+        {outlineLines(lvAll, now, picked).map(l => <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim} wrap="truncate">{l.text}</Text>)}
+        {view !== 'outline' && <Text dimColor>{`four levels or more: drawn as an outline (the boxes would be ${Math.round(scene.width)} columns wide); o toggles`}</Text>}
+      </Box>
+    ) : (
       <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
         <Text color="cyan" bold>[ Run graph ]</Text>
         <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · graph: live · ${running.length ? 'at work' : lv.main.busy ? 'main session at work' : 'idle'}`}</Text>

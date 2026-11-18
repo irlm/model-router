@@ -180,7 +180,10 @@ the root box (cyan); each agent is a box to the right of the one that spawned it
 depth, a centred tree down the rows), its border in the state's colour: green at work, yellow QUIET after a
 minute without a request, red FAILED, dim when DONE with its cost. The arrow from spawner to child is weighted by
 the context the child was sent, estimated from the prompt at 4 characters a token (`━━` from 16k, `──` from 4k,
-`┄┄` below) with the estimate labelled on the branch. An agent the engine resumes under the same id (a hand-back,
+`┄┄` below) with the estimate labelled on the branch. A skill that runs as a fork of the session (`/code-review` and the like) is not an Agent call, so nothing spawns it
+for the router to route; it is still shown, as `fork /<skill>`, from the moment the Skill tool reports the launch
+and its first request arrives, with its tail, its end and a Routing line saying it ran on the session's model.
+An agent the engine resumes under the same id (a hand-back,
 a follow-up) is a new run of the same box, "03 general-purpose · run 2", and a child hangs under the run that
 was active when it spawned. Beside the graph, when the pane is 130 columns or wider (under it when narrower),
 the live panels of the agents at work: their last tool calls as the engine saw them (a command, a file read, a
@@ -194,7 +197,9 @@ same tokens re-priced at catalog prices, an estimate by construction, since the 
 run shows the five lines that moved the most (escalations first, then the routed calls by what the routing changed) and
 "N more"; `r` shows every line (`/router monitor top` prints the five, `/router monitor` all).
 `g` switches to the same run as text lines, one line one row, which `/router monitor` also prints; `m` opens the
-main pane. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
+main pane. A run deeper than three levels under the session is drawn as an outline instead of boxes (one line per agent,
+indented by level, with state, model and effort, elapsed, steps, cost, task), since each level of boxes is 62 columns;
+`o` asks for the outline, or for the boxes however wide; `/router monitor outline` prints it. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
 `● IDLE` after, with the turns and cost so far, and a panel of its own lists the main session's last tool calls
 (shown whenever fewer than two agents are at work); agents hang under the box as they spawn. Nothing here is a dependency graph of the task: the engine reports who spawned whom, not who waits
 on whom, so no box is marked blocked and no waiting arrow is drawn.
@@ -251,6 +256,12 @@ cccost's author showed. On a subscription they are headroom, not a bill, so the 
 suggestions header give the saving as a share of the window's spend too.
 
 ### Updating
+
+With the marketplace pointed at a checkout (`claude plugin marketplace add <the checkout>`), two things differ:
+`/reload-plugins` reads `mod/` from the folder, so an edit is live in the session that reloads; but a *new* session
+loads the copy recorded by the install (`~/.claude/plugins/cache/model-router/<version>`), which only
+`claude plugin update model-router@model-router` refreshes from the folder. After a commit, run that once (`dotup`
+does), or every new session starts on the previous version until it reloads.
 
 The widget has two parts that update separately: the mod (the pane, the status line, the router
 hook: the code Claude Code loads at start) and the repository it reads (the scripts, the routing,

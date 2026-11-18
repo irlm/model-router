@@ -934,3 +934,88 @@ test("the monitor's Routing frame: each agent as asked -> ran on with the decisi
   expect(routing(text)).not.toContain('more: the 5 above')
   await settled()
 })
+
+test('a forked skill (/code-review runs as a fork of the session, not an Agent call) shows in the monitor: its box, its tail, its end, and why the router left it alone', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_762_000_000_000 })
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(STATUS) } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('session.model', () => ({ value: 'claude-fable-5-1' }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.step', async function* (_, e) { steps.push(e.effort); return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } })
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  let n = 0
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `g${++n}` }))
+  // the Skill tool's answer for a forked skill, as the engine words it
+  on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return e.tool === 'Skill' ? { result: 'Skill "code-review" launched (forked execution, running in the background).\n\nRunning in the background as @code-review' } : { result: {} } })   // the engine's wording, 2.1.327
+  await $.session.start({ cwd: '/work/shop', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'review my changes', turnId: 'fk1' })
+  await $.tool.call({ tool: 'Skill', skill: 'code-review', args: 'medium' })
+  await drain($.turn.step({ turnId: 'fkt1', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1, agentId: 'fork-1' }))   // no agent.spawn came first
+  await $.tool.call({ tool: 'Grep', pattern: 'TODO', path: 'src', agentId: 'fork-1' })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
+  expect(text).toContain('┌ 01 fork /code-review')
+  expect(text).toMatch(/● RUNNING\s+fable high\s+\S+\s+1 step/)
+  expect(text).toContain('● 01 fork /code-review / live')
+  expect(text).toMatch(/\d\d:\d\d:\d\d  Grep "TODO" src/)
+  expect(text).toContain('01 fork /code-review started on fable high')
+  expect(text).toMatch(/01 fork \/code-review\s+inherit \(fable high\)\s+unmeasured\s+kept\s+a fork of this session: runs on its model, no Agent call to route/)
+  await $.turn.complete({ answer: 'two findings', durationMs: 9000, isAborted: false, turnId: 'fkt1', reason: 'answer', agentId: 'fork-1', usage: { model: 'claude-fable-5-1', input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 100000, cache_creation_input_tokens: 0 } })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toMatch(/01 fork \/code-review done in \S+, \$0\.14/)
+  // a request under an id nothing announced and no fork pending is not invented
+  await drain($.turn.step({ turnId: 'x', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1, agentId: 'stranger' }))
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).not.toContain('02 ')
+  // a fork launched from inside an agent hangs under its launcher
+  const sp = await $.agent.spawn({ tool_use_id: 'tg1', prompt: 'Review the change and run the checks.', description: 'review with checks', subagentType: 'general-purpose', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1' })
+  await drain($.turn.step({ turnId: 'g-t1', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1, agentId: sp.agentId }))
+  await $.tool.call({ tool: 'Skill', skill: 'code-review', args: 'low', agentId: sp.agentId })
+  await drain($.turn.step({ turnId: 'fkt2', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1, agentId: 'fork-2' }))
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toMatch(/┗[━─┄]+ ~\d+k? [━─┄]+▶ ┌ 03 fork \/code-review/)                       // under 02, the agent that launched it
+  expect(text).toContain('03 fork /code-review started on fable high')
+  await settled()
+})
+
+test('a deep tree: the pane draws an outline when the boxes would not fit its width, o toggles, and /router monitor outline prints it', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, null)
+  let n = 0
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `d${++n}` }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  const base = { provider: { kind: 'model' }, parentModel: 'claude-fable-5-1' } as const
+  const a1 = await $.agent.spawn({ ...base, tool_use_id: 'd1', subagentType: 'general-purpose', description: 'review the change', prompt: 'Review the change with a real check.' })
+  const a2 = await $.agent.spawn({ ...base, tool_use_id: 'd2', subagentType: 'general-purpose', description: 'verify the claim', prompt: 'Run the tests and report.', parentAgentId: a1.agentId })
+  const a3 = await $.agent.spawn({ ...base, tool_use_id: 'd3', subagentType: 'Explore', description: 'find the callers', prompt: 'Find every caller.', parentAgentId: a2.agentId, model: 'claude-haiku-5-5' })
+  await $.agent.spawn({ ...base, tool_use_id: 'd4', subagentType: 'Web Researcher', description: 'the rounding rule', prompt: 'Which rounding?', parentAgentId: a3.agentId, model: 'claude-haiku-5-5' })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor outline' })
+  expect(text).toContain('[ Run outline ]')
+  expect(text).toMatch(/^● WORKING|^● IDLE/m)
+  expect(text).toMatch(/^  ● RUNNING  01 general-purpose/m)
+  expect(text).toMatch(/^    ● RUNNING  02 general-purpose/m)
+  expect(text).toMatch(/^      ● RUNNING  03 Explore/m)
+  expect(text).toMatch(/^        ● RUNNING  04 Web Researcher/m)
+  // 150 columns cannot hold four levels of boxes: the pane shows the outline by itself and says so
+  let ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^\[ Run outline \]$/ }))?.text).toBe('[ Run outline ]')
+  expect((await ui.find({ type: 'Text', text: /drawn as an outline .*o toggles/ }))?.text).toContain('o toggles')
+  await ui.press({ key: 'outline' })                                                      // o: the boxes, however wide
+  expect((await ui.find({ type: 'Text', text: /^\[ Run graph \]$/ }))?.text).toBe('[ Run graph ]')
+  await ui.press({ key: 'outline' })                                                      // o again: the outline, asked for outright (no note)
+  expect((await ui.find({ type: 'Text', text: /^\[ Run outline \]$/ }))?.text).toBe('[ Run outline ]')
+  expect(await ui.find({ type: 'Text', text: /o toggles/ })).toBeUndefined()
+  await ui.unmount()
+  await settled()
+})

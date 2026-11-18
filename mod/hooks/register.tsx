@@ -124,7 +124,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.27.0'
+const WIDGET_VERSION = '0.27.1'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -1718,7 +1718,6 @@ export const register: Register = (on, options) => {
         <Button key="save" hotkey="s" onPress={() => { void saveReport($, shownId).then(t => $.ui.toast(`router: ${t}`)) }}>Save report</Button>
         <Button key="routing" hotkey="r" onPress={() => { void update($, monitorRouting, v => !v) }}>{routingFull ? 'Routing: top 5' : 'Routing: all'}</Button>
         {picked !== null && <Button key="current" hotkey="c" onPress={() => { void update($, monitorRun, () => null) }}>Current run</Button>}
-        <Button key="main" hotkey="m" onPress={() => { void showPane($, PANE, 'Model router') }}>Model router</Button>
       </Box>
     )
     const runText = <Text dimColor>{runLine(lvAll, picked)}</Text>
@@ -1728,7 +1727,7 @@ export const register: Register = (on, options) => {
           <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Agent run</Text></Text>
           <Text dimColor>{`${spin}${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''}) · ${clockS(now)}`}</Text>
         </Box>
-        {runText}
+        <Box flexDirection="row" gap={1}><Button key="main" hotkey="m" onPress={() => { void showPane($, PANE, 'Model router') }}>↑ Model router</Button>{runText}</Box>
       </Box>
     )
     if (history) {
@@ -1738,7 +1737,6 @@ export const register: Register = (on, options) => {
       return (
         <Box flexDirection="column">
           {header}
-          {footer}
           <Text color="cyan" bold>[ Runs this session ]</Text>
           {lvAll.runs.length === 0 && <Text dimColor>none yet</Text>}
           {[...lvAll.runs].reverse().map((r, i) => (
@@ -1749,6 +1747,7 @@ export const register: Register = (on, options) => {
           {older.length === 0 && <Text dimColor>{saved.length ? 'all listed above' : 'none listed; /router runs lists them, /router runs import rebuilds the days before the widget watched'}</Text>}
           {older.map(r => <Text dimColor>{`${stamp(r.startedAt)}  ${(r.name ? `task ${r.name}` : r.prompt).slice(0, 56).padEnd(56)}  ${String(r.agentN).padStart(2)} agents  ${money(r.cost).padStart(6)}  ${r.source === 'transcript' ? 'from transcripts' : ''}  ${r.id}`}</Text>)}
           <Text dimColor>/router runs show &lt;id&gt; prints a saved run; /router monitor save &lt;id&gt; writes its report into docs/runs/</Text>
+          {footer}
         </Box>
       )
     }
@@ -1757,10 +1756,10 @@ export const register: Register = (on, options) => {
       return (
         <Box flexDirection="column">
           {header}
-          {footer}
           {monitorLines(lvAll, now, picked, routingFull).map(l => (
             <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text === '' ? ' ' : cut(l.text)}</Text>
           ))}
+          {footer}
         </Box>
       )
     }
@@ -1844,7 +1843,6 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         {header}
-        {footer}
         {twoCol ? (
           <Box flexDirection="row" gap={1}>
             <Box flexDirection="column" flexGrow={1}>{graph}{routingFrame}{events}</Box>
@@ -1853,6 +1851,7 @@ export const register: Register = (on, options) => {
         ) : (
           <Box flexDirection="column">{graph}{routingFrame}{right}{events}</Box>
         )}
+        {footer}
       </Box>
     )
   })
@@ -1954,6 +1953,8 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         {header}
+        {sections}
+        {jobFrame}
         <Box flexDirection="row" gap={1} flexWrap="wrap">
           <Button key="update" hotkey="u" variant="primary" dimColor={busy} onPress={() => { void runJob($, 'update') }}>Re-check routing</Button>
           <Button key="details" hotkey="d" onPress={() => { void update($, details, v => !v) }}>{full ? 'Less' : 'Details'}</Button>
@@ -1961,8 +1962,6 @@ export const register: Register = (on, options) => {
           <Button key="ledger" hotkey="l" dimColor={busy} onPress={() => { void runJob($, 'ledger') }}>Ledger now</Button>
           <Button key="apply" hotkey="a" dimColor={busy} onPress={() => { void runJob($, 'apply') }}>Apply agents</Button>
         </Box>
-        {sections}
-        {jobFrame}
       </Box>
     )
   })

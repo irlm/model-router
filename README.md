@@ -57,8 +57,7 @@ machine, Routed). `/router check` prints the same lines as text. An example, fig
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ model-router  /  Model router           12 turns · $1.84 · cache hit 93% · ctx 148k · fable-5-1 high │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
-widget 0.27.0 loaded
- Re-check routing (u)  Details (d)  Monitor (g)  Ledger now (l)  Apply agents (a)
+widget 0.27.1 loaded
 repo ~/Projects/Github/model-router · 255ce37 · clean
 spend $61 last 30d
 routed this session 2
@@ -93,6 +92,7 @@ routed this session 2
 │   3. research notes on general-purpose → Sonnet low                 up to $5 less    measured        │
 │   4 more under Details (d)                                                                           │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Re-check routing (u)  Details (d)  Monitor (g)  Ledger now (l)  Apply agents (a)
 ```
 
 - *Session live* is the session as it runs, from the engine's own per-turn figures: cost per turn as a
@@ -119,6 +119,8 @@ stopped, dim when done with its cost), the arrow weighted by the context the chi
 an error in red; then the run's event log. A sketch:
 
 ```
+↑ Model router (m)   run 1/1 this session · "why does the checkout total drift…" · 3 agents · $0.21 · running
+
 ┌ 00 main session ──────────────────┐
 │ fable-5-1 high · 12 turns · $1.84 │
 └─────────┬─────────────────────────┘
@@ -138,7 +140,7 @@ an error in red; then the run's event log. A sketch:
 12:00:52  02 Web Researcher spawned on haiku (~9 ctx) by 01
 12:01:01  02 Web Researcher done in 5s, $0.02
 
- List (g)  History (3) (h)  Save report (s)  Model router (m)
+ List (g)  Outline (o)  History (3) (h)  Save report (s)  Routing: all (r)
 ```
 
 A `[ Routing ]` frame under the graph says what the routing did to the run: per agent, what the call asked for →

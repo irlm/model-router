@@ -3,6 +3,12 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.27.1 — 2026-11-17
+
+- The buttons are back at the bottom of both panes, as before 0.27.0; what the top gets is one way up: the monitor's
+  header line starts with `↑ Model router (m)`, so going back up never needs the bottom row, and the main pane, the
+  root, has nothing above its sections. Refresh, Fetch origin and Pull stay verbs.
+
 ## 0.27.0 — 2026-11-17
 
 - The buttons sit at the top of both panes, under the header, instead of below everything (a full pane meant scrolling

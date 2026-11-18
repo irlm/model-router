@@ -75,7 +75,7 @@ classify a prompt are the same as `tools/consumption.py`'s, so what the ledger c
 router acts on agree. The main session's own model is not touched: a mod can set a subagent's
 model per call, the main model only `/model` can.
 
-Buttons (at the top of the pane, under the header) and verbs (`/router <verb>`):
+Buttons (at the bottom of the pane) and verbs (`/router <verb>`):
 
 | Button | Verb | Runs |
 |---|---|---|
@@ -196,8 +196,8 @@ effort gear within the run; and, once every agent has ended, `run on the decisio
 same tokens re-priced at catalog prices, an estimate by construction, since the as-asked run never happened. A long
 run shows the five lines that moved the most (escalations first, then the routed calls by what the routing changed) and
 "N more"; `r` shows every line (`/router monitor top` prints the five, `/router monitor` all).
-`g` switches to the same run as text lines, one line one row, which `/router monitor` also prints; `m` opens the
-main pane. A run deeper than three levels under the session is drawn as an outline instead of boxes (one line per agent,
+`g` switches to the same run as text lines, one line one row, which `/router monitor` also prints; `m`, the `↑ Model router`
+control under the monitor's header, goes back up to the main pane. A run deeper than three levels under the session is drawn as an outline instead of boxes (one line per agent,
 indented by level, with state, model and effort, elapsed, steps, cost, task), since each level of boxes is 62 columns;
 `o` asks for the outline, or for the boxes however wide; `/router monitor outline` prints it. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
 `● IDLE` after, with the turns and cost so far, and a panel of its own lists the main session's last tool calls

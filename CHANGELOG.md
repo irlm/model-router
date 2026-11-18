@@ -3,6 +3,12 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.27.0 — 2026-11-17
+
+- The buttons sit at the top of both panes, under the header, instead of below everything (a full pane meant scrolling
+  to reach them). Refresh, Fetch origin and Pull are gone from the row: the status refreshes after every job and every
+  30 minutes, and `dotup` pulls; `/router check`, `/router fetch` and `/router pull` still do them on demand.
+
 ## 0.26.2 — 2026-11-17
 
 - 0.26.1's fix was wrong: `$.ui.place` places a pane as a row in the conversation, not in front. The rule in the engine

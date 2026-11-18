@@ -124,7 +124,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.26.2'
+const WIDGET_VERSION = '0.27.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -1722,12 +1722,23 @@ export const register: Register = (on, options) => {
       </Box>
     )
     const runText = <Text dimColor>{runLine(lvAll, picked)}</Text>
+    const header = (
+      <Box flexDirection="column">
+        <Box borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="row" justifyContent="space-between">
+          <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Agent run</Text></Text>
+          <Text dimColor>{`${spin}${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''}) · ${clockS(now)}`}</Text>
+        </Box>
+        {runText}
+      </Box>
+    )
     if (history) {
       const inSession = new Set(lvAll.runs.map(r => r.id))
       const older = saved.filter(r => !inSession.has(r.id)).slice(-20).reverse()
       const row = (r: RunMeta) => `${clock(r.startedAt)}  ${(r.name ? `task ${r.name}` : r.prompt).slice(0, 56).padEnd(56)}  ${String(r.agentN).padStart(2)} agents  ${money(r.cost).padStart(6)}${r.endedAt ? '' : '  running'}${r.failedN || r.stoppedN ? `  ${r.failedN + r.stoppedN} failed/stopped` : ''}`
       return (
         <Box flexDirection="column">
+          {header}
+          {footer}
           <Text color="cyan" bold>[ Runs this session ]</Text>
           {lvAll.runs.length === 0 && <Text dimColor>none yet</Text>}
           {[...lvAll.runs].reverse().map((r, i) => (
@@ -1738,7 +1749,6 @@ export const register: Register = (on, options) => {
           {older.length === 0 && <Text dimColor>{saved.length ? 'all listed above' : 'none listed; /router runs lists them, /router runs import rebuilds the days before the widget watched'}</Text>}
           {older.map(r => <Text dimColor>{`${stamp(r.startedAt)}  ${(r.name ? `task ${r.name}` : r.prompt).slice(0, 56).padEnd(56)}  ${String(r.agentN).padStart(2)} agents  ${money(r.cost).padStart(6)}  ${r.source === 'transcript' ? 'from transcripts' : ''}  ${r.id}`}</Text>)}
           <Text dimColor>/router runs show &lt;id&gt; prints a saved run; /router monitor save &lt;id&gt; writes its report into docs/runs/</Text>
-          {footer}
         </Box>
       )
     }
@@ -1746,10 +1756,11 @@ export const register: Register = (on, options) => {
       const cut = (t: string) => (t.length > width ? t.slice(0, width - 1) + '…' : t)
       return (
         <Box flexDirection="column">
+          {header}
+          {footer}
           {monitorLines(lvAll, now, picked, routingFull).map(l => (
             <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text === '' ? ' ' : cut(l.text)}</Text>
           ))}
-          {footer}
         </Box>
       )
     }
@@ -1814,15 +1825,6 @@ export const register: Register = (on, options) => {
         {lv.events.slice(-8).map(ev => <Text><Text dimColor>{clockS(ev.at)}  </Text><Text color={ev.color}>{ev.text}</Text></Text>)}
       </Box>
     )
-    const header = (
-      <Box flexDirection="column">
-        <Box borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="row" justifyContent="space-between">
-          <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Agent run</Text></Text>
-          <Text dimColor>{`${spin}${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''}) · ${clockS(now)}`}</Text>
-        </Box>
-        {runText}
-      </Box>
-    )
     // The main session's own panel whenever fewer than two agents are at work: alone before any agent runs, beside a
     // lone agent, and again after a run ends (finished agents keep their tail but do not take its place).
     const mainPanel = running.length < 2 && (
@@ -1842,6 +1844,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         {header}
+        {footer}
         {twoCol ? (
           <Box flexDirection="row" gap={1}>
             <Box flexDirection="column" flexGrow={1}>{graph}{routingFrame}{events}</Box>
@@ -1850,7 +1853,6 @@ export const register: Register = (on, options) => {
         ) : (
           <Box flexDirection="column">{graph}{routingFrame}{right}{events}</Box>
         )}
-        {footer}
       </Box>
     )
   })
@@ -1952,18 +1954,15 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         {header}
-        {sections}
-        {jobFrame}
         <Box flexDirection="row" gap={1} flexWrap="wrap">
-          <Button key="refresh" hotkey="r" onPress={() => { void refresh($) }}>Refresh</Button>
-          <Button key="fetch" hotkey="f" onPress={() => { void refresh($, true) }}>Fetch origin</Button>
           <Button key="update" hotkey="u" variant="primary" dimColor={busy} onPress={() => { void runJob($, 'update') }}>Re-check routing</Button>
           <Button key="details" hotkey="d" onPress={() => { void update($, details, v => !v) }}>{full ? 'Less' : 'Details'}</Button>
           <Button key="monitor" hotkey="g" onPress={() => { void showPane($, MONITOR, 'Agent run') }}>Monitor</Button>
           <Button key="ledger" hotkey="l" dimColor={busy} onPress={() => { void runJob($, 'ledger') }}>Ledger now</Button>
           <Button key="apply" hotkey="a" dimColor={busy} onPress={() => { void runJob($, 'apply') }}>Apply agents</Button>
-          <Button key="pull" hotkey="p" dimColor={busy} onPress={() => { void runJob($, 'pull') }}>Pull</Button>
         </Box>
+        {sections}
+        {jobFrame}
       </Box>
     )
   })

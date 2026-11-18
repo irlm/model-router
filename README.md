@@ -57,7 +57,8 @@ machine, Routed). `/router check` prints the same lines as text. An example, fig
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ model-router  /  Model router           12 turns · $1.84 · cache hit 93% · ctx 148k · fable-5-1 high │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
-widget 0.20.1 loaded
+widget 0.27.0 loaded
+ Re-check routing (u)  Details (d)  Monitor (g)  Ledger now (l)  Apply agents (a)
 repo ~/Projects/Github/model-router · 255ce37 · clean
 spend $61 last 30d
 routed this session 2
@@ -92,7 +93,6 @@ routed this session 2
 │   3. research notes on general-purpose → Sonnet low                 up to $5 less    measured        │
 │   4 more under Details (d)                                                                           │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
- Refresh (r)  Fetch origin (f)  Re-check routing (u)  Details (d)  Monitor (g)  Ledger now (l)  Apply agents (a)  Pull (p)
 ```
 
 - *Session live* is the session as it runs, from the engine's own per-turn figures: cost per turn as a
@@ -182,7 +182,7 @@ requests: a prompt that reads as a measured family runs at that family's measure
 | Verb | Does |
 |---|---|
 | `setup`, `doctor` | first run on a machine; the installation piece by piece, ok or to do |
-| `check` | the pane's text, every section (`fetch`: after `git fetch`, so behind/ahead are current) |
+| `check` | the pane's text, every section (`fetch`: after `git fetch`, so behind/ahead are current); the pane refreshes by itself after every job and every 30 minutes |
 | `routing ask\|auto\|off` | how Agent calls are routed this session (`/config` for good) |
 | `effort advise\|auto\|off` | the main session's effort rule |
 | `monitor`, `monitor save [id]` | the run monitor pane and its text; a run's report into `docs/runs/` |
@@ -196,7 +196,7 @@ requests: a prompt that reads as a measured family runs at that family's measure
 | Re-check routing (u) | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry |
 | Ledger now (l) | `tools/ledger.py --commit` (into the pane in the marketplace clone) |
 | Apply agents (a) | `apply_agents.py`: routing.json's model and effort into the agent files you have |
-| Pull (p) | `git pull --ff-only` |
+| `pull` | `git pull --ff-only` (`dotup` does it too) |
 
 ## The method, in the order it runs
 

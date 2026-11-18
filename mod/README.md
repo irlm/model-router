@@ -75,7 +75,7 @@ classify a prompt are the same as `tools/consumption.py`'s, so what the ledger c
 router acts on agree. The main session's own model is not touched: a mod can set a subagent's
 model per call, the main model only `/model` can.
 
-Buttons and verbs (`/router <verb>`):
+Buttons (at the top of the pane, under the header) and verbs (`/router <verb>`):
 
 | Button | Verb | Runs |
 |---|---|---|
@@ -85,12 +85,12 @@ Buttons and verbs (`/router <verb>`):
 | | `prefer <class> <model> <effort>` | sets an override for this project: calls of that class run on that model and effort, before the family default |
 | | `prefer clear <class>`, `prefer` | removes one, lists this project's |
 | | `dismiss <n or id>`, `undismiss <id>` | hides a suggestion you judge wrong (by its number in the pane); Details lists the dismissed ones |
-| Refresh | `check` | `tools/status.py` (also prints the table as text) |
-| Fetch origin | `fetch` | the same after `git fetch`, so behind/ahead are current |
+| | `check` | `tools/status.py` (also prints the table as text); the pane refreshes by itself after every job and every 30 minutes |
+| | `fetch` | the same after `git fetch`, so behind/ahead are current |
 | Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
 | Ledger now | `ledger` | `tools/ledger.py --commit` (`--stdout` in the marketplace clone: the entry goes to the pane) |
 | Apply agents | `apply` | `apply_agents.py`: write routing.json's model and effort into the agent files you have in `~/.claude/agents`; installs `agents/web-researcher.md` from the repository when missing; agent files you do not have are absent and skipped |
-| Pull | `pull` | `git pull --ff-only` |
+| | `pull` | `git pull --ff-only` (`dotup` does it; the button is gone) |
 
 Setup on a machine: Python 3 on PATH (`python3`, `python` or `py`), git, and the `claude` CLI; then,
 at the prompt of a terminal session:
@@ -276,7 +276,7 @@ The first pulls the repository (the marketplace clone); the second installs the 
 from it. Then exit Claude Code and open it again: "Restart to apply changes" is literal, a running
 session keeps the mod it started with. Inside a session, `/plugin` has the same two steps as menus.
 
-What you see before the restart: the scripts and data are already new, and Refresh runs them
+What you see before the restart: the scripts and data are already new, and `/router check` runs them
 fresh, so new classes, suggestions and advice appear at once; the pane layout, the status line and
 the router hook stay old until the restart. That mix is normal.
 

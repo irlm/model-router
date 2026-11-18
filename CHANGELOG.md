@@ -3,6 +3,12 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.26.1 — 2026-11-17
+
+- The Monitor button (`g`) did nothing after `m` had brought the main pane to the front, and the other way round: the
+  engine keeps both panes open and shows one, and opening an open pane leaves the shown one as it is. Every pane open
+  now places the pane as well (`$.ui.place`), so a button or a verb brings an open pane back to the front.
+
 ## 0.26.0 — 2026-11-17
 
 - The monitor draws a deep run as an outline: one line per agent, two spaces of indent per level, with the state,

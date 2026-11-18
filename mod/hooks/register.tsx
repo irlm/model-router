@@ -69,7 +69,7 @@ const pruneJob = (arg: string) => {
 /** What /router agents <args> runs: pin <url>, check, update [file...] [--accept-flags], list; null when it is none of them. */
 const agentsJob = (arg: string): { name: string; extra: string[] } | null => {
   const [sub, ...rest] = arg.split(/\s+/).filter(Boolean)
-  if (sub === 'pin' && rest.length === 1 && /^(https?:\/\/|git@|\/|~|[A-Za-z]:\\)/.test(rest[0])) return { name: 'agents-pin', extra: rest }
+  if (sub === 'pin' && rest.length === 1 && /^(https?:\/\/|git@|\/|~|[A-Za-z]:\\)/.test(rest[0] ?? '')) return { name: 'agents-pin', extra: rest }
   if (sub === 'check' && rest.length === 0) return { name: 'agents-check', extra: [] }
   if (sub === 'update' && rest.every(r => r === '--accept-flags' || /^[\w.-]+\.md$/.test(r))) return { name: 'agents-update', extra: rest }
   if ((sub === 'list' || sub === undefined) && rest.length === 0) return { name: 'agents-list', extra: [] }
@@ -124,7 +124,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.26.0'
+const WIDGET_VERSION = '0.26.1'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -611,7 +611,7 @@ const treeOf = (lv: Live) => {
     if (c.parent === null) return null
     const runs = all.filter(p => p.id === c.parent).sort((x, y) => x.startedAt - y.startedAt)
     if (runs.length === 0) return null
-    return [...runs].reverse().find(p => p.startedAt <= c.startedAt) ?? runs[0]
+    return [...runs].reverse().find(p => p.startedAt <= c.startedAt) ?? runs[0] ?? null
   }
   const kids = (p: RunningAgent | null) => all.filter(a => parentOf(a) === p)
   return { all, kids }
@@ -620,7 +620,7 @@ const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 /** The run the monitor shows when none is picked: the latest with an agent at work, else the latest. */
 const latestRunId = (lv: Live): string | null => {
   const at = Object.values(lv.agents)
-  for (let i = lv.runs.length - 1; i >= 0; i--) if (at.some(a => a.runId === lv.runs[i].id)) return lv.runs[i].id
+  for (let i = lv.runs.length - 1; i >= 0; i--) if (at.some(a => a.runId === lv.runs[i]!.id)) return lv.runs[i]!.id
   return lv.runs[lv.runs.length - 1]?.id ?? null
 }
 const runOf = (lv: Live, id: string | null) => (id ? lv.runs.find(r => r.id === id) ?? null : null)
@@ -673,7 +673,7 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
     const routed = a.decision === 'auto' || a.decision === 'routed'
     const fam = familiesNow.find(f => f.name === a.family)
     const why = a.decision === 'escalated' ? (lvAll.escalated[a.family ?? ''] ?? 'a routed call failed or was re-issued') + ': runs as asked for the rest of the session'
-      : routed ? (fam ? `measured ${fam.rate}, $${fam.cost_per_success.toFixed(4)}/success` : 'measured')
+      : routed ? (fam ? `measured ${fam.rate}, $${(fam.cost_per_success ?? 0).toFixed(4)}/success` : 'measured')
       : a.decision === 'kept' ? 'kept as asked'
       : a.type.startsWith('fork /') ? 'a fork of this session: runs on its model, no Agent call to route'
       : !a.family ? 'no measured family covers it'
@@ -753,7 +753,7 @@ const sceneOf = (lv: Live, now: number, width: number): Scene => {
         cur += r.height
       }
       height = cur - cursor
-      row = Math.round((childRows[0].row + childRows[childRows.length - 1].row) / 2)
+      row = Math.round((childRows[0]!.row + childRows[childRows.length - 1]!.row) / 2)
     }
     if (a === null) {
       const t = lv.turns
@@ -789,7 +789,7 @@ const sceneOf = (lv: Live, now: number, width: number): Scene => {
         const from = x1 + 1
         const to = (depth + 1) * (w + GAP) - 1   // the column before the child's box
         for (let c = from; c <= to; c++) put(y1, c, wgt.h)
-        for (let i = 0; i < label.length && from + 1 + i < to; i++) put(y1, from + 1 + i, label[i])
+        for (let i = 0; i < label.length && from + 1 + i < to; i++) put(y1, from + 1 + i, label[i]!)
         put(y1, to, '▶')
       }
     }
@@ -1015,19 +1015,26 @@ async function admit($: Dollar, a: RunningAgent, now: number, verb: 'spawned' | 
   await update($, live, v => {
       // The engine resumes an agent under the same id (a hand-back, a follow-up message): that is a new run of the same box, not a new agent.
       const prior = v.finished.filter(x => x.id === a.id)
-      const n = prior.length ? prior[0].n : v.nextN
+      const n = prior.length ? prior[0]!.n : v.nextN
       const run = prior.length + 1
       const nn = String(n).padStart(2, '0')
       const parentRec = a.parent ? (v.agents[a.parent] ?? [...v.finished].reverse().find(x => x.id === a.parent)) : undefined
       const by = a.parent ? ` by ${String(parentRec?.n ?? 0).padStart(2, '0')}` : ''
       // The run it joins: the open named task; else the run of its earlier self (a resume) or of its spawner; else this prompt's.
-      const runId = v.task ? `task:${slug(v.task)}` : prior.length ? prior[prior.length - 1].runId : parentRec ? parentRec.runId : `turn:${currentTurn || 'start'}`
+      const runId = v.task ? `task:${slug(v.task)}` : prior.length ? prior[prior.length - 1]!.runId : parentRec ? parentRec.runId : `turn:${currentTurn || 'start'}`
       const have = v.runs.find(r => r.id === runId)
       const meta: RunMeta = have ? { ...have, endedAt: null, agentN: have.agentN + 1 } : { id: runId, startedAt: now, endedAt: null, prompt: (v.task ?? lastPrompt).slice(0, 120), name: v.task, agentN: 1, cost: 0, failedN: 0, stoppedN: 0, saved: null }
       const ev: RunEvent = { at: now, runId, text: run > 1 ? `${nn} ${a.type} resumed (run ${run}, ~${kilo(a.ctx)} ctx)` : `${nn} ${a.type} ${verb} on ${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''} (~${kilo(a.ctx)} ctx)${by}` }
       // an inherited call runs at the session's effort: the last turn's, when one has been reported
       return { ...v, nextN: prior.length ? v.nextN : n + 1, agents: { ...v.agents, [a.id]: { ...a, n, run, runId, askedEffort: a.askedEffort || v.turns[v.turns.length - 1]?.sessionEffort || '' } }, events: [...v.events, ev].slice(-400), runs: have ? v.runs.map(r => (r.id === runId ? meta : r)) : [...v.runs, meta] }
   })
+}
+/** Open a pane, or bring it to the front when it is already open behind another: the engine keeps several panes open
+ * and shows one, and ui.open on an open pane leaves the shown one as it is (the Monitor button did nothing after m). */
+async function showPane($: Dollar, id: string, title: string) {
+  const opened = await $.ui.open({ id, title })
+  try { await $.ui.place({ id }) } catch { /* a host without placement: the open stands */ }
+  return opened
 }
 /** A run with no agent left at work has ended (a named task ends only by /router task end): mark it and save it. */
 async function closeIdleRuns($: Dollar) {
@@ -1351,13 +1358,13 @@ export const register: Register = (on, options) => {
     const [verb = 'open', arg = ''] = e.args.trim().split(/\s+/).filter(Boolean)
     const tail = e.args.trim().split(/\s+/).filter(Boolean).slice(1).join(' ')   // every word after the verb: agents pin <url>, agents update <file...>
     if (verb === 'open') {
-      const opened = await $.ui.open({ id: PANE, title: 'Model router' })
+      const opened = await showPane($, PANE, 'Model router')
       void refresh($)
       return { text: opened.isPlaced ? 'Model router pane opened.' : `The pane waits for room: ${opened.reason}` }
     }
     if (verb === 'monitor') {
       if (arg === 'save') return { text: await saveReport($, tail.split(/\s+/)[1] ?? null) }
-      const opened = await $.ui.open({ id: MONITOR, title: 'Agent run' })
+      const opened = await showPane($, MONITOR, 'Agent run')
       const lv = await read($, live)
       const text = (arg === 'outline' ? outlineLines(lv, await $.clock.now(), await read($, monitorRun)) : monitorLines(lv, await $.clock.now(), await read($, monitorRun), arg !== 'top')).map(l => l.text).join('\n')   // `monitor top`: the five routing lines that moved the most; `monitor outline`: one line per agent
       return { text: (opened.isPlaced ? 'Agent run pane opened.' : `The pane waits for room: ${opened.reason}`) + '\n' + text + (lv.runs.length > 1 ? `\n(${lv.runs.length} runs this session: h in the pane lists them; /router runs lists the saved ones)` : '') }
@@ -1456,7 +1463,7 @@ export const register: Register = (on, options) => {
     }
     // First run on a machine: install the routed agents, then say what the pane's yellow lines mean and what comes next.
     if (verb === 'setup') {
-      await $.ui.open({ id: PANE, title: 'Model router' })
+      await showPane($, PANE, 'Model router')
       const started = await runJob($, 'apply')
       const s = await read($, status)
       const a = s?.json?.agents
@@ -1469,29 +1476,29 @@ export const register: Register = (on, options) => {
     }
     // The installation piece by piece, as a job in the pane: what is there, what is missing and the step for it.
     if (verb === 'doctor') {
-      await $.ui.open({ id: PANE, title: 'Model router' })
+      await showPane($, PANE, 'Model router')
       const started = await runJob($, 'doctor')
       return { text: started ? 'installation check started; the pane lists each piece as ok or the step to take (python3 tools/status.py --doctor prints the same at a terminal).' : 'Not started.' }
     }
     if (verb === 'agents') {
       const j = agentsJob(tail)
       if (!j) return { text: 'agents takes: pin <repository url> | check | update [file.md ...] [--accept-flags] | list. A flagged change is taken only by name with --accept-flags.' }
-      await $.ui.open({ id: PANE, title: 'Model router' })
+      await showPane($, PANE, 'Model router')
       const started = await runJob($, j.name, j.extra)
-      return { text: started ? `${JOBS[j.name].title} started; the pane shows its output${j.name === 'agents-check' ? '; /router agents update takes the unflagged changes, /router agents update <file> --accept-flags a flagged one you have read' : j.name === 'agents-update' ? '; /router apply then puts the routed model and effort back' : ''}.` : 'Not started.' }
+      return { text: started ? `${JOBS[j.name]!.title} started; the pane shows its output${j.name === 'agents-check' ? '; /router agents update takes the unflagged changes, /router agents update <file> --accept-flags a flagged one you have read' : j.name === 'agents-update' ? '; /router apply then puts the routed model and effort back' : ''}.` : 'Not started.' }
     }
     if (verb === 'prune') {
       const name = pruneJob(tail)   // every word after the verb: skills move, all revert
       if (!name) return { text: 'prune takes nothing (dry run), move or revert, for the agents, the skills or all: /router prune [skills|all] | /router prune [skills|all] move | /router prune [skills|all] revert' }
-      await $.ui.open({ id: PANE, title: 'Model router' })
+      await showPane($, PANE, 'Model router')
       const started = await runJob($, name)
       const verbWords = name.startsWith('prune-skills') ? 'prune skills' : name.startsWith('prune-all') ? 'prune all' : 'prune'
       const hint = name.endsWith('-move') ? `; /router ${verbWords} revert undoes it` : name.endsWith('-revert') ? '' : `; /router ${verbWords} move does it, /router ${verbWords} revert undoes it`
-      return { text: started ? `${JOBS[name].title} started; the pane shows its output${hint}` : 'a job is still running; try again when it ends' }
+      return { text: started ? `${JOBS[name]!.title} started; the pane shows its output${hint}` : 'a job is still running; try again when it ends' }
     }
     const spec = JOBS[verb]
     if (spec) {
-      await $.ui.open({ id: PANE, title: 'Model router' })
+      await showPane($, PANE, 'Model router')
       const started = await runJob($, verb)
       return { text: started ? `${spec.title} started; the pane shows its output.` : 'Not started.' }
     }
@@ -1550,10 +1557,10 @@ export const register: Register = (on, options) => {
         // No spawn announced this id: a fork the Skill tool launched moments ago, if one is pending (a confirmed one first).
         // A subagent whose spawn hook failed would be taken for it: that hook toasts its failure, so the mislabel is not silent.
         const now0 = await $.clock.now()
-        for (let k = pendingForks.length - 1; k >= 0; k--) if (now0 - pendingForks[k].at > PENDING_MS) pendingForks.splice(k, 1)
+        for (let k = pendingForks.length - 1; k >= 0; k--) if (now0 - pendingForks[k]!.at > PENDING_MS) pendingForks.splice(k, 1)
         const i = pendingForks.findIndex(f => f.sure) >= 0 ? pendingForks.findIndex(f => f.sure) : pendingForks.length ? 0 : -1
         if (i >= 0) {
-          const [f] = pendingForks.splice(i, 1)
+          const f = pendingForks.splice(i, 1)[0]!
           const model = e.model || (await $.session.model().catch(() => '')) || ''
           const ctx = (await contextTokens($))?.tokens ?? 0   // a fork carries the whole session: the arrow is as heavy as the context is
           const fork: RunningAgent = { id, parent: f.parent, type: `fork /${f.skill}`, description: `/${f.skill}: a fork of ${f.parent ? 'its launcher' : 'this session'}, in the background`, model, effort: typeof e.effort === 'string' ? e.effort : '', wantEffort: null,
@@ -1710,7 +1717,7 @@ export const register: Register = (on, options) => {
         <Button key="save" hotkey="s" onPress={() => { void saveReport($, shownId).then(t => $.ui.toast(`router: ${t}`)) }}>Save report</Button>
         <Button key="routing" hotkey="r" onPress={() => { void update($, monitorRouting, v => !v) }}>{routingFull ? 'Routing: top 5' : 'Routing: all'}</Button>
         {picked !== null && <Button key="current" hotkey="c" onPress={() => { void update($, monitorRun, () => null) }}>Current run</Button>}
-        <Button key="main" hotkey="m" onPress={() => { void $.ui.open({ id: PANE, title: 'Model router' }) }}>Model router</Button>
+        <Button key="main" hotkey="m" onPress={() => { void showPane($, PANE, 'Model router') }}>Model router</Button>
       </Box>
     )
     const runText = <Text dimColor>{runLine(lvAll, picked)}</Text>
@@ -1882,7 +1889,7 @@ export const register: Register = (on, options) => {
     // The summary's sections are separated by blank lines; each becomes a frame, titled by what its first line says.
     const groups: Line[][] = [[]]
     for (const l of summary) {
-      if (l.text === '') { if (groups[groups.length - 1].length) groups.push([]) } else groups[groups.length - 1].push(l)
+      if (l.text === '') { if (groups[groups.length - 1]!.length) groups.push([]) } else groups[groups.length - 1]!.push(l)
     }
     const titleOf = (first: Line): [string, string | undefined] => {
       const t = first.text.toLowerCase()
@@ -1898,7 +1905,7 @@ export const register: Register = (on, options) => {
       if (t.startsWith('no model-router checkout') || t.startsWith('reading')) return ['Status', 'yellow']
       return ['Status', undefined]
     }
-    const named = groups.filter(g => g.length).map(g => ({ g, t: titleOf(g[0]) }))
+    const named = groups.filter(g => g.length).map(g => ({ g, t: titleOf(g[0]!) }))
     // The glance: what is acted on (the session live, the agents, the limits, what is to check, the top suggestions) and a
     // few dim facts under the header; Details (d) adds every other section, the way /router check prints them.
     const GLANCE_SUGGESTIONS = 3
@@ -1907,7 +1914,7 @@ export const register: Register = (on, options) => {
       const status = named.find(x => x.t[0] === 'Status')?.g ?? []
       for (const l of status) if (/^(read |repo |spend )/.test(l.text)) quick.push(line(l.text.replace(/ · prev .*$/, ''), { dim: true }))
       const routedG = named.find(x => x.t[0] === 'Routed')?.g
-      if (routedG) quick.push(line(routedG[0].text.replace(/ \(mode .*$/, ''), { dim: true }))
+      if (routedG) quick.push(line(routedG[0]!.text.replace(/ \(mode .*$/, ''), { dim: true }))
     }
     // a Status that is a warning (no checkout, an error reading it) stays in the glance, in yellow
     const shown = full ? named : named.filter(x => x.t[0] === 'To check' || x.t[0] === 'Suggestions' || (x.t[0] === 'Status' && x.t[1] === 'yellow')).map(x => {
@@ -1951,7 +1958,7 @@ export const register: Register = (on, options) => {
           <Button key="fetch" hotkey="f" onPress={() => { void refresh($, true) }}>Fetch origin</Button>
           <Button key="update" hotkey="u" variant="primary" dimColor={busy} onPress={() => { void runJob($, 'update') }}>Re-check routing</Button>
           <Button key="details" hotkey="d" onPress={() => { void update($, details, v => !v) }}>{full ? 'Less' : 'Details'}</Button>
-          <Button key="monitor" hotkey="g" onPress={() => { void $.ui.open({ id: MONITOR, title: 'Agent run' }) }}>Monitor</Button>
+          <Button key="monitor" hotkey="g" onPress={() => { void showPane($, MONITOR, 'Agent run') }}>Monitor</Button>
           <Button key="ledger" hotkey="l" dimColor={busy} onPress={() => { void runJob($, 'ledger') }}>Ledger now</Button>
           <Button key="apply" hotkey="a" dimColor={busy} onPress={() => { void runJob($, 'apply') }}>Apply agents</Button>
           <Button key="pull" hotkey="p" dimColor={busy} onPress={() => { void runJob($, 'pull') }}>Pull</Button>

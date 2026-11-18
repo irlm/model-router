@@ -3,6 +3,33 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.29.0 — 2026-11-17
+
+- The staircase takes four columns a level, not 23: the arrow and its context label sit on their own row on the trunk,
+  the child box starts four columns right of its spawner, and the trunk (┃) runs beside every box of a branch that still
+  has a sibling to come, so ten levels fit where two did. The pane, the text view and the report draw the same thing.
+- The timeline, a view of its own (`t` in the monitor, `/router monitor timeline`, `## Timeline` in the report): the day
+  as one bar per run with a lens on the run shown, then that run at its own scale, one row per agent in start order,
+  indented by depth, the bar in the state's colour with a live edge, its tool calls as ticks and an error as ✗, elapsed
+  and cost after it; a run of twenty rows or more folds its finished branches into one row each (`x` unfolds); `z`
+  zooms the run lane out to the whole day. Nothing new is recorded: it is drawn from what the live state and the
+  saved runs already hold.
+- One box per agent. A resume (the engine re-invoking the parent when a child hands back, or a follow-up) is the same
+  agent continuing, so its runs fold into one box: the runs counted (`· 3 runs`), steps, cost and tool calls summed, the
+  time from the first start to the last end, the latest state. A chain of three agents drew as seven boxes with arrows
+  carrying the hand-back's context; it is three. The events keep every resume; the saved run keeps every record; the
+  Routing frame and the timeline have one row per agent too.
+- A resumed agent keeps its spawner. When a child hands back, the engine resumes the parent without a parent id, and
+  the resumed run's box hung under the session instead of under the agent that spawned it (seen in the first real
+  four-level run: session → general-purpose → general-purpose → Explore, with the resumes of the middle two).
+- `tools/prune_skills.py`, after a forked `/code-review high` of it (launched from inside a subagent, the first fork
+  under an agent the monitor drew): its tests sat below `unittest.main()` and never ran (moved; 46 tests now); the
+  revert record is written before `settings.json`, so a failed settings write cannot leave overrides nobody can undo;
+  `--keep` restores a name pruned earlier instead of saying "keep" and leaving it name-only; a plugin skill is one whose
+  prefix names an installed plugin, so a folder-scoped skill (`apps/web:deploy`) is the person's own; a settings file
+  that is not a map is refused in one line; the file keeps its non-ASCII characters; the token figure counts the
+  descriptions only (the names stay in the list); the "no listing yet" gate works on a summary without a skill listing.
+
 ## 0.28.0 — 2026-11-17
 
 - The boxes stay for deep hierarchies. A run of four levels or more is drawn as a staircase of boxes (each child one

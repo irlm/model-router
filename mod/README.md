@@ -197,10 +197,20 @@ same tokens re-priced at catalog prices, an estimate by construction, since the 
 run shows the five lines that moved the most (escalations first, then the routed calls by what the routing changed) and
 "N more"; `r` shows every line (`/router monitor top` prints the five, `/router monitor` all).
 `g` switches to the same run as text lines, one line one row, which `/router monitor` also prints; `m`, the `↑ Model router`
-control under the monitor's header, goes back up to the main pane. A run deeper than three levels under the session keeps its boxes as a staircase (each child one step to the right
-of its spawner, under it; about 13 columns per level) instead of the grid, whose levels are 62 columns each; `o` cycles
-an outline (one indented line per agent with state, model and effort, elapsed, steps, cost, task), the grid however
-wide, and the automatic choice; `/router monitor outline` prints the outline. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
+control under the monitor's header, goes back up to the main pane. A run deeper than three levels under the session keeps its boxes as a staircase: each child box starts four columns
+right of its spawner, under it, the arrow and its context label on the row between them, a trunk (┃) beside every box
+of a branch that still has a sibling to come; the grid's levels are 62 columns each, so this is where ten levels fit.
+`o` cycles an outline (one indented line per agent with state, model and effort, elapsed, steps, cost, task), the grid
+however wide, and the automatic choice; `/router monitor outline` prints the outline.
+
+**The timeline** (`t` in the monitor, `/router monitor timeline`, a `## Timeline` section in the report) is the run in
+time, the question the tree cannot answer: what ran beside what, what waited, where the time went. Two lanes. The day:
+one bar per run of the session at the day's scale (`✗` on a run that had a failure, `▶` on the one still running), a tag
+under each, and a lens on the run shown (`h` picks another). The run: its own scale, one row per agent in start order,
+indented by depth, the bar in the state's colour (`█` running, `▓` done, `░` the minute without a request, `✗` failed
+or stopped), the agent's tool calls as `│` ticks and an error as `✗` on the bar, `▶` at now, then elapsed, cost and the
+quiet stretch after it; a run of twenty rows or more folds each finished branch into one row with what it held (`x`
+unfolds); `z` zooms the run lane out to the whole day. Nothing new is recorded: it is drawn from the live state. Before any agent has run the main session is drawn alone: its box says `● WORKING` while a turn runs and
 `● IDLE` after, with the turns and cost so far, and a panel of its own lists the main session's last tool calls
 (shown whenever fewer than two agents are at work); agents hang under the box as they spawn. Nothing here is a dependency graph of the task: the engine reports who spawned whom, not who waits
 on whom, so no box is marked blocked and no waiting arrow is drawn.

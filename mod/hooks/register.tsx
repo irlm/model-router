@@ -23,10 +23,13 @@ const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { sha
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 /** The run monitor's view: the drawn graph, or the same run as text lines. */
-const monitorView = atom({ plugin: 'model-router', key: 'monitorView' } as const, 'graph' as 'graph' | 'list' | 'outline' | 'boxes', { shape: 'monitorView-2' })
+const monitorView = atom({ plugin: 'model-router', key: 'monitorView' } as const, 'graph' as 'graph' | 'list' | 'outline' | 'boxes' | 'timeline', { shape: 'monitorView-2' })
 /** The run the monitor shows: null is the current one (the latest with an agent at work, else the latest). */
 const monitorRun = atom({ plugin: 'model-router', key: 'monitorRun' } as const, null as string | null, { shape: 'monitorRun-1' })
 const monitorHistory = atom({ plugin: 'model-router', key: 'monitorHistory' } as const, false, { shape: 'monitorHistory-1' })
+/** The timeline's run lane zoomed out to the whole day, and its folded branches opened. */
+const monitorZoom = atom({ plugin: 'model-router', key: 'monitorZoom' } as const, false, { shape: 'monitorZoom-1' })
+const monitorUnfold = atom({ plugin: 'model-router', key: 'monitorUnfold' } as const, false, { shape: 'monitorUnfold-1' })
 /** The monitor's Routing frame: every line, or the five that moved the most (the default for a long run). */
 const monitorRouting = atom({ plugin: 'model-router', key: 'monitorRouting' } as const, false, { shape: 'monitorRouting-1' })
 /** The runs saved on this machine, as last listed (tools/runs.py list --json). */
@@ -124,7 +127,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.28.0'
+const WIDGET_VERSION = '0.29.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -494,15 +497,15 @@ const weightOf = (ctx: number) => (ctx >= 16000 ? '━' : ctx >= 4000 ? '─' : 
  * context sent with the label on the branch. About 13 columns per level, so a deep hierarchy keeps its boxes. The text
  * view draws it always; the pane draws it when the grid would be wider than the pane. */
 const stairLines = (lv: Live, now: number, all: RunningAgent[], kids: (p: RunningAgent | null) => RunningAgent[], boxW = BOX_W): Line[] => {
-  // Every line of a box is boxW + 2 columns: ┌ title ─┐ / │ text │ / └──┘.
+  // Every line of a box is boxW + 2 columns: ┌ title ─┐ / │ text │ / └──┬──┘, the ┬ three columns in, where the children's trunk hangs.
   const inner = (t: string) => `│ ${t.slice(0, boxW - 2).padEnd(boxW - 2)} │`
   const top = (title: string) => { const t = title.slice(0, boxW - 3); return `┌ ${t} ${'─'.repeat(boxW - 2 - t.length)}┐` }
-  const bottom = (hasChildren: boolean) => (hasChildren ? `└${'─'.repeat(9)}┬${'─'.repeat(boxW - 10)}┘` : `└${'─'.repeat(boxW)}┘`)   // the ┬ sits over the children's trunk, 10 columns in
-  // Draw with a trunk: lines of a child's box after the first carry the trunk mark when siblings follow.
+  const bottom = (hasChildren: boolean) => (hasChildren ? `└──┬${'─'.repeat(boxW - 3)}┘` : `└${'─'.repeat(boxW)}┘`)
   const drawn: Line[] = []
-  const draw = (a: RunningAgent | null, prefix: string, arrow: string, trunk: boolean) => {
+  // A child box starts four columns right of its spawner, under it; the arrow and its context label take the row between,
+  // on the trunk; the prefix carries a ┃ wherever an ancestor still has a sibling to come, so a branch can be followed down.
+  const draw = (a: RunningAgent | null, prefix: string) => {
     const children = kids(a)
-    const cont = prefix + (trunk ? '┃' : ' ') + ' '.repeat(Math.max(0, arrow.length - 1))
     if (a === null) {
       const t = lv.turns
       drawn.push(line(top('00 main session'), { color: 'cyan' }))
@@ -512,28 +515,29 @@ const stairLines = (lv: Live, now: number, all: RunningAgent[], kids: (p: Runnin
       // The whole box carries the state's colour: green at work, yellow quiet, red failed or stopped; a finished box in the default colour.
       const { state, color } = stateOf(a, now)
       const figures = `${shortModel(a.model)} ${a.effort}`.trim() + `  ${secs((a.done ?? now) - a.startedAt)}  ${a.steps} step${a.steps === 1 ? '' : 's'}` + (a.cost !== null ? `  ${money(a.cost)}` : '')
-      const title = `${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''}`
-      drawn.push(line(`${prefix}${arrow}${top(title)}`, { color }))
-      drawn.push(line(`${cont}${inner(`${state.padEnd(9)}  ${figures}`)}`, { color }))
-      drawn.push(line(`${cont}${inner(a.description)}`, { color }))
-      drawn.push(line(`${cont}${bottom(children.length > 0)}`, { color }))
+      const title = `${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''}`
+      drawn.push(line(`${prefix}${top(title)}`, { color }))
+      drawn.push(line(`${prefix}${inner(`${state.padEnd(9)}  ${figures}`)}`, { color }))
+      drawn.push(line(`${prefix}${inner(a.description)}`, { color }))
+      drawn.push(line(`${prefix}${bottom(children.length > 0)}`, { color }))
     }
-    const base = a === null ? '' : cont
     children.forEach((c, i) => {
       const last = i === children.length - 1
       const w = weightOf(c.ctx)
-      draw(c, base + '          ', `${last ? '┗' : '┣'}${w}${w} ~${kilo(c.ctx)} ${w}${w}▶ `, !last)
+      drawn.push(line(`${prefix}   ${last ? '┗' : '┣'}${w}${w} ~${kilo(c.ctx)} ${w}${w}▶`, { dim: true }))
+      draw(c, `${prefix}   ${last ? ' ' : '┃'}`)
     })
   }
-  draw(null, '', '', false)
+  draw(null, '')
   return drawn
 }
 const monitorLines = (lvAll: Live, now: number, runId: string | null = null, routingFull = true): Line[] => {
   const lv = scopeOf(lvAll, runId)
-  const running = Object.values(lv.agents)
   const { all, kids } = treeOf(lv)
+  const running = all.filter(a => a.done === null)
+  const ended = all.filter(a => a.done !== null)
   const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
-  const head = `${spin}agent run · ${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''})`
+  const head = `${spin}agent run · ${running.length} running · ${ended.length} done (${money(ended.reduce((n, a) => n + (a.cost ?? 0), 0))}${ended.filter(a => a.failed).length ? `, ${ended.filter(a => a.failed).length} failed` : ''}${ended.filter(a => a.stopped).length ? `, ${ended.filter(a => a.stopped).length} stopped` : ''})`
   const out: Line[] = [line(head, { bold: true, color: running.length ? 'cyan' : undefined }), line(runLine(lvAll, runId), { dim: true })]
   // Before any agent: the main session is drawn alone, with its state and its own tool tail; agents hang under it as they spawn.
   if (all.length === 0) out.push(line('no agent spawned yet; Agent calls hang under the session box as they spawn', { dim: true }))
@@ -543,7 +547,7 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null, rou
   // Live: the agents at work, the most recent call first; a failed one keeps its tail while it is among the last finished.
   // Live: the agents at work, the most recent call first; when fewer than two run, the last finished (a failed one first) keep their tail.
   const live = [...running].sort((x, y) => y.lastStepAt - x.lastStepAt).slice(0, 2)
-  const rest = [...lv.finished].sort((x, y) => Number(bad(y)) - Number(bad(x)) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - live.length)
+  const rest = [...ended].sort((x, y) => Number(bad(y)) - Number(bad(x)) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - live.length)
   const tail = (title: string, state: string, recent: Recent[], color: string | undefined) => {
     out.push(BLANK)
     out.push(line(`${title}${' '.repeat(Math.max(1, 62 - title.length))}[${state}]`, { bold: true, color }))
@@ -552,7 +556,7 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null, rou
   }
   for (const a of [...live, ...rest]) {
     const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : `${endWord(a)} ${bad(a) ? 'after' : 'in'} ${secs((a.done ?? now) - a.startedAt)}`
-    tail(`● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''} / ${a.done === null ? 'live' : 'stopped'}`, state, a.recent, a.done === null ? 'green' : bad(a) ? 'red' : undefined)
+    tail(`● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''} / ${a.done === null ? 'live' : 'stopped'}`, state, a.recent, a.done === null ? 'green' : bad(a) ? 'red' : undefined)
   }
   // The main session's own tail when there is room for it: always before any agent, beside a lone agent after.
   // The main session's own tail whenever fewer than two agents are at work; finished agents do not take its place.
@@ -566,6 +570,100 @@ const monitorLines = (lvAll: Live, now: number, runId: string | null = null, rou
   return out
 }
 
+/** The timeline: the day as one bar per run with a lens on the run shown, then that run at its own scale, one row per
+ * agent in start order, indented by depth, the bar in the state's colour with a live edge, its tool calls as ticks and an
+ * error as ✗; a run of FOLD_FROM rows or more folds its finished branches into one row each. Drawn from the live state only. */
+const FOLD_FROM = 20
+const TL_LABEL = 28
+const tickEvery = (span: number) => (span < 120e3 ? 10e3 : span < 1200e3 ? 60e3 : span < 10800e3 ? 600e3 : 3600e3)
+const timelineLines = (lvAll: Live, now: number, runId: string | null, width: number, zoomDay = false, unfold = false): Line[] => {
+  const out: Line[] = []
+  const axisW = Math.max(20, width - TL_LABEL - 16)
+  const runs = lvAll.runs
+  const shownId = runId ?? latestRunId(lvAll)
+  const shown = runOf(lvAll, shownId)
+  const dayStart = runs[0]?.startedAt ?? lvAll.turns[0]?.at ?? now
+  const dayEnd = Math.max(now, ...runs.map(r => r.endedAt ?? now))
+  const daySpan = Math.max(1000, dayEnd - dayStart)
+  const colOf = (at: number, start: number, span: number) => Math.min(axisW - 1, Math.max(0, Math.floor(((at - start) / span) * axisW)))
+  const agentsN = runs.reduce((n, r) => n + r.agentN, 0), dayCost = runs.reduce((n, r) => n + r.cost, 0)
+  out.push(line(`[ Day ]  ${clock(dayStart)} ${'─'.repeat(Math.max(1, axisW - 12))} ${clock(dayEnd)}${dayEnd >= now - 1000 ? ' now' : ''}   ${secs(daySpan)} · ${runs.length} run${runs.length === 1 ? '' : 's'} · ${agentsN} agent${agentsN === 1 ? '' : 's'} · ${money(dayCost)}`, { bold: true, color: 'cyan' }))
+  if (runs.length === 0) { out.push(line('  no run yet this session: the timeline draws as Agent calls spawn', { dim: true })); return out }
+  // the day lane: one bar per run, ✗ when it had a failure, ▶ on the one still running
+  const day = Array<string>(axisW).fill(' '), tags = Array<string>(axisW).fill(' '), lens = Array<string>(axisW).fill('─')
+  runs.forEach((r, i) => {
+    const a = colOf(r.startedAt, dayStart, daySpan), b = Math.max(a, colOf(r.endedAt ?? now, dayStart, daySpan))
+    for (let c = a; c <= b; c++) day[c] = r.endedAt ? '▓' : '█'
+    if (r.failedN || r.stoppedN) day[b] = '✗'
+    else if (!r.endedAt) day[b] = '▶'
+    const tag = `r${i + 1}`
+    if (tags.slice(a, a + tag.length + 1).every(ch => ch === ' ')) for (let k = 0; k < tag.length && a + k < axisW; k++) tags[a + k] = tag[k]!
+    if (r.id === shownId) { for (let c = a; c <= b; c++) lens[c] = '═'; lens[a] = '['; lens[Math.max(a + 1, b)] = ']' }
+  })
+  out.push(line(`${'runs'.padEnd(TL_LABEL)}${day.join('')}`))
+  out.push(line(`${''.padEnd(TL_LABEL)}${tags.join('')}`, { dim: true }))
+  out.push(line(`${'lens'.padEnd(TL_LABEL)}${lens.join('')}   ${shown ? `r${runs.findIndex(r => r.id === shown.id) + 1}` : ''}${shown && !shown.endedAt ? ', the current run' : ''} · h picks another · z: ${zoomDay ? 'the run alone' : 'the whole day'}`, { dim: true }))
+  if (!shown) return out
+  // the run lane, at the run's own scale (or the day's, zoomed out)
+  const lv = scopeOf(lvAll, shown.id)
+  const runEnd = shown.endedAt ?? now
+  const start = zoomDay ? dayStart : shown.startedAt
+  const span = Math.max(1000, (zoomDay ? dayEnd : runEnd) - start)
+  const i0 = runs.findIndex(r => r.id === shown.id) + 1
+  out.push(BLANK)
+  out.push(line(`[ Run ${i0}/${runs.length} · ${shown.name ? `task "${shown.name}"` : `"${shown.prompt.slice(0, 40)}${shown.prompt.length > 40 ? '…' : ''}"`} · ${clock(shown.startedAt)} → ${shown.endedAt ? clock(shown.endedAt) : 'now'} · ${shown.agentN} agent${shown.agentN === 1 ? '' : 's'} · ${money(shown.cost)} ]`, { bold: true, color: 'cyan' }))
+  const tick = tickEvery(span)
+  const ruler = Array<string>(axisW).fill(' ')
+  for (let at = Math.ceil(start / tick) * tick; at <= start + span; at += tick) {
+    const c = colOf(at, start, span)
+    const label = tick < 60e3 ? clockS(at) : clock(at)
+    if (ruler.slice(c, c + label.length + 1).every(ch => ch === ' ')) for (let k = 0; k < label.length && c + k < axisW; k++) ruler[c + k] = label[k]!
+  }
+  out.push(line(`${''.padEnd(TL_LABEL)}${ruler.join('')}`, { dim: true }))
+  const bar = (from: number, to: number | null, fill: string, ticks: Recent[] = [], quietFrom: number | null = null, bad = false) => {
+    const cells = Array<string>(axisW).fill(' ')
+    const a = colOf(from, start, span), b = Math.max(a, colOf(to ?? now, start, span))
+    for (let c = a; c <= b; c++) cells[c] = fill
+    if (quietFrom !== null) for (let c = Math.max(a, colOf(quietFrom, start, span)); c <= b; c++) cells[c] = '░'
+    for (const r of ticks) { const c = colOf(r.at, start, span); if (c >= a && c <= b) cells[c] = r.err ? '✗' : '│' }
+    if (bad) cells[b] = '✗'
+    else if (to === null) cells[b] = '▶'
+    return cells.join('')
+  }
+  const mainT = lv.turns.reduce((n, x) => n + x.cost, 0)
+  out.push(line(`${'00 main session'.padEnd(TL_LABEL)}${bar(shown.startedAt, shown.endedAt, '━')}  ${shown.endedAt ? secs(shown.endedAt - shown.startedAt) : secs(now - shown.startedAt)}${lv.turns.length ? `  ${money(mainT)}` : ''}`, { color: 'cyan', bold: true }))
+  const { all, kids } = treeOf(lv)
+  const order = (p: RunningAgent | null): RunningAgent[] => kids(p).sort((x, y) => x.startedAt - y.startedAt)
+  const subtree = (a: RunningAgent): RunningAgent[] => [a, ...order(a).flatMap(subtree)]
+  const fold = all.length >= FOLD_FROM && !unfold
+  const row = (a: RunningAgent, depth: number) => {
+    const { color } = stateOf(a, now)
+    const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
+    const label = `${'  '.repeat(depth)}${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''}`.slice(0, TL_LABEL - 1).padEnd(TL_LABEL)
+    const tail = `  ${secs((a.done ?? now) - a.startedAt)}${a.cost !== null ? `  ${money(a.cost)}` : ''}${a.stopped ? '  stopped' : a.failed ? '  failed' : quiet ? `  quiet ${secs(now - a.lastStepAt)}` : ''}`
+    out.push(line(`${label}${bar(a.startedAt, a.done, a.done === null ? '█' : '▓', a.recent, quiet ? a.lastStepAt : null, bad(a))}${tail}`, { color, dim: a.done !== null && !bad(a) }))
+  }
+  const walk = (p: RunningAgent | null, depth: number) => {
+    for (const a of order(p)) {
+      const tree = subtree(a)
+      if (fold && depth === 1 && tree.length > 1 && tree.every(x => x.done !== null && !bad(x))) {
+        // a finished branch, folded: one row from its first start to its last end, with what it held
+        const models = [...tree.slice(1).reduce((m, x) => m.set(shortModel(x.model), (m.get(shortModel(x.model)) ?? 0) + 1), new Map<string, number>())].map(([m, n]) => `${m} ×${n}`).join(', ')
+        const from = Math.min(...tree.map(x => x.startedAt)), to = Math.max(...tree.map(x => x.done ?? now)), cost = tree.reduce((n, x) => n + (x.cost ?? 0), 0)
+        const label = `  ${String(a.n).padStart(2, '0')} ${a.type} ▸`.slice(0, TL_LABEL - 1).padEnd(TL_LABEL)
+        out.push(line(`${label}${bar(from, to, '▓')}  ${secs(to - from)}  ${money(cost)}  ${tree.length - 1} done under it (${models}; x unfolds)`, { dim: true }))
+        continue
+      }
+      row(a, depth)
+      walk(a, depth + 1)
+    }
+  }
+  walk(null, 1)
+  const others = runs.filter(r => r.id !== shown.id && r.endedAt)
+  if (others.length) out.push(line(`[ Done runs ]  ${others.map(r => `r${runs.findIndex(x => x.id === r.id) + 1} ${clock(r.startedAt)} ${r.agentN} agent${r.agentN === 1 ? '' : 's'} ${secs((r.endedAt ?? now) - r.startedAt)} ${money(r.cost)}${r.failedN ? ` ${r.failedN} failed` : ''}${r.stoppedN ? ` ${r.stoppedN} stopped` : ''}`).join(' · ')}`.slice(0, width), { dim: true }))
+  out.push(line('▓ done   █ running   ░ quiet   ✗ failed or stopped   │ a tool call   ▶ now', { dim: true }))
+  return out
+}
 /** The run as an outline: one line per agent, two spaces of indent per level, so a tree of any depth fits the pane
  * (the graph is 62 columns per level). The state word, the model and effort, elapsed, steps, cost, the task. */
 const outlineLines = (lvAll: Live, now: number, runId: string | null = null): Line[] => {
@@ -577,7 +675,7 @@ const outlineLines = (lvAll: Live, now: number, runId: string | null = null): Li
   const walk = (p: RunningAgent | null, depth: number) => {
     for (const a of kids(p)) {
       const { state, color } = stateOf(a, now)
-      const label = `${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''}`
+      const label = `${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''}`
       const figures = [`${shortModel(a.model)} ${a.effort}`.trim(), secs((a.done ?? now) - a.startedAt), `${a.steps} step${a.steps === 1 ? '' : 's'}`, ...(a.cost !== null ? [money(a.cost)] : [])].join('  ')
       out.push(line(`${'  '.repeat(depth)}${state.padEnd(9)}  ${label.padEnd(Math.max(0, 26 - depth * 2))} ${figures.padEnd(30)} ${a.description}`, { color, dim: a.done !== null && !bad(a) }))
       walk(a, depth + 1)
@@ -611,15 +709,31 @@ const stateOf = (a: RunningAgent, now: number) => {
   return { state: a.done === null ? (quiet ? '● QUIET' : '● RUNNING') : `● ${endWord(a)}`, color: a.done === null ? (quiet ? 'yellow' : 'green') : bad(a) ? 'red' : undefined }
 }
 /** The tree of a run: every record (running and finished), and a child's parent as the run of that id active at the child's spawn. */
+/** One record per agent: a resume (a hand-back, a follow-up) is the same agent continuing, so its runs fold into one box
+ * with the runs counted, the steps, cost and tool calls summed, the time from the first start to the last end, the latest
+ * state, and the spawner of the first run. The events keep every resume; the saved run keeps every record. */
+const foldRuns = (records: RunningAgent[]): RunningAgent[] => {
+  const byId = new Map<string, RunningAgent[]>()
+  for (const r of records) byId.set(r.id, [...(byId.get(r.id) ?? []), r])
+  return [...byId.values()].map(g => {
+    g.sort((x, y) => x.run - y.run)
+    const first = g[0]!, last = g[g.length - 1]!
+    const running = g.some(x => x.done === null)
+    const priced = g.filter(x => x.cost !== null)
+    const usages = g.map(x => x.usage).filter((u): u is NonNullable<RunningAgent['usage']> => u !== null)
+    return { ...last, parent: first.parent, n: first.n, run: g.length, description: first.description, ctx: first.ctx,
+      asked: first.asked, askedModel: first.askedModel, askedEffort: first.askedEffort, decision: first.decision ?? last.decision,
+      startedAt: Math.min(...g.map(x => x.startedAt)), done: running ? null : Math.max(...g.map(x => x.done ?? 0)), lastStepAt: Math.max(...g.map(x => x.lastStepAt)),
+      steps: g.reduce((n, x) => n + x.steps, 0), out: g.reduce((n, x) => n + x.out, 0), cost: priced.length ? priced.reduce((n, x) => n + (x.cost ?? 0), 0) : null,
+      recent: g.flatMap(x => x.recent).sort((a, b) => a.at - b.at).slice(-8),
+      usage: usages.length ? usages.reduce((s, u) => ({ input_tokens: s.input_tokens + u.input_tokens, output_tokens: s.output_tokens + u.output_tokens, cache_read_input_tokens: s.cache_read_input_tokens + u.cache_read_input_tokens, cache_creation_input_tokens: s.cache_creation_input_tokens + u.cache_creation_input_tokens })) : null }
+  }).sort((x, y) => x.n - y.n)
+}
 const treeOf = (lv: Live) => {
-  const all = [...Object.values(lv.agents), ...lv.finished].sort((x, y) => x.n - y.n || x.run - y.run)
-  const parentOf = (c: RunningAgent): RunningAgent | null => {
-    if (c.parent === null) return null
-    const runs = all.filter(p => p.id === c.parent).sort((x, y) => x.startedAt - y.startedAt)
-    if (runs.length === 0) return null
-    return [...runs].reverse().find(p => p.startedAt <= c.startedAt) ?? runs[0] ?? null
-  }
-  const kids = (p: RunningAgent | null) => all.filter(a => parentOf(a) === p)
+  const all = foldRuns([...Object.values(lv.agents), ...lv.finished])
+  // By id, not by object: the folded records are built anew on every call, so two trees must still agree on who hangs where.
+  const parentIdOf = (c: RunningAgent): string | null => (c.parent !== null && all.some(p => p.id === c.parent) ? c.parent : null)
+  const kids = (p: RunningAgent | null) => all.filter(a => parentIdOf(a) === (p?.id ?? null))
   return { all, kids }
 }
 const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'run'
@@ -683,10 +797,11 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
       : a.decision === 'kept' ? 'kept as asked'
       : a.type.startsWith('fork /') ? 'a fork of this session: runs on its model, no Agent call to route'
       : !a.family ? 'no measured family covers it'
-      : fam ? 'already on the routed model' : 'family not decided yet: runs as asked'
+      : !fam ? 'family not decided yet: runs as asked'
+      : shortModel(a.model) === fam.model ? 'already on the routed model' : 'no Agent call seen for it: not routed'
     const arrow = routed ? `${a.asked} → ${ran}` : a.asked === 'inherit' ? `inherit (${ran})` : a.asked
     const est = a.cost !== null ? (routed ? costAsAsked(a) : a.cost) : null
-    rows.push({ l: line(`  ${String(a.n).padStart(2, '0')} ${a.type.padEnd(18).slice(0, 18)} ${arrow.padEnd(28)} ${(a.family ?? 'unmeasured').padEnd(19)} ${(a.decision ?? 'kept').padEnd(10)} ${why}`, { color: routed ? 'cyan' : a.decision === 'escalated' ? 'yellow' : undefined, dim: !routed && a.decision !== 'escalated' }),
+    rows.push({ l: line(`  ${String(a.n).padStart(2, '0')} ${`${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''}`.padEnd(26).slice(0, 26)} ${arrow.padEnd(28)} ${(a.family ?? 'unmeasured').padEnd(19)} ${(a.decision ?? 'kept').padEnd(10)} ${why}`, { color: routed ? 'cyan' : a.decision === 'escalated' ? 'yellow' : undefined, dim: !routed && a.decision !== 'escalated' }),
       cls: a.decision === 'escalated' ? 3 : routed ? 2 : a.decision === 'kept' ? 1 : 0, delta: est !== null && a.cost !== null ? est - a.cost : routed ? Infinity : 0, n: a.n })
     if (a.cost !== null) { actual += a.cost; if (est === null) estimable = false; else asked += est }
     if (routed) moved++
@@ -714,7 +829,7 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
 const runReport = (lvAll: Live, id: string, now: number): string => {
   const m = runOf(lvAll, id)
   const lv = scopeOf(lvAll, id)
-  const agents = [...Object.values(lv.agents), ...lv.finished].sort((x, y) => x.n - y.n || x.run - y.run)
+  const agents = treeOf(lv).all
   const d = stamp
   const out: string[] = []
   out.push(`# Agent run: ${m?.name ?? m?.prompt ?? id}`, '')
@@ -722,8 +837,9 @@ const runReport = (lvAll: Live, id: string, now: number): string => {
   if (m?.prompt && !m.name) out.push('## Asked', '', m.prompt, '')
   out.push('## Graph', '', '```text', ...monitorLines(lvAll, now, id).map(l => l.text), '```', '')
   out.push('## Routing', '', '```text', ...routingLines(lvAll, id, now).slice(1).map(l => l.text), '```', '')
+  out.push('## Timeline', '', '```text', ...timelineLines(lvAll, now, id, 110).map(l => l.text), '```', '')
   out.push('## Agents', '', '| # | agent | model effort | family | steps | elapsed | cost | outcome | task |', '|---|---|---|---|---|---|---|---|---|')
-  for (const a of agents) out.push(`| ${String(a.n).padStart(2, '0')}${a.run > 1 ? ` · run ${a.run}` : ''} | ${a.type} | ${`${shortModel(a.model)} ${a.effort}`.trim()} | ${a.family ?? 'unmeasured'} | ${a.steps} | ${secs((a.done ?? now) - a.startedAt)} | ${a.cost !== null ? money(a.cost) : '-'} | ${a.done === null ? 'running' : endWord(a).toLowerCase()} | ${a.description.replace(/\|/g, '/')} |`)
+  for (const a of agents) out.push(`| ${String(a.n).padStart(2, '0')}${a.run > 1 ? ` · ${a.run} runs` : ''} | ${a.type} | ${`${shortModel(a.model)} ${a.effort}`.trim()} | ${a.family ?? 'unmeasured'} | ${a.steps} | ${secs((a.done ?? now) - a.startedAt)} | ${a.cost !== null ? money(a.cost) : '-'} | ${a.done === null ? 'running' : endWord(a).toLowerCase()} | ${a.description.replace(/\|/g, '/')} |`)
   out.push('', '## Answers', '')
   for (const a of agents) if (a.answer) out.push(`### ${String(a.n).padStart(2, '0')} ${a.type}: ${a.description}`, '', a.answer, '')
   out.push('## Events', '')
@@ -770,7 +886,7 @@ const sceneOf = (lv: Live, now: number, width: number): Scene => {
       let figures = parts.join('  ')
       // Too long for the box: drop the step count, then the cost, then the elapsed time; the model stays.
       while (`${state}  ${figures}`.length > inner && parts.length > 1) { if (parts.length > 2) parts.splice(2, 1); else parts.pop(); figures = parts.join('  ') }
-      boxes.push({ a, x, y: row, w, color, title: fit(`${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''}`), state, figures, desc: fit(a.description) })
+      boxes.push({ a, x, y: row, w, color, title: fit(`${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''}`), state, figures, desc: fit(a.description) })
     }
     // Arrows: a stub out of the box's middle, a trunk two columns on, a branch into each child's middle with the label.
     if (childRows.length) {
@@ -1024,6 +1140,8 @@ async function admit($: Dollar, a: RunningAgent, now: number, verb: 'spawned' | 
       const n = prior.length ? prior[0]!.n : v.nextN
       const run = prior.length + 1
       const nn = String(n).padStart(2, '0')
+      // A resume (a hand-back, a follow-up) comes without a parent id: the agent keeps the spawner of its first run.
+      if (a.parent === null && prior.length) a.parent = prior[0]!.parent
       const parentRec = a.parent ? (v.agents[a.parent] ?? [...v.finished].reverse().find(x => x.id === a.parent)) : undefined
       const by = a.parent ? ` by ${String(parentRec?.n ?? 0).padStart(2, '0')}` : ''
       // The run it joins: the open named task; else the run of its earlier self (a resume) or of its spawner; else this prompt's.
@@ -1373,7 +1491,7 @@ export const register: Register = (on, options) => {
       if (arg === 'save') return { text: await saveReport($, tail.split(/\s+/)[1] ?? null) }
       const opened = await showPane($, MONITOR, 'Agent run')
       const lv = await read($, live)
-      const text = (arg === 'outline' ? outlineLines(lv, await $.clock.now(), await read($, monitorRun)) : monitorLines(lv, await $.clock.now(), await read($, monitorRun), arg !== 'top')).map(l => l.text).join('\n')   // `monitor top`: the five routing lines that moved the most; `monitor outline`: one line per agent
+      const text = (arg === 'outline' ? outlineLines(lv, await $.clock.now(), await read($, monitorRun)) : arg === 'timeline' ? timelineLines(lv, await $.clock.now(), await read($, monitorRun), 100, await read($, monitorZoom), await read($, monitorUnfold)) : monitorLines(lv, await $.clock.now(), await read($, monitorRun), arg !== 'top')).map(l => l.text).join('\n')   // `monitor top`: the five routing lines that moved the most; `monitor outline`: one line per agent; `monitor timeline`: the day and the run in time
       return { text: (opened.isPlaced ? 'Agent run pane opened.' : `The pane waits for room: ${opened.reason}`) + '\n' + text + (lv.runs.length > 1 ? `\n(${lv.runs.length} runs this session: h in the pane lists them; /router runs lists the saved ones)` : '') }
     }
     // A named task: every agent from now joins one run, until it is ended; the run is saved then.
@@ -1703,17 +1821,22 @@ export const register: Register = (on, options) => {
     const picked = await read($, monitorRun)
     const history = await read($, monitorHistory)
     const routingFull = await read($, monitorRouting)
+    const zoomDay = await read($, monitorZoom)
+    const unfold = await read($, monitorUnfold)
     const saved = await read($, savedRuns)
     await read($, tick)
     const now = await $.clock.now()
     const width = Math.max(40, (e.props as { bodyColumns?: number }).bodyColumns ?? (e.viewport?.columns ?? 100) - 1)
     const shownId = picked ?? latestRunId(lvAll)
     const lv = scopeOf(lvAll, picked)
-    const running = Object.values(lv.agents)
+    const tree = treeOf(lv)
+    const folded = tree.all
+    const running = folded.filter(a => a.done === null)
+    const endedF = folded.filter(a => a.done !== null)
     const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
     // Boxes draw up to three levels under the session; a deeper tree is an outline by itself, since each level is 62 columns
     // (`o` asks for the outline outright, or for the boxes however wide: 'boxes').
-    const depth = (p: RunningAgent | null, d: number): number => Math.max(d, ...treeOf(lv).kids(p).map(c => depth(c, d + 1)))
+    const depth = (p: RunningAgent | null, d: number): number => Math.max(d, ...tree.kids(p).map(c => depth(c, d + 1)))
     const tooDeep = depth(null, 0) > 3
     // graph: the grid up to three levels, the staircase beyond; outline and boxes are the person's own choices (o cycles).
     const layout: 'grid' | 'stairs' | 'outline' = view === 'outline' ? 'outline' : view === 'boxes' ? 'grid' : tooDeep ? 'stairs' : 'grid'
@@ -1721,7 +1844,10 @@ export const register: Register = (on, options) => {
     const footer = (
       <Box flexDirection="row" gap={1} flexWrap="wrap">
         <Button key="view" hotkey="g" onPress={() => { void update($, monitorView, v => (v === 'graph' ? 'list' : 'graph')) }}>{view === 'graph' ? 'List' : 'Graph'}</Button>
-        <Button key="outline" hotkey="o" onPress={() => { void update($, monitorView, v => (v === 'graph' ? 'outline' : v === 'outline' ? 'boxes' : 'graph')) }}>{view === 'graph' ? 'Outline' : view === 'outline' ? 'Boxes' : 'Auto layout'}</Button>
+        <Button key="outline" hotkey="o" onPress={() => { void update($, monitorView, v => (v === 'graph' ? 'outline' : v === 'outline' ? 'boxes' : 'graph')) }}>{view === 'graph' ? 'Outline' : view === 'outline' ? 'Boxes' : view === 'timeline' ? 'Outline' : 'Auto layout'}</Button>
+        <Button key="timeline" hotkey="t" onPress={() => { void update($, monitorView, v => (v === 'timeline' ? 'graph' : 'timeline')) }}>{view === 'timeline' ? 'Graph' : 'Timeline'}</Button>
+        {view === 'timeline' && <Button key="zoom" hotkey="z" onPress={() => { void update($, monitorZoom, v => !v) }}>{zoomDay ? 'This run' : 'Whole day'}</Button>}
+        {view === 'timeline' && <Button key="fold" hotkey="x" onPress={() => { void update($, monitorUnfold, v => !v) }}>{unfold ? 'Fold' : 'Unfold'}</Button>}
         <Button key="history" hotkey="h" onPress={() => { void update($, monitorHistory, v => !v); void listSavedRuns($) }}>{history ? 'Back' : `History (${lvAll.runs.length})`}</Button>
         <Button key="save" hotkey="s" onPress={() => { void saveReport($, shownId).then(t => $.ui.toast(`router: ${t}`)) }}>Save report</Button>
         <Button key="routing" hotkey="r" onPress={() => { void update($, monitorRouting, v => !v) }}>{routingFull ? 'Routing: top 5' : 'Routing: all'}</Button>
@@ -1733,7 +1859,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         <Box borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="row" justifyContent="space-between">
           <Text><Text color="cyan" bold>model-router</Text><Text dimColor>  /  </Text><Text bold>Agent run</Text></Text>
-          <Text dimColor>{`${spin}${running.length} running · ${lv.doneN} done (${money(lv.doneCost)}${lv.failedN ? `, ${lv.failedN} failed` : ''}${lv.stoppedN ? `, ${lv.stoppedN} stopped` : ''}) · ${clockS(now)}`}</Text>
+          <Text dimColor>{`${spin}${running.length} running · ${endedF.length} done (${money(endedF.reduce((n, a) => n + (a.cost ?? 0), 0))}${endedF.filter(a => a.failed).length ? `, ${endedF.filter(a => a.failed).length} failed` : ''}${endedF.filter(a => a.stopped).length ? `, ${endedF.filter(a => a.stopped).length} stopped` : ''}) · ${clockS(now)}`}</Text>
         </Box>
         <Box flexDirection="row" gap={1}><Button key="main" hotkey="m" onPress={() => { void showPane($, PANE, 'Model router') }}>↑ Model router</Button>{runText}</Box>
       </Box>
@@ -1759,6 +1885,22 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
+    if (view === 'timeline') {
+      return (
+        <Box flexDirection="column">
+          {header}
+          <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
+            {timelineLines(lvAll, now, picked, width - 4, zoomDay, unfold).map(l => (
+              <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim} wrap="truncate">{l.text === '' ? ' ' : l.text}</Text>
+            ))}
+          </Box>
+          <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
+            {routingLines(lvAll, picked, now, routingFull).map(l => <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim}>{l.text}</Text>)}
+          </Box>
+          {footer}
+        </Box>
+      )
+    }
     if (view === 'list') {
       const cut = (t: string) => (t.length > width ? t.slice(0, width - 1) + '…' : t)
       return (
@@ -1775,16 +1917,16 @@ export const register: Register = (on, options) => {
     const rightW = 50
     const graphW = (twoCol ? width - rightW - 1 : width) - 4
     const scene = sceneOf(lv, now, graphW)
-    const { all } = treeOf(lv)
+    const { all } = tree
     const tails = [...[...running].sort((x, y) => y.lastStepAt - x.lastStepAt).slice(0, 2)]
-    tails.push(...[...lv.finished].sort((x, y) => Number(bad(y)) - Number(bad(x)) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - tails.length))
+    tails.push(...[...endedF].sort((x, y) => Number(bad(y)) - Number(bad(x)) || (y.done ?? 0) - (x.done ?? 0)).slice(0, 2 - tails.length))
     const panel = (a: RunningAgent) => {
       const { color } = stateOf(a, now)
       const state = a.done === null ? `RUNNING ${secs(now - a.startedAt)}` : endWord(a)
       return (
         <Box borderStyle="round" borderColor={color} borderDimColor={!color} flexDirection="column" paddingX={1}>
           <Box flexDirection="row" justifyContent="space-between">
-            <Text color={color} bold>{`● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · run ${a.run}` : ''} / ${a.done === null ? 'live' : 'stopped'}`}</Text>
+            <Text color={color} bold>{`● ${String(a.n).padStart(2, '0')} ${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''} / ${a.done === null ? 'live' : 'stopped'}`}</Text>
             <Text color={color}>{`[${state}]`}</Text>
           </Box>
           {a.recent.length === 0 && <Text dimColor>no tool call yet</Text>}
@@ -1795,7 +1937,7 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const stairs = stairLines(lv, now, all, treeOf(lv).kids, Math.max(24, Math.min(BOX_W, graphW - depth(null, 0) * 13 - 2)))
+    const stairs = stairLines(lv, now, all, tree.kids, Math.max(30, Math.min(BOX_W, graphW - depth(null, 0) * 4 - 2)))
     const graph = outline ? (
       <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
         {outlineLines(lvAll, now, picked).map(l => <Text color={l.color} weight={l.bold ? 'bold' : undefined} dimColor={l.dim} wrap="truncate">{l.text}</Text>)}
@@ -1803,7 +1945,7 @@ export const register: Register = (on, options) => {
     ) : layout === 'stairs' ? (
       <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
         <Text color="cyan" bold>[ Run graph ]</Text>
-        <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · four levels or more: drawn as a staircase (the grid would be ${Math.round(scene.width)} columns wide); o shows an outline`}</Text>
+        <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · four levels or more: drawn as a staircase, four columns a level (the grid would be ${Math.round(scene.width)} columns wide); o shows an outline`}</Text>
         {stairs.map(l => <Text color={l.color} dimColor={l.dim} wrap="truncate">{l.text}</Text>)}
         <Text dimColor>arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ &lt;4k</Text>
       </Box>

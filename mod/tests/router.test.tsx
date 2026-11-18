@@ -642,15 +642,15 @@ test('the run monitor: the main session at the root, each agent a box under its 
   expect(text).toContain('Agent run pane opened.')
   expect(text).toContain('agent run · 1 running · 1 done ($0.00)')
   expect(text).toContain('┌ 00 main session')
-  expect(text).toMatch(/┗━━ ~18k ━━▶ ┌ 01 Explore/)                 // 70k characters: a heavy arrow
+  expect(text).toMatch(/┗━━ ~18k ━━▶\n\s*┌ 01 Explore/)              // 70k characters: a heavy arrow, on the row above the box
   expect(text).toMatch(/● RUNNING\s+haiku low\s+\S+\s+1 step/)
-  expect(text).toMatch(/┗┄┄ ~\d+ ┄┄▶ ┌ 02 Web Researcher/)           // a short prompt: a light arrow, under its spawner
+  expect(text).toMatch(/┗┄┄ ~\d+ ┄┄▶\n\s*┌ 02 Web Researcher/)     // a short prompt: a light arrow, under its spawner
   expect(text).toMatch(/● DONE\s+haiku\s+\S+\s+0 steps\s+\$0\.00/)
   expect(text).toContain('● 01 Explore / live')
   expect(text).toMatch(/\d\d:\d\d:\d\d  Grep "parse_config" tools/)
   expect(text).toMatch(/ERROR \$ python3 -m pytest -q/)
   expect(text).toContain('01 Explore spawned on haiku (~18k ctx)')   // not routed here, so no effort known at the spawn
-  expect(text).toMatch(/└─────────┬[─]+┘\n {10}┗━━/)                  // the trunk leaves the parent's box where the ┬ is
+  expect(text).toMatch(/└──┬[─]+┘\n {3}┗━━/)                          // the trunk leaves the parent's box where the ┬ is, three columns in
   expect(text).toContain('02 Web Researcher spawned on haiku (~9 ctx) by 01')
   expect(text).toMatch(/02 Web Researcher done in \S+, \$0\.00/)
   expect(text).toMatch(/● 02 Web Researcher \/ stopped\s+\[DONE in \S+\]/)   // one agent at work: the finished one keeps its tail
@@ -660,16 +660,25 @@ test('the run monitor: the main session at the root, each agent a box under its 
   const box = rows.slice(i, i + 4).map(l => l.trimEnd().length)
   expect(box.length).toBe(4)
   expect(new Set(box).size).toBe(1)
-  // the engine resumes an agent under the same id: the same box, run 2, and 02's child count does not double
+  // the engine resumes an agent under the same id: the same box, its runs counted, and 02's child count does not double
   await $.agent.spawn({ ...SPAWN, tool_use_id: 'tm3', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'What is the RFC number of TLS 1.3? (again)', parentAgentId: 'm1' })
   n = 1   // the mock hands out m2 again
   await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 'tm3', reason: 'answer', agentId: 'm3' })
   await $.agent.spawn({ ...SPAWN, tool_use_id: 'tm4', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'And the year?', parentAgentId: 'm1' })
   ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
-  expect(text).toContain('┌ 02 Web Researcher · run 2 ')
-  expect(text).toContain('02 Web Researcher resumed (run 2, ~3 ctx)')
+  expect(text).toContain('┌ 02 Web Researcher · 2 runs ')                      // one box for the agent, its runs counted
+  expect(text).not.toContain('· run 2')
+  expect(text).toContain('02 Web Researcher resumed (run 2, ~3 ctx)')          // the events keep every resume
+  expect((text.match(/┌ 02 Web Researcher/g) ?? []).length).toBe(1)
   expect((text.match(/┌ 03 Web Researcher/g) ?? []).length).toBe(1)
-  expect(text.indexOf('┌ 02 Web Researcher ─')).toBeLessThan(text.indexOf('┌ 02 Web Researcher · run 2'))   // runs in order
+  // a resume that comes without a parent id (a hand-back) keeps its spawner: the box stays on 01's trunk
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 'tm4', reason: 'answer', agentId: 'm2' })
+  n = 1
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 'tm5', description: 'look up the RFC', subagentType: 'Web Researcher', prompt: 'And the section?' })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(text).toMatch(/[┣┗]┄┄ ~\d+ ┄┄▶\n\s*┃?┌ 02 Web Researcher · 3 runs/)   // on 01's trunk, not the session's
+  expect(text).toContain('02 Web Researcher resumed (run 3, ~4 ctx)')
+  expect(text).toMatch(/02 Web Researcher · 3 runs\s+claude-haiku-5-5\s+web_research\s+kept\s+already on the routed model/)   // one Routing row too
   await settled()
 })
 
@@ -771,7 +780,7 @@ test('the run monitor pane draws the graph: a box per agent in its state colour,
   expect((await ui.find({ type: 'Text', text: /^● 01 Explore \/ live$/ }))?.text).toBe('● 01 Explore / live')
   // the g button switches to the list view: the text drawing
   await ui.press({ key: 'view' })
-  expect((await ui.find({ type: 'Text', text: /[┣┗]━━ ~18k ━━▶ ┌ 01 Explore/ }))?.text).toContain('┌ 01 Explore')
+  expect((await ui.find({ type: 'Text', text: /^\s*┃?┌ 01 Explore/ }))?.text).toContain('┌ 01 Explore')
   await ui.unmount()
   await settled()
 })
@@ -990,7 +999,7 @@ test('a forked skill (/code-review runs as a fork of the session, not an Agent c
   await $.tool.call({ tool: 'Skill', skill: 'code-review', args: 'low', agentId: sp.agentId })
   await drain($.turn.step({ turnId: 'fkt2', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1, agentId: 'fork-2' }))
   ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
-  expect(text).toMatch(/┗[━─┄]+ ~\d+k? [━─┄]+▶ ┌ 03 fork \/code-review/)                       // under 02, the agent that launched it
+  expect(text).toMatch(/┗[━─┄]+ ~\d+k? [━─┄]+▶\n\s*┌ 03 fork \/code-review/)                   // under 02, the agent that launched it
   expect(text).toContain('03 fork /code-review started on fable high')
   await settled()
 })
@@ -1020,9 +1029,9 @@ test('a deep tree: the pane keeps the boxes as a staircase when the grid would n
   // four levels: the pane keeps the boxes as a staircase (the grid would not fit) and says so; o cycles outline, boxes, auto
   let ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /^\[ Run graph \]$/ }))?.text).toBe('[ Run graph ]')
-  expect((await ui.find({ type: 'Text', text: /drawn as a staircase .*o shows an outline/ }))?.text).toContain('staircase')
-  expect((await ui.find({ type: 'Text', text: /[┣┗][━─┄]{2} ~\d+k? [━─┄]{2}▶ ┌ 01 general-purpose/ }))?.text).toContain('┌ 01 general-purpose')
-  expect((await ui.find({ type: 'Text', text: /┌ 04 Web Researcher/ }))?.text).toContain('04 Web Researcher')      // the fourth level, still a box
+  expect((await ui.find({ type: 'Text', text: /drawn as a staircase.*o shows an outline/ }))?.text).toContain('staircase')
+  expect((await ui.find({ type: 'Text', text: /^ {4}┌ 01 general-purpose/ }))?.text).toContain('┌ 01 general-purpose')   // four columns in
+  expect((await ui.find({ type: 'Text', text: /^ {16}┌ 04 Web Researcher/ }))?.text).toContain('04 Web Researcher')   // the fourth level, still a box, 16 columns in
   await ui.press({ key: 'outline' })                                                      // o: the outline
   expect((await ui.find({ type: 'Text', text: /^\[ Run outline \]$/ }))?.text).toBe('[ Run outline ]')
   await ui.press({ key: 'outline' })                                                      // o: the grid, however wide
@@ -1031,5 +1040,59 @@ test('a deep tree: the pane keeps the boxes as a staircase when the grid would n
   await ui.press({ key: 'outline' })                                                      // o: back to the automatic choice
   expect((await ui.find({ type: 'Text', text: /drawn as a staircase/ }))?.text).toContain('staircase')
   await ui.unmount()
+  await settled()
+})
+
+test('the timeline: the day as one bar per run with the lens on the run shown, the run at its own scale with a row per agent in start order, ticks and a live edge; t in the pane; a run of twenty rows folds its finished branches, x unfolds', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, 'Bash')
+  let n = 0
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: `tl${++n}` }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.close', () => ({ value: undefined }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'find the parser and check it', turnId: 'tt1' })
+  const base = { provider: { kind: 'model' }, parentModel: 'claude-fable-5-1' } as const
+  const a1 = await $.agent.spawn({ ...base, tool_use_id: 'tl-1', subagentType: 'general-purpose', description: 'check the parser', prompt: 'Run the parser tests and report.' })
+  const a2 = await $.agent.spawn({ ...base, tool_use_id: 'tl-2', subagentType: 'Explore', description: 'find the parser', prompt: 'Find the parser.', parentAgentId: a1.agentId, model: 'claude-haiku-5-5' })
+  await $.tool.call({ tool: 'Bash', command: 'python3 -m pytest -q', agentId: a1.agentId })
+  await $.turn.complete({ answer: 'in tools/config.py', durationMs: 1000, isAborted: false, turnId: 'tl-t2', reason: 'answer', agentId: a2.agentId, usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 10000, cache_creation_input_tokens: 0 } })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor timeline' })
+  expect(text).toMatch(/^\[ Day \]  \d\d:\d\d .*1 run · 2 agents · \$0\.00/m)
+  expect(text).toMatch(/^runs {24}[█]*▶/m)                                               // the current run, still running, ends in the live edge (one cell: the clock is frozen)
+  expect(text).toMatch(/^ {28}r1/m)                                                       // tagged
+  expect(text).toMatch(/^lens {24}\[/m)                                                   // the lens on it
+  expect(text).toMatch(/^\[ Run 1\/1 · "find the parser and check it" · \d\d:\d\d → now · 2 agents · \$0\.00 \]/m)
+  expect(text).toMatch(/^00 main session {13}[━]*▶/m)
+  expect(text).toMatch(/^ {2}01 general-purpose {8}[✗▶]/m)                               // its one tool call failed in the same cell as the live edge, which wins
+  expect(text).toMatch(/^ {4}02 Explore +▓ +0s {2}\$0\.00/m)                              // under 01, done, its elapsed and cost after the bar
+  expect(text).toContain('▓ done   █ running   ░ quiet   ✗ failed or stopped   │ a tool call   ▶ now')
+  // the pane: t shows the timeline with the Routing frame under it; t again, the graph
+  const ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  await ui.press({ key: 'timeline' })
+  expect((await ui.find({ type: 'Text', text: /^\[ Day \]/ }))?.text).toContain('[ Day ]')
+  expect((await ui.find({ type: 'Text', text: /^\[ Routing \]$/ }))?.text).toBe('[ Routing ]')
+  await ui.press({ key: 'timeline' })
+  expect((await ui.find({ type: 'Text', text: /^\[ Run graph \]$/ }))?.text).toBe('[ Run graph ]')
+  await ui.unmount()
+  // twenty rows: the finished branch under 01 folds into one row once 01 and every agent under it has ended
+  for (let i = 3; i <= 21; i++) {
+    const sp = await $.agent.spawn({ ...base, tool_use_id: `tl-${i}`, subagentType: 'Explore', description: `search ${i}`, prompt: `Search ${i}.`, parentAgentId: a1.agentId, model: 'claude-haiku-5-5' })
+    await $.turn.complete({ answer: 'ok', durationMs: 1000, isAborted: false, turnId: `tl-t${i}`, reason: 'answer', agentId: sp.agentId, usage: { model: 'claude-haiku-5-5', input_tokens: 100, output_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } })
+  }
+  await $.turn.complete({ answer: 'checked', durationMs: 1000, isAborted: false, turnId: 'tl-t1', reason: 'answer', agentId: a1.agentId, usage: { model: 'claude-fable-5-1', input_tokens: 1000, output_tokens: 1000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor timeline' }))
+  expect(text).toMatch(/^ {2}01 general-purpose ▸ +▓ +0s {2}\$0\.06 {2}20 done under it/m)
+  expect(text).toContain('(haiku ×20; x unfolds)')
+  expect(text).not.toMatch(/^ {4}02 Explore/m)
+  const ui2 = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
+  await ui2.press({ key: 'timeline' })
+  await ui2.press({ key: 'fold' })
+  await ui2.unmount()
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor timeline' }))
+  expect(text).toMatch(/^ {4}02 Explore/m)                                                 // unfolded
+  expect(text).not.toContain('done under')
   await settled()
 })

@@ -149,8 +149,11 @@ the as-asked figure, labelled `est` (the same tokens re-priced; that run never h
 session (`/code-review`) is shown too, as `fork /<skill>`, under whatever launched it, with a note that nothing spawned
 it for the router to route. Before any agent has run, the main session is drawn alone: its box says `● WORKING` while a turn runs
 and `● IDLE` after, with the turns and cost so far, and its own live panel lists the main session's tool
-calls; agents hang under it as they spawn. A run deeper than three levels keeps its boxes as a staircase (each child one step right, under its spawner); `o`
-cycles an outline, the grid and the automatic choice. An agent the engine resumes under the same id (a hand-back, a
+calls; agents hang under it as they spawn. A run deeper than three levels keeps its boxes as a staircase (each child four columns right, under its spawner,
+the arrow on the row between); `o` cycles an outline, the grid and the automatic choice. `t` is the timeline: the
+day as one bar per run, then the run shown at its own scale, one row per agent with its bar in the state's colour,
+its tool calls as ticks, a live edge, elapsed and cost; a long run folds its finished branches (`x` unfolds), `z`
+zooms out to the day. An agent the engine resumes under the same id (a hand-back, a
 follow-up) is a new run of the same box, "02 Web Researcher · run 2"; a child hangs under the run active
 when it spawned. Nothing here is a dependency graph: the engine reports who spawned whom, not who waits
 on whom, so no box is marked blocked.

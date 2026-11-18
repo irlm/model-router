@@ -715,10 +715,6 @@ class Release(unittest.TestCase):
         self.assertIn('v0.12.0 exists already', probs[2])
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-
 class PruneSkills(unittest.TestCase):
     FX = {'requests': 100, 'sessions': 3, 'skills_used': {'herdr': 1}, 'bodies': [],
           'parts': {'skills': {'tokens': 900, 'cost': 1.0, 'n': 5, 'unused_n': 4, 'unused_tokens': 800, 'largest_unused': [],
@@ -727,7 +723,7 @@ class PruneSkills(unittest.TestCase):
 
     def run_tool(self, d, *args):
         return subprocess.run([sys.executable, str(Path(__file__).resolve().parent / 'prune_skills.py'), '--fixed-json', str(d / 'fixed.json'),
-                               '--settings', str(d / 'settings.json'), '--state', str(d / 'state.json'), *args], capture_output=True, text=True)
+                               '--settings', str(d / 'settings.json'), '--state', str(d / 'state.json'), '--plugins', 'anthropic-skills', *args], capture_output=True, text=True)
 
     def test_unused_skills_go_name_only_and_come_back(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -736,10 +732,11 @@ class PruneSkills(unittest.TestCase):
             (d / 'settings.json').write_text(json.dumps({'model': 'opus', 'skillOverrides': {'init': 'off'}}), encoding='utf-8')
             r = self.run_tool(d, '--dry-run')
             self.assertEqual(r.returncode, 0, r.stderr)
-            self.assertIn('would set  dataviz: name-only (362 tokens)', r.stdout)
+            self.assertIn('would set  dataviz: name-only (360 tokens of description)', r.stdout)   # 362 less the name line, as fixed_text counts it
             self.assertIn('keep  init: already off in settings.json', r.stdout)
             self.assertIn('1 plugin skills left alone', r.stdout)
             self.assertIn('2 skills would be listed name-only', r.stdout)
+            self.assertIn('the descriptions, about', r.stdout)                                  # the names stay in the list: not counted as saved
             self.assertEqual(json.loads((d / 'settings.json').read_text())['skillOverrides'], {'init': 'off'})   # a dry run writes nothing
             r = self.run_tool(d, '--keep', 'code-review')
             self.assertEqual(r.returncode, 0, r.stderr)
@@ -750,11 +747,33 @@ class PruneSkills(unittest.TestCase):
             self.assertEqual(json.loads((d / 'state.json').read_text()), ['dataviz'])
             r = self.run_tool(d)                                                              # a second run adds the rest, keeps the record whole
             self.assertEqual(json.loads((d / 'state.json').read_text()), ['code-review', 'dataviz'])
+            r = self.run_tool(d, '--keep', 'dataviz')                                         # a kept name pruned earlier is restored
+            self.assertIn('restore  dataviz: --keep', r.stdout)
+            self.assertEqual(json.loads((d / 'settings.json').read_text())['skillOverrides'], {'init': 'off', 'code-review': 'name-only'})
+            self.assertEqual(json.loads((d / 'state.json').read_text()), ['code-review'])
+            r = self.run_tool(d)                                                              # and pruned again without --keep
+            # a pruned skill that was loaded since (no longer in the unused list) comes back by itself
+            fx2 = json.loads(json.dumps(self.FX)); fx2['parts']['skills']['unused'] = [u for u in fx2['parts']['skills']['unused'] if u['name'] != 'code-review']
+            (d / 'fixed.json').write_text(json.dumps(fx2), encoding='utf-8')
+            r = self.run_tool(d)
+            self.assertIn('restore  code-review: loaded since it was pruned', r.stdout)
+            self.assertEqual(json.loads((d / 'settings.json').read_text())['skillOverrides'], {'init': 'off', 'dataviz': 'name-only'})
+            (d / 'fixed.json').write_text(json.dumps(self.FX), encoding='utf-8')
+            r = self.run_tool(d)                                                              # listed unused again: pruned again
             r = self.run_tool(d, '--revert')
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn('2 skills listed with their description again', r.stdout)
             self.assertEqual(json.loads((d / 'settings.json').read_text())['skillOverrides'], {'init': 'off'})   # only what this wrote goes
             self.assertFalse((d / 'state.json').exists())
+            # a folder-scoped skill (apps/web:deploy) is the person's own, not a plugin's; a settings file that is not a map is refused
+            fx = json.loads(json.dumps(self.FX)); fx['parts']['skills']['unused'].append({'name': 'apps/web:deploy', 'tokens': 30})
+            (d / 'fixed.json').write_text(json.dumps(fx), encoding='utf-8')
+            r = self.run_tool(d, '--dry-run')
+            self.assertIn('would set  apps/web:deploy', r.stdout)
+            (d / 'settings.json').write_text('[]', encoding='utf-8')
+            r = self.run_tool(d)
+            self.assertEqual(r.returncode, 1)
+            self.assertIn('nothing changed', r.stdout)
 
     def test_no_listing_in_the_transcripts_is_said_not_pruned(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -764,4 +783,12 @@ class PruneSkills(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn('nothing to prune', r.stdout)
             self.assertFalse((d / 'settings.json').exists())
+            # a summary with no skill listing in it (an older Claude Code) is the same: the gate is on the listing, not on the summary
+            (d / 'fixed.json').write_text(json.dumps({'requests': 5, 'sessions': 1, 'skills_used': {}, 'bodies': [], 'parts': {'skills': {'tokens': 0, 'cost': 0, 'n': 0, 'unused_n': 0, 'unused_tokens': 0, 'largest_unused': [], 'unused': []}}}), encoding='utf-8')
+            r = self.run_tool(d)
+            self.assertIn('lists nothing', r.stdout)
+
+
+if __name__ == '__main__':
+    unittest.main()
 

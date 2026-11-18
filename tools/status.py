@@ -32,6 +32,7 @@ sys.path.insert(0, str(HERE / 'catalog'))
 import price  # noqa: E402
 import agent_files  # noqa: E402
 import agent_sources  # noqa: E402
+import upgrade  # noqa: E402
 import changes  # noqa: E402
 import consumption  # noqa: E402
 import overrides  # noqa: E402
@@ -803,6 +804,9 @@ def collect(fetch=False):
     if not version:
         advice.append('claude CLI not found on PATH: nothing can run here')
     advice += transcript_notes(usage)
+    newer = upgrade.advice()   # a newer version published on GitHub (the check the widget runs once a session, kept a day)
+    if newer:
+        advice.append(newer)
     advice += agent_sources.notes(AGENTS_DIR)
     wv = widget_version()
     tagged = version_tagged(wv)

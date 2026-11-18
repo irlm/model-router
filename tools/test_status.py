@@ -24,6 +24,7 @@ import fixed_text  # noqa: E402
 import prune_agents  # noqa: E402
 import release  # noqa: E402
 import status  # noqa: E402
+import upgrade  # noqa: E402
 
 
 def usage(by_class=None, rows=None):
@@ -788,6 +789,54 @@ class PruneSkills(unittest.TestCase):
             (d / 'fixed.json').write_text(json.dumps({'requests': 5, 'sessions': 1, 'skills_used': {}, 'bodies': [], 'parts': {'skills': {'tokens': 0, 'cost': 0, 'n': 0, 'unused_n': 0, 'unused_tokens': 0, 'largest_unused': [], 'unused': []}}}), encoding='utf-8')
             r = self.run_tool(d)
             self.assertIn('lists nothing', r.stdout)
+
+
+class Upgrade(unittest.TestCase):
+    """tools/upgrade.py: the install updated by itself; what it reads from Claude Code's records and what it says."""
+
+    def test_newer_compares_numbers_not_strings(self):
+        self.assertTrue(upgrade.newer('0.30.0', '0.29.4'))
+        self.assertTrue(upgrade.newer('0.10.0', '0.9.9'))   # '0.10' < '0.9' as strings
+        self.assertFalse(upgrade.newer('0.29.4', '0.29.4'))
+        self.assertTrue(upgrade.newer('0.1.0', None))
+
+    def test_published_is_the_newest_tag(self):
+        out = 'abc\trefs/tags/v0.29.4\ndef\trefs/tags/v0.30.0\nghi\trefs/tags/v0.9.9\njkl\trefs/tags/not-a-version\n'
+        with mock.patch.object(upgrade, 'sh', return_value=(0, out, '')):
+            self.assertEqual(upgrade.published_version('git'), ('0.30.0', None))
+        with mock.patch.object(upgrade, 'sh', return_value=(128, '', 'fatal: unable to access')):
+            self.assertEqual(upgrade.published_version('git'), (None, 'fatal: unable to access'))
+
+    def test_records_and_advice(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': tmp}):
+            plugins = Path(tmp) / 'plugins'
+            plugins.mkdir()
+            (plugins / 'installed_plugins.json').write_text('\ufeff' + json.dumps({'version': 2, 'plugins': {
+                'model-router@model-router': [{'scope': 'user', 'version': '0.29.4'}]}}), encoding='utf-8')   # a BOM, as on Windows
+            (plugins / 'known_marketplaces.json').write_text(json.dumps({'model-router': {
+                'source': {'source': 'github', 'repo': 'irlm/model-router'}, 'installLocation': '/x/clone'}}), encoding='utf-8')
+            self.assertEqual(upgrade.installed_version(), '0.29.4')
+            self.assertEqual(upgrade.marketplace(), {'path': '/x/clone', 'kind': 'github'})
+            self.assertIsNone(upgrade.advice())   # no check yet: nothing to say
+            with mock.patch.object(upgrade, 'published_version', return_value=('0.30.0', None)):
+                rec = upgrade.check('git', fresh=True)
+            self.assertTrue(rec['behind'])
+            self.assertEqual(upgrade.advice(), 'model-router 0.30.0 is published, 0.29.4 installed: /router upgrade')
+            # the day's cache answers without GitHub; a changed install invalidates it
+            with mock.patch.object(upgrade, 'published_version', side_effect=AssertionError('asked GitHub')):
+                self.assertTrue(upgrade.check('git')['behind'])
+            (plugins / 'installed_plugins.json').write_text(json.dumps({'plugins': {'model-router@model-router': {'version': '0.30.0'}}}), encoding='utf-8')
+            with mock.patch.object(upgrade, 'published_version', return_value=('0.30.0', None)):
+                self.assertFalse(upgrade.check('git')['behind'])
+            self.assertIsNone(upgrade.advice())
+
+    def test_no_marketplace_is_said(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': tmp}):
+            self.assertEqual(upgrade.marketplace(), {'path': None, 'kind': None})
+            with mock.patch.object(upgrade.shutil, 'which', return_value='/usr/bin/x'), mock.patch.object(sys, 'argv', ['upgrade.py']), \
+                    contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(upgrade.main(), 2)
+            self.assertIn('claude plugin marketplace add', out.getvalue())
 
 
 if __name__ == '__main__':

@@ -90,6 +90,7 @@ Buttons (at the bottom of the pane) and verbs (`/router <verb>`):
 | Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
 | Ledger now | `ledger` | `tools/ledger.py --commit` (`--stdout` in the marketplace clone: the entry goes to the pane) |
 | Apply agents | `apply` | `apply_agents.py`: write routing.json's model and effort into the agent files you have in `~/.claude/agents`; installs `agents/web-researcher.md` from the repository when missing; agent files you do not have are absent and skipped |
+| | `upgrade` | `tools/upgrade.py`: the install brought up to date by itself: the marketplace (the GitHub clone, or a checkout of your own when it is clean), then the plugin's cached copy; what remains is `/reload-plugins` in the sessions that are open. The pane's advice says when GitHub has a newer version (checked once a session, kept a day) |
 | | `pull` | `git pull --ff-only` (`dotup` does it; the button is gone) |
 
 Setup on a machine: Python 3 on PATH (`python3`, `python` or `py`), git, and the `claude` CLI; then,
@@ -268,11 +269,21 @@ suggestions header give the saving as a share of the window's spend too.
 
 ### Updating
 
+`/router upgrade` does the whole thing on any machine, with nothing but git and the `claude` CLI: it
+brings the marketplace up to date (the GitHub clone, pulled again when Claude Code's own update left
+it stale; or a checkout of your own, fast-forwarded when it is clean and behind, left alone when it has
+uncommitted work), then installs the plugin's new version (`claude plugin update`), then says what
+remains: `/reload-plugins` in the sessions that are open; a new session has it. From a terminal, the
+same is `python3 tools/upgrade.py` in the repository, and `--check` only says whether GitHub has a
+newer version. The pane asks that once a session and keeps the answer a day; when a newer version is
+published, its advice says so with the command. The workbench's `dotup` runs the same steps among its
+own; neither needs the other.
+
 With the marketplace pointed at a checkout (`claude plugin marketplace add <the checkout>`), two things differ:
 `/reload-plugins` reads `mod/` from the folder, so an edit is live in the session that reloads; but a *new* session
 loads the copy recorded by the install (`~/.claude/plugins/cache/model-router/<version>`), which only
-`claude plugin update model-router@model-router` refreshes from the folder. After a commit, run that once (`dotup`
-does), or every new session starts on the previous version until it reloads.
+`claude plugin update model-router@model-router` refreshes from the folder. After a commit, run that once
+(`/router upgrade` or `dotup` does), or every new session starts on the previous version until it reloads.
 
 The widget has two parts that update separately: the mod (the pane, the status line, the router
 hook: the code Claude Code loads at start) and the repository it reads (the scripts, the routing,

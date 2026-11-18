@@ -201,6 +201,7 @@ requests: a prompt that reads as a measured family runs at that family's measure
 | Re-check routing (u) | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry |
 | Ledger now (l) | `tools/ledger.py --commit` (into the pane in the marketplace clone) |
 | Apply agents (a) | `apply_agents.py`: routing.json's model and effort into the agent files you have |
+| `upgrade` | `tools/upgrade.py`: the install brought up to date by itself, marketplace then plugin, on any machine; the pane says when GitHub has a newer version |
 | `pull` | `git pull --ff-only` (`dotup` does it too) |
 
 ## The method, in the order it runs

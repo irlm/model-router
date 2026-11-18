@@ -3,6 +3,18 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.30.0 — 2026-11-18
+
+- `/router upgrade`: the install brought up to date by the router itself, on any machine, with nothing but git and
+  the `claude` CLI (`tools/upgrade.py`): the marketplace first (the GitHub clone, pulled again when Claude Code's
+  own update leaves it stale, as it did on 2026-11-09; a checkout of your own fast-forwarded when clean and behind,
+  left alone with uncommitted work), then the plugin's cached copy, then what remains in words: `/reload-plugins`
+  in the open sessions. Until now only the workbench's `dotup` chained these steps, so a machine without the
+  workbench had three commands to remember; the router does not depend on it any more, and `dotup` keeps running
+  the same steps among its own.
+- The pane says when GitHub has a newer version: `tools/upgrade.py --check` compares the newest `v*` tag with the
+  install record, the widget runs it once a session, the answer is kept a day, and the advice line names the command.
+
 ## 0.29.4 — 2026-11-17
 
 - The regression check's "web_research REGRESSED 0/6" of today was the grader, not the family: with no `--only`, four

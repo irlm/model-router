@@ -42,6 +42,8 @@ const JOBS: Record<string, { title: string; argv: (python: string, clone: boolea
   ledger: { title: 'usage ledger', argv: (py, clone) => [py, 'tools/ledger.py', clone ? '--stdout' : '--commit'] },
   apply: { title: 'apply agents', argv: py => [py, 'apply_agents.py'] },
   pull: { title: 'git pull', argv: () => ['git', 'pull', '--ff-only'] },
+  // The install itself, by itself: the marketplace (clone or checkout), then the plugin's cached copy; the open sessions reload.
+  upgrade: { title: 'upgrade the install', argv: py => [py, 'tools/upgrade.py'] },
   // The agent files nothing called: a dry run lists them; `move` parks them in agents.unused (folders kept); `revert` brings them back.
   prune: { title: 'prune agents (dry run)', argv: py => [py, 'tools/prune_agents.py', '--dry-run'] },
   'prune-move': { title: 'prune agents', argv: py => [py, 'tools/prune_agents.py'] },
@@ -127,7 +129,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.29.4'
+const WIDGET_VERSION = '0.30.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -1387,11 +1389,13 @@ export const register: Register = (on, options) => {
     runsDir = `${(await $.env.get('CLAUDE_CONFIG_DIR')) || `${home0}/.claude`}/model-router/runs`
     await $.command.register({
       name: 'router',
-      description: 'Model router: the session live, where the routing stands, first-run setup, installation check, re-check it, ledger, apply, prune, pinned agent sources, pull',
-      argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import [--days N] [--rebuild]|show <id>] | setup | doctor | check | fetch | update | ledger | apply | pull | prune [skills|all] [move|revert] | agents pin <url>|check|update [file]|list | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class> | dismiss <n|id> | undismiss <id>',
+      description: 'Model router: the session live, where the routing stands, first-run setup, installation check, re-check it, ledger, apply, prune, pinned agent sources, pull, upgrade the install',
+      argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import [--days N] [--rebuild]|show <id>] | setup | doctor | check | fetch | update | upgrade | ledger | apply | pull | prune [skills|all] [move|revert] | agents pin <url>|check|update [file]|list | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class> | dismiss <n|id> | undismiss <id>',
     })
     void refresh($)
     ensureTick($)
+    // Is a newer version published? Asked once a day (tools/upgrade.py keeps the answer a day); the advice line reads it.
+    void (async () => { try { await $.process.run([await findPython($), 'tools/upgrade.py', '--check'], { cwd: repo, env: pyEnv(), timeoutMs: 90000 }) } catch { /* no network, no git: the check waits for the next session */ } })()
     if (refreshMinutes > 0) {
       $.clock.every(Math.max(1, refreshMinutes) * 60000, () => {
         void refresh($)

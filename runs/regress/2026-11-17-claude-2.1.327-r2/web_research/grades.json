@@ -1,0 +1,26 @@
+{
+ "claude-haiku-5-5 / low / 1 / wr-03": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-04": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-05": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-09": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / wr-16": {
+  "outcome": "correct",
+  "detail": "1/1 cited pages state it"
+ },
+ "claude-haiku-5-5 / low / 1 / live-01": {
+  "outcome": "correct",
+  "detail": "2/2 cited pages state it"
+ }
+}

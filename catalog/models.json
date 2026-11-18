@@ -16,6 +16,20 @@
   }
  },
  "models": {
+  "claude-fable-5-2": {
+   "provider": "anthropic",
+   "tier": "frontier",
+   "input_per_mtok": 8.0,
+   "output_per_mtok": 40.0,
+   "cache_read_per_mtok": 0.2,
+   "cache_write_multipliers": {
+    "5m": 1.25,
+    "1h": 2.0
+   },
+   "context": 1000000,
+   "verified_date": "2026-11-17",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+  },
   "claude-fable-5-1": {
    "provider": "anthropic",
    "tier": "frontier",

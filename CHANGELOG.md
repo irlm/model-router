@@ -3,6 +3,17 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.29.4 — 2026-11-17
+
+- The regression check's "web_research REGRESSED 0/6" of today was the grader, not the family: with no `--only`, four
+  graders built the glob `runs-**.jsonl`, which Python 3.9's pathlib refuses, so nothing was judged and the silence
+  counted as zero successes. The pattern is `runs-*.jsonl` without `--only`, and `regress.py` now says "grader failed
+  (exit N): nothing judged" instead of REGRESSED when a grader exits non-zero. Re-graded, the six lookups were all
+  correct with their pages.
+- Claude Fable 5.2 in the catalog ($8 / $40 per million, $0.20 cache read, $10 / $16 cache writes, from Anthropic's
+  pricing page, 2026-11-17) and in the widget's live price table; the transcripts have run on it since 2026-11-10, and
+  the 30-day totals were understating it.
+
 ## 0.29.3 — 2026-11-17
 
 - A sibling is not a re-issue. Two searches launched in parallel with similar words read as "a routed call re-issued

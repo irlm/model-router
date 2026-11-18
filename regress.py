@@ -186,8 +186,12 @@ def main():
             continue
         print('run', ' '.join(run), flush=True)
         subprocess.run(run, cwd=str(HERE), check=False)
-        if grade:
-            subprocess.run(grade, cwd=str(HERE), check=False)
+        graded = subprocess.run(grade, cwd=str(HERE), check=False) if grade else None
+        if graded is not None and graded.returncode != 0:
+            # a grader that fails judged nothing: say so, instead of counting its silence as zero successes (2026-11-17)
+            lines.append(f'| {fam} | {d["model"]} {effort} | | | | | grader failed (exit {graded.returncode}): nothing judged | |')
+            print(lines[-1], flush=True)
+            continue
         cells = report.load_cells(out_root)
         rows = [x for (b, m, e, t), rs in cells.items() if b in (bench, bench + '_p' + args.prompt_variant) for x in rs]
         judged = [x for x in rows if x['outcome'] not in report.NOT_MODEL]

@@ -74,7 +74,9 @@ def main():
     runs = args.runs or HERE.parents[1] / 'runs' / args.bench
     grades_path = runs / 'grades.json'
     grades = json.loads(grades_path.read_text()) if grades_path.exists() else {}
-    for f in sorted(runs.glob(f'runs-*{args.only}*.jsonl')):
+    # no --only: 'runs-**.jsonl' is a ** glob, which Python 3.9's pathlib refuses (the regression's false 0/6 of 2026-11-17)
+    pattern = f'runs-*{args.only}*.jsonl' if args.only else 'runs-*.jsonl'
+    for f in sorted(runs.glob(pattern)):
         for line in f.read_text().splitlines():
             if not line.strip():
                 continue

@@ -127,7 +127,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.29.3'
+const WIDGET_VERSION = '0.29.4'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -433,7 +433,7 @@ const STOP = new Set(['that', 'this', 'with', 'from', 'have', 'what', 'when', 't
   'other', 'which', 'while', 'where', 'does', 'done', 'doing', 'after', 'before', 'again', 'still', 'please', 'lets', 'check', 'look', 'think', 'maybe'])
 const WORDS = /[a-z]{4,}/g
 const TICKETS = /\b[A-Z][A-Z0-9]+-\d+\b|#\d{2,}|\bissues?\s+\d+/g
-const CACHE_READ: Record<string, number> = { fable: 0.25, opus: 0.2, sonnet: 0.1, haiku: 0.01 }   // $ per million tokens, catalog cache-read prices
+const CACHE_READ: Record<string, number> = { 'fable-5-2': 0.2, fable: 0.25, opus: 0.2, sonnet: 0.1, haiku: 0.01 }   // a longer key first: 'fable' would match 5.2 too   // $ per million tokens, catalog cache-read prices
 const PREFIX_TOKENS = 23000   // what a fresh session re-reads per turn here (results/prefix)
 const vocab = new Set<string>()
 const ticketsSeen = new Set<string>()
@@ -447,6 +447,7 @@ const ticketsOf = (t: string) => new Set((t.match(TICKETS) ?? []).map(x => x.toU
 const cacheRate = (model: string): number => CACHE_READ[Object.keys(CACHE_READ).find(k => model.toLowerCase().includes(k)) ?? 'opus'] ?? 0.2
 /** $ per million tokens by model family, catalog/models.json: input, output, cache read, cache write at the 1h multiplier (2x input), what a session on a subscription's cache pays. */
 const PRICES: Record<string, { in: number; out: number; read: number; write: number }> = {
+  'fable-5-2': { in: 8, out: 40, read: 0.2, write: 16 },   // Fable 5.2 (verified 2026-11-17 on Anthropic's pricing page); the key before 'fable', which 5.2's id also contains
   fable: { in: 10, out: 50, read: 0.25, write: 20 }, opus: { in: 4, out: 20, read: 0.2, write: 8 },
   sonnet: { in: 2, out: 10, read: 0.1, write: 4 }, haiku: { in: 0.1, out: 0.5, read: 0.01, write: 0.2 },
 }

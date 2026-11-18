@@ -3,6 +3,40 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.29.3 — 2026-11-17
+
+- A sibling is not a re-issue. Two searches launched in parallel with similar words read as "a routed call re-issued
+  within ten minutes", and the second was escalated to Opus (30x the routed cost) on a false premise. While a routed
+  agent of that type with similar words still runs, a new call is a sibling and is routed like it; a re-issue is the
+  same call again after the routed one has ended.
+- An escalation lasts half an hour, not the session: it says a family is struggling now, and a wrong one (the sibling above)
+  sent every later search of the session to Opus. `/router routing ask|auto|off` also clears the escalated families.
+- A re-issue is the same call again in the same run (prompt or task). A similar search under a new prompt read as a
+  re-issue of the last run's and was escalated, every run of the day phrasing its searches alike; the routed rows carry
+  their run now and only a row of the current run counts.
+- A parallel pair is two siblings. The engine issues a batch of Agent calls before any of them spawns, so the second of
+  two similar searches saw the first's routed row and no running sibling, and was escalated. A routed call still pending
+  its spawn counts as a sibling, and a re-issue needs half a minute to have passed (an answer takes time to fail).
+- The staircase takes over whenever the grid would run past the pane's edge, not at a fixed depth: three agent levels in a
+  100-column pane were drawn as the grid with the third level off-screen. The grid stays for what fits.
+
+## 0.29.2 — 2026-11-17
+
+- The panes redraw after a `/reload-plugins`. The second ticker that redraws the monitor while agents run was started in
+  `session.start`, which a reload does not run again, so a reloaded widget drew the graph only when a prompt or a key
+  wrote state: a run of eight agents on four levels went by with a frozen pane. The ticker now arms itself from any
+  hook (a spawn, a turn, a render), and the main pane reads it too, so its agent rows and the session's elapsed move.
+
+## 0.29.1 — 2026-11-17
+
+- An orchestrator is never routed. A general-purpose agent told to "use the Agent tool to launch a Web Researcher: what
+  is the default value of …" matched the lookup words and was routed to Haiku low, where it had no Agent tool and did
+  the lookups itself: a flat run where a tree was asked for. A prompt that names the Agent tool, subagents, or launching
+  in parallel is an orchestrator, whatever it delegates; the ledger counts it the same way, and the list test covers it.
+- A spawn finds its own Agent call's decision by the call's id. It matched by the call's words within ten minutes, so a
+  call repeated with the same words took the earlier call's decision (two orchestrators run as asked read as "routed" in
+  the Routing frame). Rows without an id (older sessions) still match by words, within a minute.
+
 ## 0.29.0 — 2026-11-17
 
 - The staircase takes four columns a level, not 23: the arrow and its context label sit on their own row on the trunk,

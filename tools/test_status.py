@@ -47,13 +47,14 @@ class Classify(unittest.TestCase):
         self.assertEqual(c('general-purpose', 'compare the two queues and write a report'), 'research-synthesis')
         self.assertEqual(c('general-purpose', 'compare the two parsers and fix the bug'), 'code-change')   # a code change is not a research note
         self.assertEqual(c('general-purpose', 'fix the failing test'), 'code-change')
-        self.assertEqual(c('Plan', 'plan the migration'), 'other')   # not an Explore: the widget does not route it, so the ledger does not count it as measured
+        self.assertEqual(c('Plan', 'plan the migration'), 'other')
+        self.assertEqual(c('general-purpose', 'use the Agent tool to launch an Explore subagent: what is the default value of X'), 'other')   # an orchestrator, whatever it delegates   # not an Explore: the widget does not route it, so the ledger does not count it as measured
         self.assertEqual(c('general-purpose', 'hello'), 'other')
 
     def test_the_widget_and_the_ledger_share_the_keyword_lists(self):
         # The widget routes by these words and the ledger counts by them: one copy each, kept identical by this test.
         source = (Path(__file__).resolve().parents[1] / 'mod/hooks/register.tsx').read_text(encoding='utf-8')
-        for name in ('LOOKUP', 'SYNTHESIS', 'CODE', 'RUNNER', 'BROWSER'):
+        for name in ('LOOKUP', 'SYNTHESIS', 'CODE', 'RUNNER', 'BROWSER', 'ORCHESTRATE'):
             m = re.search(r"^const %s = \[(.*?)\]$" % name, source, re.S | re.M)
             self.assertIsNotNone(m, name)
             widget = re.findall(r"'((?:[^'\\]|\\.)*)'", m.group(1))

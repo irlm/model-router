@@ -270,6 +270,11 @@ test('auto mode routes a research note to the decided family once it is measured
   expect(spawnSeen(seen)?.model).toBe('sonnet')
   await drain($.turn.step({ turnId: 'ta', index: 0, model: 'claude-sonnet-5-5', effort: 'high', messageCount: 1, agentId: sp.agentId }))
   expect((seen.filter(x => x.tool === '$step').at(-1) as { effort?: string })?.effort).toBe('low')
+  // an orchestrator that delegates a lookup is not the lookup: left on the session's model (a real misroute, 2026-11-17: routed to haiku, it had no Agent tool)
+  const ORCH = { tool: 'Agent', description: 'delegate a lookup', prompt: 'Use the Agent tool to launch a Web Researcher subagent: what is the default value of shared_buffers?', subagent_type: 'general-purpose' } as const
+  await $.tool.call(ORCH)
+  await $.agent.spawn(spawnOf(ORCH))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
   // running a test command and reporting what it said is not a research note: left on the session's model (a real misroute, 2026-11-09)
   const TESTS = { tool: 'Agent', description: 'run the cart tests', prompt: 'Run python3 -m pytest cart -q and report the failures with their assertion messages. Do not change any file.', subagent_type: 'general-purpose' } as const
   await $.tool.call(TESTS)
@@ -583,19 +588,67 @@ test('a routed Agent call that fails escalates its family: the next call runs as
 test('an Agent call re-issued within minutes of a routed one, with the same words, escalates its family', { options: { routing: 'auto' } }, async ($, on) => {
   const seen: Record<string, unknown>[] = []
   const steps: unknown[] = []
-  LIVE_MOCKS(on, seen, steps, null)
+  // LIVE_MOCKS with a clock that can move: a re-issue needs half a minute to have passed since the routed call
+  let clockNow = 1_762_000_000_000
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('clock.now', () => ({ value: clockNow }))
+  on('clock.every', () => ({ value: undefined }))
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(STATUS) } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('session.model', () => ({ value: 'claude-fable-5-1' }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.step', async function* (_, e) { steps.push(e.effort); return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } })
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return { result: {} } })
   on('agent.spawn', (_, e) => { seen.push({ tool: '$spawn', ...e }); return { model: e.model ?? 'claude-fable-5-1', agentId: `a${++spawned}` } })
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   await $.tool.call(EXPLORE)
-  await $.agent.spawn(spawnOf(EXPLORE))
+  const first = await $.agent.spawn(spawnOf(EXPLORE))
   expect(spawnSeen(seen)?.model).toBe('haiku')
+  // a sibling with similar words, launched while the first still runs (two searches in parallel), is routed too, not an escalation
+  const sibling = { ...EXPLORE, tool_use_id: 'tu-explore-sib', description: EXPLORE.description + ' too' }
+  await $.tool.call(sibling)
+  const second = await $.agent.spawn(spawnOf(sibling))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  // two calls issued together, before either spawned (the engine launches a parallel batch that way): both routed
+  const pairA = { ...EXPLORE, tool_use_id: 'tu-pair-a', description: EXPLORE.description + ' here' }
+  const pairB = { ...EXPLORE, tool_use_id: 'tu-pair-b', description: EXPLORE.description + ' there' }
+  await $.tool.call(pairA)
+  await $.tool.call(pairB)
+  const pa = await $.agent.spawn(spawnOf(pairA))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  const pb = await $.agent.spawn(spawnOf(pairB))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  for (const [id, turnId] of [[pa.agentId, 'tpa'], [pb.agentId, 'tpb']] as const) await $.turn.complete({ answer: 'ok', durationMs: 1000, isAborted: false, turnId, reason: 'answer', agentId: id })
+  await $.turn.complete({ answer: 'ok', durationMs: 1000, isAborted: false, turnId: 'te1', reason: 'answer', agentId: first.agentId })
+  await $.turn.complete({ answer: 'ok', durationMs: 1000, isAborted: false, turnId: 'te2', reason: 'answer', agentId: second.agentId })
+  // the same call again, a minute later, after the routed ones ended: a re-issue, the family escalates
+  clockNow += 60_000
   const again = { ...EXPLORE, tool_use_id: 'tu-explore-2', description: EXPLORE.description + ' again' }
   await $.tool.call(again)
   await $.agent.spawn(spawnOf(again))
   expect(spawnSeen(seen)?.model).toBeUndefined()
-  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('escalated: find_feature (re-issued within 10 min of a routed call)')
+  // setting the mode clears the escalations: the same call is routed again
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'routing auto' }))
+  expect(text).toContain('escalated families cleared')
+  const third = { ...EXPLORE, tool_use_id: 'tu-explore-3', description: EXPLORE.description + ' once more' }
+  await $.tool.call(third)
+  const t3 = await $.agent.spawn(spawnOf(third))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  await $.turn.complete({ answer: 'ok', durationMs: 1000, isAborted: false, turnId: 'te3', reason: 'answer', agentId: t3.agentId })
+  // a similar search under a new prompt is new work, not a re-issue: routed (the chains of 2026-11-17 phrased every search alike)
+  await $.turn.start({ text: 'now find the loader too', turnId: 'tnext' })
+  const fourth = { ...EXPLORE, tool_use_id: 'tu-explore-4', description: EXPLORE.description + ' as well' }
+  await $.tool.call(fourth)
+  await $.agent.spawn(spawnOf(fourth))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
   await settled()   // the detached work (log writes, the change record) ends inside the test
 })
 
@@ -755,9 +808,9 @@ test('the run monitor pane draws the graph: a box per agent in its state colour,
   // wide: graph and panels side by side
   let ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /^Agent run$/ }))?.text).toBe('Agent run')
-  expect((await ui.find({ type: 'Text', text: /^00 main session$/ }))?.text).toBe('00 main session')
-  expect((await ui.find({ type: 'Text', text: /^01 Explore$/ }))?.text).toBe('01 Explore')
-  expect((await ui.find({ type: 'Text', text: /^02 Web Researcher$/ }))?.text).toBe('02 Web Researcher')
+  expect((await ui.find({ type: 'Text', text: /┌ 00 main session/ }))?.text).toContain('00 main session')   // a 95-column graph: the staircase, boxes kept
+  expect((await ui.find({ type: 'Text', text: /┌ 01 Explore/ }))?.text).toContain('01 Explore')
+  expect((await ui.find({ type: 'Text', text: /┌ 02 Web Researcher/ }))?.text).toContain('02 Web Researcher')
   expect((await ui.find({ type: 'Text', text: /● RUNNING/ }))?.text).toContain('● RUNNING')
   expect((await ui.find({ type: 'Text', text: /● FAILED/ }))?.text).toContain('● FAILED')
   expect((await ui.find({ type: 'Text', text: /~18k/ }))?.text).toContain('~18k')                       // the arrow's label, on the branch
@@ -776,7 +829,7 @@ test('the run monitor pane draws the graph: a box per agent in its state colour,
   await ui.unmount()
   // narrow: the same parts, stacked
   ui = await $.ui.mount({ ...MONITOR_PANE, props: { ...MONITOR_PANE.props, bodyColumns: 90 }, surface: 'terminal' })
-  expect((await ui.find({ type: 'Text', text: /^01 Explore$/ }))?.text).toBe('01 Explore')
+  expect((await ui.find({ type: 'Text', text: /┌ 01 Explore/ }))?.text).toContain('01 Explore')
   expect((await ui.find({ type: 'Text', text: /^● 01 Explore \/ live$/ }))?.text).toBe('● 01 Explore / live')
   // the g button switches to the list view: the text drawing
   await ui.press({ key: 'view' })
@@ -949,6 +1002,14 @@ test("the monitor's Routing frame: each agent as asked -> ran on with the decisi
   ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
   expect(routing(text)).toContain('08 general-purpose')
   expect(routing(text)).not.toContain('more: the 5 above')
+  // a later call with the same words but its own id is not the routed one: no stale decision on it (seen 2026-11-17)
+  const AGAIN = { tool: 'Agent', tool_use_id: 'tu-orch-2', description: 'delegate a lookup', prompt: 'Use the Agent tool to launch a Web Researcher subagent: what is the default value of X?', subagent_type: 'general-purpose' } as const
+  await $.tool.call({ ...AGAIN, tool_use_id: 'tu-orch-1' })
+  await $.agent.spawn(spawnOf({ ...AGAIN, tool_use_id: 'tu-orch-1' }))
+  await $.tool.call(AGAIN)
+  await $.agent.spawn(spawnOf(AGAIN))
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' }))
+  expect(routing(text)).toMatch(/10 general-purpose\s+inherit \(fable\)\s+unmeasured\s+kept\s+no measured family covers it/)
   await settled()
 })
 
@@ -1029,7 +1090,7 @@ test('a deep tree: the pane keeps the boxes as a staircase when the grid would n
   // four levels: the pane keeps the boxes as a staircase (the grid would not fit) and says so; o cycles outline, boxes, auto
   let ui = await $.ui.mount({ ...MONITOR_PANE, surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /^\[ Run graph \]$/ }))?.text).toBe('[ Run graph ]')
-  expect((await ui.find({ type: 'Text', text: /drawn as a staircase.*o shows an outline/ }))?.text).toContain('staircase')
+  expect((await ui.find({ type: 'Text', text: /drawn as a staircase.*o shows an outline/ }))?.text).toContain('in a pane of')
   expect((await ui.find({ type: 'Text', text: /^ {4}┌ 01 general-purpose/ }))?.text).toContain('┌ 01 general-purpose')   // four columns in
   expect((await ui.find({ type: 'Text', text: /^ {16}┌ 04 Web Researcher/ }))?.text).toContain('04 Web Researcher')   // the fourth level, still a box, 16 columns in
   await ui.press({ key: 'outline' })                                                      // o: the outline

@@ -124,6 +124,10 @@ export type Routed = {
   /** auto: rewritten without asking; routed: the person chose it; kept: the person kept what was asked, or no one could be asked */
   decision: 'auto' | 'routed' | 'kept' | 'escalated'
   description: string
+  /** the Agent call's tool_use_id, so the spawn finds its own decision and not an earlier call's with the same words */
+  callId?: string
+  /** the run (prompt or task) the call was made in: a re-issue is the same call again in the same run */
+  runId?: string
 }
 
 /** One main-loop turn as the engine reported it: its tokens, the model, what the effort gear did, and what the turn held. */
@@ -223,7 +227,7 @@ export type RunEvent = { at: number; text: string; color?: string; runId: string
 /** The main session itself, for the monitor's root box and its panel: at work since a turn began, its last tool calls. */
 export type MainLive = { busy: boolean; since: number; lastAt: number; recent: Recent[] }
 /** The session as it runs: the turns so far, the families escalated (the reason), the agents running and the last that finished. */
-export type Live = { turns: Turn[]; escalated: Record<string, string>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; stoppedN: number; events: RunEvent[]; nextN: number; runs: RunMeta[]; task: string | null; main: MainLive }
+export type Live = { turns: Turn[]; escalated: Record<string, string>; /** when each family was escalated; one expires after ESCALATE_MS */ escalatedAt: Record<string, number>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; stoppedN: number; events: RunEvent[]; nextN: number; runs: RunMeta[]; task: string | null; main: MainLive }
 
 /** A prompt that read as a different task in a session already re-reading a lot per turn, and what was done. */
 export type Switch = { at: number; ctx: number; why: string; action: 'compacted' | 'kept' | 'asked' }

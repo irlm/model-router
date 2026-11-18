@@ -42,6 +42,8 @@ CODE = ('fix', 'implement', 'refactor', 'write tests', 'bug', 'add a', 'change t
 # A prompt that runs a test command is not a research note, whatever else it says (the widget's RUNNER list).
 RUNNER = ('failing test', 'test command', 'run the tests', 'run the test', 'npm test', 'vitest', 'pytest', 'cargo test', 'go test',
           'make test', 'tests pass', 'test passes', 'the suite')
+# A prompt that delegates (the Agent tool, subagents) is an orchestrator: never a measured family, as in the widget.
+ORCHESTRATE = ('agent tool', 'subagent', 'sub-agent', 'launch, in parallel', 'spawn a')
 BROWSER = ('in the browser', 'chrome', 'web page', 'the page at', 'fill the form', 'fill in the form', 'click', 'sign in', 'log in',
            'navigate to', 'open http', 'checklist', 'pass/fail')   # the same list the widget's router uses
 
@@ -60,6 +62,8 @@ def classify(subagent_type, prompt):
         return 'browser-flow'
     if 'review' in t:
         return 'code-review'
+    if any(k in p for k in ORCHESTRATE):
+        return 'other'
     if len(p) < 900 and any(k in p for k in LOOKUP):
         return 'fact-lookup'
     if any(k in p for k in SYNTHESIS) and not any(k in p for k in RUNNER) and not any(k in p for k in CODE):

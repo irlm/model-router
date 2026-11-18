@@ -17,9 +17,9 @@ const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Ro
 const details = atom({ plugin: 'model-router', key: 'details' } as const, false, { shape: 'details-1' })
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
-const LIVE0: Live = { turns: [], escalated: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, stoppedN: 0, events: [], nextN: 1, runs: [], task: null, main: { busy: false, since: 0, lastAt: 0, recent: [] } }
-// live-9: an agent carries what its call asked for, the decision and its tokens, for the monitor's Routing frame
-const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-9' })
+const LIVE0: Live = { turns: [], escalated: {}, escalatedAt: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, stoppedN: 0, events: [], nextN: 1, runs: [], task: null, main: { busy: false, since: 0, lastAt: 0, recent: [] } }
+// live-10: escalations carry their time and expire; an agent carries what its call asked for, the decision and its tokens
+const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-10' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
 const tick = atom({ plugin: 'model-router', key: 'tick' } as const, 0, { shape: 'tick-1' })
 /** The run monitor's view: the drawn graph, or the same run as text lines. */
@@ -127,7 +127,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.29.0'
+const WIDGET_VERSION = '0.29.3'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -792,7 +792,7 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
     const ran = `${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''}`.trim()
     const routed = a.decision === 'auto' || a.decision === 'routed'
     const fam = familiesNow.find(f => f.name === a.family)
-    const why = a.decision === 'escalated' ? (lvAll.escalated[a.family ?? ''] ?? 'a routed call failed or was re-issued') + ': runs as asked for the rest of the session'
+    const why = a.decision === 'escalated' ? (lvAll.escalated[a.family ?? ''] ?? 'a routed call failed or was re-issued') + ': runs as asked for half an hour'
       : routed ? (fam ? `measured ${fam.rate}, $${(fam.cost_per_success ?? 0).toFixed(4)}/success` : 'measured')
       : a.decision === 'kept' ? 'kept as asked'
       : a.type.startsWith('fork /') ? 'a fork of this session: runs on its model, no Agent call to route'
@@ -1080,6 +1080,18 @@ async function refresh($: Dollar, fetch = false) {
   }
 }
 
+/** The second tick while any agent runs, or while the main session's own turn runs: the panes that read it redraw, so
+ * elapsed times, the spinner and the live edge move. Armed from any hook, not only session.start: a /reload-plugins
+ * loads the module afresh without a session.start, and a widget without a ticker showed a frozen graph until the next prompt. */
+let ticking = false
+function ensureTick($: Dollar) {
+  if (ticking) return
+  ticking = true
+  $.clock.every(1000, async () => {
+    const lv = await read($, live)
+    if (Object.keys(lv.agents).length > 0 || lv.main.busy) await update($, tick, n => n + 1)
+  })
+}
 /** Record a routing change on this machine (tools/changes.py): the pane counts the saving from now. */
 async function recordChange($: Dollar, kind: string, detail: string, projected?: number) {
   try {
@@ -1266,6 +1278,9 @@ const RUNNER = ['failing test', 'test command', 'run the tests', 'run the test',
   'make test', 'tests pass', 'test passes', 'the suite']
 const BROWSER = ['in the browser', 'chrome', 'web page', 'the page at', 'fill the form', 'fill in the form', 'click', 'sign in', 'log in',
   'navigate to', 'open http', 'checklist', 'pass/fail']
+// A prompt that delegates (names the Agent tool, subagents) is an orchestrator, whatever else it mentions: never routed, since the
+// lookup it describes is for its subagent, and a routed orchestrator has been seen without the Agent tool.
+const ORCHESTRATE = ['agent tool', 'subagent', 'sub-agent', 'launch, in parallel', 'spawn a']
 const EXPLORE_TYPES = new Set(['Explore', 'Codebase Onboarding Engineer'])
 const MODELS = new Set(['sonnet', 'opus', 'haiku', 'fable'])
 const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max'])
@@ -1276,6 +1291,13 @@ const pendingRoutes = new Map<string, PendingRoute>()
  * unknown agent id within minutes is that fork. No agent.spawn fires for a fork, and it runs on the session's model. */
 const pendingForks: { at: number; skill: string; parent: string | null; sure: boolean }[] = []
 const PENDING_MS = 10 * 60000
+/** An escalation says a family is struggling now: it lasts half an hour, not the session (a wrong one stuck all day). */
+const ESCALATE_MS = 30 * 60000
+/** A call within this of a routed one with similar words is its sibling (launched together), not a re-issue of it. */
+const SIBLING_MS = 30000
+/** The run an Agent call made now belongs to: the open named task, else this prompt's. */
+const currentRunId = (lv: Live) => (lv.task ? `task:${slug(lv.task)}` : `turn:${currentTurn || 'start'}`)
+const escalationOf = (lv: Live, fam: string, now: number): string | undefined => (lv.escalated[fam] !== undefined && now - (lv.escalatedAt[fam] ?? now) < ESCALATE_MS ? lv.escalated[fam] : undefined)
 /** The last prompt the person sent: the run a spawn belongs to takes its words. */
 let lastPrompt = ''
 /** Where runs are saved: <config>/model-router/runs; the session's working directory, for the reports. */
@@ -1290,6 +1312,7 @@ const matchFamily = (agent: string, prompt: string): Match | null => {
   if (EXPLORE_TYPES.has(agent)) return { family: 'find_feature', why: `${agent}: read-only code search` }
   if (agent === 'Web Researcher') return { family: 'web_research', why: 'the lookup agent' }
   if (agent === 'Evidence Collector') return { family: 'browser_flow', why: 'the browser agent' }
+  if (ORCHESTRATE.some(k => p.includes(k))) return null
   // The same order as tools/consumption.py's classify, so what the ledger counts and what is routed agree.
   if (BROWSER.filter(k => p.includes(k)).length >= 2) return { family: 'browser_flow', why: 'a browser flow' }
   if (p.length < 900 && LOOKUP.some(k => p.includes(k))) return { family: 'web_research', why: 'a short fact lookup' }
@@ -1367,11 +1390,7 @@ export const register: Register = (on, options) => {
       argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import [--days N] [--rebuild]|show <id>] | setup | doctor | check | fetch | update | ledger | apply | pull | prune [skills|all] [move|revert] | agents pin <url>|check|update [file]|list | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class> | dismiss <n|id> | undismiss <id>',
     })
     void refresh($)
-    // The second tick while any agent runs, or while the main session's own turn runs: its elapsed time and cursor move too.
-    $.clock.every(1000, async () => {
-      const lv = await read($, live)
-      if (Object.keys(lv.agents).length > 0 || lv.main.busy) await update($, tick, n => n + 1)
-    })
+    ensureTick($)
     if (refreshMinutes > 0) {
       $.clock.every(Math.max(1, refreshMinutes) * 60000, () => {
         void refresh($)
@@ -1582,9 +1601,10 @@ export const register: Register = (on, options) => {
       if (arg === 'ask' || arg === 'auto' || arg === 'off') {
         const was = routingMode
         routingMode = arg
+        await update($, live, v => ({ ...v, escalated: {}, escalatedAt: {} }))   // a fresh start for the families escalated this session
         if (arg === 'auto' && was !== 'auto') void recordChange($, 'routing', 'auto for this session', measuredProjected((await read($, status))?.json))
       }
-      return { text: `routing ${routingMode} for this session${arg ? '' : ' (routing ask|auto|off sets it)'}; /config makes it permanent.` }
+      return { text: `routing ${routingMode} for this session${arg ? '; escalated families cleared' : ' (routing ask|auto|off sets it)'}; /config makes it permanent.` }
     }
     // First run on a machine: install the routed agents, then say what the pane's yellow lines mean and what comes next.
     if (verb === 'setup') {
@@ -1634,6 +1654,7 @@ export const register: Register = (on, options) => {
   // The routing decision for this Agent call (made in tool.call below) is applied here, on the spawn, never on the
   // Agent tool's input: a tool input a hook changes loses the auto-mode review and the call is bounced once.
   on('agent.spawn', async ($, e, next) => {
+    ensureTick($)
     const now = await $.clock.now()
     for (const [k, v] of pendingRoutes) if (now - v.at > PENDING_MS) pendingRoutes.delete(k)
     const key = pendingRoutes.has(e.tool_use_id) ? e.tool_use_id : [...pendingRoutes].find(([, v]) => v.description === e.description && v.prompt === e.prompt)?.[0]
@@ -1642,7 +1663,9 @@ export const register: Register = (on, options) => {
     const r = await next(want ? { ...e, model: want.model as 'haiku' | 'sonnet' | 'opus' | 'fable', ...(want.family === 'repo_fix' ? { prompt: e.prompt + RUNNER_NOTE } : {}) } : e)
     if (r.agentId) {
       // The decision the Agent call got (the routed log's row for it, minutes old at most): what was asked, what was decided.
-      const rt = [...(await read($, routed))].reverse().find(x => x.agent === e.subagentType && x.description === e.description && now - x.at < PENDING_MS)
+      // By the call's id first; by its words only for a row without one, and then within a minute, not an earlier call's
+      const rows = [...(await read($, routed))].reverse()
+      const rt = rows.find(x => x.callId !== undefined && x.callId === e.tool_use_id) ?? rows.find(x => x.callId === undefined && x.agent === e.subagentType && x.description === e.description && now - x.at < 60000)
       const askedEffort = (e as { effort?: string }).effort ?? ''
       const a: RunningAgent = { id: r.agentId, parent: e.parentAgentId ?? null, type: e.subagentType, description: e.description, model: r.model, effort: want?.effort ?? '', wantEffort: want?.effort ?? null,
         family: want?.family ?? matchFamily(e.subagentType, e.prompt)?.family ?? null, startedAt: 0, lastStepAt: 0, steps: 0, done: null, cost: null, out: 0, failed: false, stopped: false,
@@ -1658,6 +1681,7 @@ export const register: Register = (on, options) => {
 
   // The main loop's turn begins: what its prompt reads as decides the effort its requests may run at.
   on('turn.start', async ($, e, next) => {
+    ensureTick($)
     if (e.agentId !== undefined) return next(e)
     currentTurn = e.turnId
     lastPrompt = e.text ?? ''
@@ -1666,7 +1690,7 @@ export const register: Register = (on, options) => {
     const m = e.text ? matchFamily('', e.text) : null
     const s = await read($, status)
     const f = m && s?.json ? s.json.families.find(x => x.name === m.family) : null
-    const escalated = m ? (await read($, live)).escalated[m.family] : undefined
+    const escalated = m ? escalationOf(await read($, live), m.family, began) : undefined
     plans.set(e.turnId, { family: m?.family ?? null, effort: f?.effort && EFFORTS.has(f.effort) && !escalated ? f.effort : null, sessionEffort: '', applied: null, wouldApply: null, errors: 0, agentCalls: 0, routed: 0, gear: 'same' })
     return next(e)
   })
@@ -1769,12 +1793,19 @@ export const register: Register = (on, options) => {
     if (fam) {
       const lv = await read($, live)
       const now = await $.clock.now()
-      const reissued = !lv.escalated[fam] && (await read($, routed)).some(r => r.family === fam && r.agent === agent && r.decision !== 'kept' && r.decision !== 'escalated' && now - r.at < REISSUE_MS && similar(r.description, e.description))
-      const why = lv.escalated[fam] ?? (reissued ? 're-issued within 10 min of a routed call' : null)
+      // A re-issue is the same call again after the routed one; a sibling launched while a routed agent of that type with
+      // similar words still runs (two searches in parallel) is not one, and escalating it cost 30x on a parallel pair.
+      const siblingRunning = Object.values(lv.agents).some(a => a.type === agent && a.done === null && similar(a.description, e.description))
+        || [...pendingRoutes.values()].some(v => v.family === fam && now - v.at < PENDING_MS && similar(v.description, e.description))   // routed, its spawn not seen yet
+      const standing = escalationOf(lv, fam, now)
+      // A re-issue is the same call again in the same run (prompt or task): a similar search under a new prompt is new work.
+      const runNow = currentRunId(lv)
+      const reissued = !standing && !siblingRunning && (await read($, routed)).some(r => r.family === fam && r.agent === agent && r.decision !== 'kept' && r.decision !== 'escalated' && now - r.at < REISSUE_MS && now - r.at >= SIBLING_MS && r.runId === runNow && similar(r.description, e.description))
+      const why = standing ?? (reissued ? 're-issued within 10 min of a routed call' : null)
       if (why) {
-        if (reissued) await update($, live, v => ({ ...v, escalated: { ...v.escalated, [fam]: why } }))
+        if (reissued) await update($, live, v => ({ ...v, escalated: { ...v.escalated, [fam]: why }, escalatedAt: { ...v.escalatedAt, [fam]: now } }))
         const asked = e.model ? `${e.model} ${e.effort ?? '(default effort)'}` : (s?.json?.agents.routed.find(r => r.name === agent)?.have ?? 'inherit')
-        await update($, routed, r => [...r, { at: now, agent, family: fam, from: asked, to: 'as asked', decision: 'escalated' as const, description: e.description }].slice(-50))
+        await update($, routed, r => [...r, { at: now, agent, family: fam, from: asked, to: 'as asked', decision: 'escalated' as const, description: e.description, callId: e.tool_use_id, runId: currentRunId(lv) }].slice(-50))
         await logRouted($, fam, agent, asked, 'as asked', 'escalated')
         $.ui.toast(`router: ${agent} runs as asked (${fam} escalated this session: ${why})`)
         return next(e)
@@ -1792,7 +1823,8 @@ export const register: Register = (on, options) => {
       decision = choice === 'keep' ? 'kept' : choice === 'auto' ? 'auto' : 'routed'
     }
     const at = await $.clock.now()
-    await update($, routed, r => [...r, { at, agent, family: c.family, from: c.asked, to: `${c.model} ${c.effort}`, decision, description: e.description }].slice(-50))
+    const runOfCall = currentRunId(await read($, live))
+    await update($, routed, r => [...r, { at, agent, family: c.family, from: c.asked, to: `${c.model} ${c.effort}`, decision, description: e.description, callId: e.tool_use_id, runId: runOfCall }].slice(-50))
     await logRouted($, c.family, agent, c.asked, `${c.model} ${c.effort}`, decision)
     if (decision === 'kept') return next(e)
     $.ui.toast(`router: ${agent} on ${c.model} ${c.effort} (${c.family} ${c.rate})`)
@@ -1801,10 +1833,10 @@ export const register: Register = (on, options) => {
     // Not a rewrite of the tool input (auto mode would bounce the call): the spawn inside this call picks it up.
     pendingRoutes.set(e.tool_use_id ?? `${at}:${e.description}`, { at, description: e.description, prompt: e.prompt, model: c.model, effort: c.effort, family: c.family })
     const r = await next(e)
-    // The routed call failed: the family runs as asked for the rest of the session, and the pane says why.
+    // The routed call failed: the family runs as asked for the next half hour, and the pane says why.
     if ((r as { isError?: boolean }).isError && c.family !== 'override') {
-      await update($, live, v => ({ ...v, escalated: { ...v.escalated, [c.family]: `a call routed to ${c.model} ${c.effort} failed` } }))
-      $.ui.toast(`router: the ${c.family} call on ${c.model} ${c.effort} failed; the next ones run as asked`)
+      await update($, live, v => ({ ...v, escalated: { ...v.escalated, [c.family]: `a call routed to ${c.model} ${c.effort} failed` }, escalatedAt: { ...v.escalatedAt, [c.family]: at } }))
+      $.ui.toast(`router: the ${c.family} call on ${c.model} ${c.effort} failed; the next ones run as asked for half an hour`)
     }
     return r
   }).catch(($, e, next) => {
@@ -1815,6 +1847,7 @@ export const register: Register = (on, options) => {
   // The run monitor: its own pane. The graph view draws the scene (boxes with a border in the state's colour, the arrows
   // between them) beside the live panels when the pane is wide, under them when it is not; the list view is the text.
   on('ui.render', { component: 'Pane', requestId: MONITOR }, async ($, e) => {
+    ensureTick($)
     const { Box, Text, Button } = $.ui.resolve(e)
     const lvAll = await read($, live)
     const view = await read($, monitorView)
@@ -1834,10 +1867,12 @@ export const register: Register = (on, options) => {
     const running = folded.filter(a => a.done === null)
     const endedF = folded.filter(a => a.done !== null)
     const spin = running.length ? SPIN[Math.floor(now / 1000) % SPIN.length] + ' ' : ''
-    // Boxes draw up to three levels under the session; a deeper tree is an outline by itself, since each level is 62 columns
-    // (`o` asks for the outline outright, or for the boxes however wide: 'boxes').
+    // The grid when it fits the pane, the staircase when it would run past the edge (a level of the grid is a box and an
+    // arrow, 62 columns; three levels in a 100-column pane were cut off). `o` asks for the outline, or for the grid however wide.
     const depth = (p: RunningAgent | null, d: number): number => Math.max(d, ...tree.kids(p).map(c => depth(c, d + 1)))
-    const tooDeep = depth(null, 0) > 3
+    const twoColEarly = width >= 130
+    const graphWEarly = (twoColEarly ? width - 50 - 1 : width) - 4
+    const tooDeep = depth(null, 0) > 1 && sceneOf(lv, now, graphWEarly).width > graphWEarly
     // graph: the grid up to three levels, the staircase beyond; outline and boxes are the person's own choices (o cycles).
     const layout: 'grid' | 'stairs' | 'outline' = view === 'outline' ? 'outline' : view === 'boxes' ? 'grid' : tooDeep ? 'stairs' : 'grid'
     const outline = layout === 'outline'
@@ -1945,7 +1980,7 @@ export const register: Register = (on, options) => {
     ) : layout === 'stairs' ? (
       <Box borderStyle="single" borderDimColor flexDirection="column" paddingX={1}>
         <Text color="cyan" bold>[ Run graph ]</Text>
-        <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · four levels or more: drawn as a staircase, four columns a level (the grid would be ${Math.round(scene.width)} columns wide); o shows an outline`}</Text>
+        <Text dimColor>{`${all.length} agent${all.length === 1 ? '' : 's'} this session · drawn as a staircase, four columns a level: the grid would be ${Math.round(scene.width)} columns wide in a pane of ${graphW}; o shows an outline`}</Text>
         {stairs.map(l => <Text color={l.color} dimColor={l.dim} wrap="truncate">{l.text}</Text>)}
         <Text dimColor>arrow = context sent, estimated from the prompt (4 chars/token): ━━ ≥16k  ── 4k–16k  ┄┄ &lt;4k</Text>
       </Box>
@@ -2017,6 +2052,7 @@ export const register: Register = (on, options) => {
   // the section's colour (limits by how full a window is, agents green while any runs, to-check yellow), the buttons
   // in a footer. The lines inside are the same as /router check prints: the producers are shared, only the framing is here.
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    ensureTick($)
     const { Box, Text, Button } = $.ui.resolve(e)
     const s = await read($, status)
     const j = await read($, job)
@@ -2024,6 +2060,7 @@ export const register: Register = (on, options) => {
     const full = await read($, details)
     await read($, tick)   // read so the second counter redraws the pane while agents run
     const lv = await read($, live)
+    await read($, tick)
     const now = await $.clock.now()
     const ctx = (await contextTokens($))?.tokens ?? null
     const modelNow = await $.session.model().catch(() => '')

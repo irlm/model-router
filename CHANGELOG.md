@@ -3,6 +3,46 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.30.1 — 2026-11-18
+
+A review pass with three readers (the code, the features, the field: twenty-odd Claude Code routers and monitors of
+2026) found nine defects in what the pane shows and what the router moves; all fixed here, each with a test. `GAPS.md`
+has what the pass left open.
+
+- The pane showed the wrong evidence for `fix_bug` and `write_tests`: `variant_of` looked for `kunit` in routing.json's
+  "(KUnit)", found nothing, and read the cell without the runner (16/21, 5/10) instead of the decided one (63/63,
+  30/30). Lower-cased; `evidence_of` is one function, and a test checks every decided family finds its cell.
+- The router routed upward too: any call whose model and effort differed from the decision was moved, so a research
+  note asked at haiku went to sonnet, and an Explore already on haiku with no effort said was toasted and counted as
+  routed. Only a call that asks for something dearer is routed now (a bigger tier, or the decided model above its
+  effort); `inherit` is the session's model.
+- Every "saved $X since <change>" was biased toward "cost up": the counterfactual priced cache writes at the 5-minute
+  rate while the actual side used the receipt's split (all 1-hour here), so the same work on the same model read as a
+  loss of a third of its writes. The split now travels with the tokens (`cache_write_5m/1h`) and one function
+  (`catalog/price.py cache_write_split`) prices every write; the idle-return and re-write costs were understated 1.6x
+  the same way.
+- The status line's "up to $N less" summed overlapping suggestions: effort, tier, the prefix and a project's re-reading
+  each price the same main-session messages, and the line read "up to $557 less" on $557 spent. The upper bound is
+  now the Agent-call suggestions summed plus the largest main-session one, and the pane says so under the header.
+- A routing change was credited with the main sessions' delta: "saved $1.28" for `routing: auto` was $1.19 of main
+  sessions getting cheaper by themselves. A change to the Agent calls (routing, apply, override) scores its classes
+  only; its main-session line is shown and marked not scored; a `mark` still counts everything.
+- The status line's `routed N` counted kept answers and escalations (three "Keep" answers read `routed 3`); it counts
+  what was moved.
+- An escalation after a failed routed call was stamped with the call's start, so a call that failed after 31 minutes
+  wrote one already expired; it is stamped when the call failed. Expired escalations stayed on the pane for the
+  session; they leave it when they are over.
+- The ledger and the router classified differently: the ledger checked the agent type (`browser`, `review`) before the
+  words and the browser words before the orchestrator rule, the router neither, so a "Code Reviewer" with a lookup in
+  its prompt was routed to haiku and counted as a review. One order in both (the type, the orchestrator rule, the
+  words), and a fixture of cases runs through both.
+- The first 70 characters of every Bash line and 2000 of every answer went into the saved runs and, with `monitor save`,
+  into the project's `docs/runs/`, secrets included. A value after a key-like name, a bearer token and the common key
+  shapes are redacted before the widget keeps them.
+- Docs: escalation lasts half an hour (the READMEs said the session); Python 3.9 (the README said 3.10); the "checkout
+  has another version" line names `/router upgrade` (a GitHub install reads the plugin cache, `/reload-plugins` alone
+  did nothing).
+
 ## 0.30.0 — 2026-11-18
 
 - `/router upgrade`: the install brought up to date by the router itself, on any machine, with nothing but git and

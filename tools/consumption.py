@@ -58,12 +58,17 @@ def classify(subagent_type, prompt):
         return 'fact-lookup'
     if subagent_type in ('Explore', 'Codebase Onboarding Engineer'):   # the types the widget routes as find_feature; a Plan agent is not measured
         return 'code-explore'
-    if 'browser' in t or subagent_type == 'Evidence Collector' or sum(k in p for k in BROWSER) >= 2:
+    # The type first (a browser agent is one whatever it is told; a reviewer is never a lookup), then the orchestrator rule
+    # (a prompt that spawns agents is never routed, whatever else it says), then the prompt. The widget's matchFamily
+    # keeps this order, and the test in tools/test_status.py runs the same cases through both.
+    if 'browser' in t or subagent_type == 'Evidence Collector':
         return 'browser-flow'
     if 'review' in t:
         return 'code-review'
     if any(k in p for k in ORCHESTRATE):
         return 'other'
+    if sum(k in p for k in BROWSER) >= 2:
+        return 'browser-flow'
     if len(p) < 900 and any(k in p for k in LOOKUP):
         return 'fact-lookup'
     if any(k in p for k in SYNTHESIS) and not any(k in p for k in RUNNER) and not any(k in p for k in CODE):
@@ -218,6 +223,7 @@ def collect(days=30, now=None, splits=None):
                         if not entry:
                             model = model + ' (no price)'
                         c = (price.price_usage(u, entry) or 0) if entry else 0
+                        w5, w1 = price.cache_write_split(u)   # the writes by lifetime, kept with the tokens so a counterfactual prices them as the actual was
                         oc = u.get('output_tokens', 0) * price.rates(entry)['out'] if entry else 0
                         if not is_sub:
                             fixed[str(f)].request(u, price.rates(entry) if entry else None, ts, window == 'cur')
@@ -229,10 +235,10 @@ def collect(days=30, now=None, splits=None):
                             rd, wr = u.get('cache_read_input_tokens', 0) or 0, u.get('cache_creation_input_tokens', 0) or 0
                             s['ctx_tokens'] += (u.get('input_tokens', 0) or 0) + rd + wr
                             if rt:
-                                s['read_cost'] += rd * rt['cache_read']; s['write_cost'] += wr * rt['write_5m']
+                                s['read_cost'] += rd * rt['cache_read']; s['write_cost'] += w5 * rt['write_5m'] + w1 * rt['write_1h']
                             gap = (datetime.datetime.fromisoformat(ts.replace('Z', '+00:00')) - s['prev_ts']).total_seconds() / 60 if s['prev_ts'] and ts else None
                             if gap is not None and gap > 60 and wr > 50000:
-                                s['idle_returns'] += 1; s['idle_cost'] += wr * rt['write_5m'] if rt else 0.0
+                                s['idle_returns'] += 1; s['idle_cost'] += (w5 * rt['write_5m'] + w1 * rt['write_1h']) if rt else 0.0
                             if ts:
                                 s['prev_ts'] = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
                         if window:
@@ -247,10 +253,12 @@ def collect(days=30, now=None, splits=None):
                                     pmsgs[pk] += 1; pcost[pk] += c
                                     for k in TOKENS:
                                         ptok[pk][k] += u.get(k, 0) or 0
+                                    ptok[pk]['cache_write_5m'] += w5; ptok[pk]['cache_write_1h'] += w1
                         if is_sub and r.get('agentId'):
                             agent_cost[r['agentId']] += c; agent_model[r['agentId']] = model
                             for k in TOKENS:
                                 agent_tok[r['agentId']][k] += u.get(k, 0) or 0
+                            agent_tok[r['agentId']]['cache_write_5m'] += w5; agent_tok[r['agentId']]['cache_write_1h'] += w1
                     for it in m['content']:
                         if not is_sub and isinstance(it, dict) and it.get('type') == 'tool_use' and it.get('name') == 'Skill':
                             fixed[str(f)].skill_call(it.get('id'), (it.get('input') or {}).get('skill'))

@@ -9,10 +9,12 @@ What you see:
 - A status line under the prompt (the host prefixes the plugin's name):
   `5h 37% · 7d 62% · routed 2 · saved $7 since 11-02 · up to $25 less last 30d ($25 measured) · 1 to check · /router`.
   The percentages are the subscription's rate-limit windows as the last API response reported
-  them; `routed` is what the router rewrote this session; `saved` is what the transcripts show
-  since the last recorded change (what happened); `up to $N less last 30d` is what the suggestions add
-  up to for the window that was, a look back and not a forecast, with the measured part named, since the
-  rest is extrapolated or unmeasured; `to check` counts the advice. Each part appears only when it has something to say. The "Status
+  them; `routed` is what the router moved this session (a kept answer and an escalation are not
+  routings); `saved` is what the transcripts show since the last recorded change (what happened);
+  `up to $N less last 30d` is the suggestions' upper bound for the window that was, a look back and not a
+  forecast: the Agent-call suggestions summed, plus the largest of the main-session ones (effort, tier,
+  the prefix, what a project re-reads price the same messages each its own way, so they do not add),
+  with the measured part named, since the rest is extrapolated or unmeasured; `to check` counts the advice. Each part appears only when it has something to say. The "Status
   line" option in `/config` makes it `minimal` (windows, routed, to check) or `off`.
 - `/router` opens a pane whose glance is numbers that compare, one line each: the rate-limit
   windows as bars; one line on the checkout; the window's spend as a daily sparkline with the
@@ -50,7 +52,9 @@ Routing each Agent call. When the main model starts a task through the Agent too
 looks at the agent type and the prompt. If a measured family covers that kind of task (a read-only
 code search on Explore, a short fact lookup, a browser flow, a fix with the test runner in the
 loop) and the call asks for something dearer than the family's decision (the main model by
-inheritance, or an explicit bigger model), it acts by the "Route Agent calls" option:
+inheritance, an explicit bigger model, or the decided model above its effort), it acts by the "Route
+Agent calls" option; a call already on the decided model, or on a cheaper one, is left alone and not
+counted:
 
 - `ask` (the default): a question in the terminal with three answers: the measured model and
   effort with its evidence (`haiku low (measured 214/216, $0.005/success)`), keep what was asked,
@@ -222,8 +226,10 @@ start <name>` and closed with `/router task end`, across as many prompts as it t
 names the run: its place among the session's runs, its words, agents and cost, whether it ended and was saved.
 `h` lists the session's runs (pick one by its number; `c` returns to the current) and the runs saved on this
 machine. A run is saved when its last agent ends (a task when it is ended): one JSON file under
-`<config>/model-router/runs/<day>/`, with every agent, its final answer and the events, so a long day is many
-small files rather than one growing pane. `/router runs` lists them, `/router runs show <id>` prints one, and
+`<config>/model-router/runs/<day>/`, with every agent, its final answer (2000 characters), its last tool calls in
+a few words each and the events, so a long day is many small files rather than one growing pane. A secret in a
+tool line or an answer (a value after a key-like name, `GITHUB_TOKEN=…`, `password: …`, a bearer token, the common
+key shapes) is redacted before the widget keeps it, so neither the saved run nor a report carries it. `/router runs` lists them, `/router runs show <id>` prints one, and
 `/router runs import [--days N]` rebuilds the days before the widget watched from the transcripts' Agent calls
 (prompt, model, cost; no per-second timing and no tool tail, which the engine reports only while the widget is
 loaded). `/router monitor save [id]`, or `s` in the pane, writes a run into the project as
@@ -244,14 +250,15 @@ turn's output cost, which is the part effort moves. Main sessions were not measu
 that is why the default is advise and the figure says `est`.
 
 **Escalation for Agent calls.** A call the router moved down that failed (a tool error), or that the
-main model re-issued within 10 minutes with mostly the same words, escalates its family for the rest of
-the session: the next calls run as the main model asked, the routed log records `escalated` with the
-reason, the pane shows it on the `agents` line. No call is re-run on its own: a second run doubles the
+main model re-issued within 10 minutes with mostly the same words, escalates its family for half an hour
+from the failure: the next calls run as the main model asked, the routed log records `escalated` with the
+reason, the pane shows it on the `agents` line until it is over, then the family is routed again
+(`/router routing ask|auto|off` clears the escalations at once). No call is re-run on its own: a second run doubles the
 cost and may repeat an edit; the main model's own re-issue is the signal, and it is then left alone.
 
 ### Requirements and what it reads
 
-Python 3 (3.10 or newer), git and the `claude` CLI on PATH; `CLAUDE_CONFIG_DIR` is honoured when
+Python 3 (3.9 or newer; the tools run on 3.9), git and the `claude` CLI on PATH; `CLAUDE_CONFIG_DIR` is honoured when
 Claude Code runs with one. Without Python the pane says so, with the install command for your OS, and
 nothing else runs: the data side (`tools/*.py`) reads your transcripts with it.
 
@@ -488,6 +495,11 @@ shows what your own transcripts saved since it, per unit of the same work:
   the price per million tokens on each side. What a different model does with the same ask (reads
   more, or less) does not cancel out; that is why the regression verdict stands next to it;
 - main sessions: the same, per message, against the model and effort most messages ran on before.
+
+What a change is scored on is what it can move: a change to the Agent calls (Apply agents, `/router
+routing auto`, a `prefer` override) counts its classes only, and its main-session line is shown but
+marked "not scored" (a quiet day in the main session is not the routing's saving); a `mark` is a note
+on anything, so everything counts for it.
 
 A number that cannot mean anything yet says so on its line: too few messages and calls after the
 change, or, for a change marked by hand, main sessions still on the same model and effort as

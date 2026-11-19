@@ -666,11 +666,11 @@ test('the pane names the loaded widget version, and warns when the checkout has 
   on('tool.call', (_, e) => { seen.push(e as unknown as Record<string, unknown>); return { result: {} } })
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
-  expect(text).toMatch(/widget \d+\.\d+\.\d+ loaded; the checkout has 0\.9\.0: \/reload-plugins loads it/)
+  expect(text).toMatch(/widget \d+\.\d+\.\d+ loaded; the checkout has 0\.9\.0: \/router upgrade/)
   have = text.match(/widget (\d+\.\d+\.\d+) loaded/)![1]
   ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
   expect(text).toMatch(/widget \d+\.\d+\.\d+ loaded$/m)
-  expect(text).not.toContain('/reload-plugins')
+  expect(text).not.toContain('the checkout has')
   await settled()
 })
 
@@ -1156,4 +1156,155 @@ test('the timeline: the day as one bar per run with the lens on the run shown, t
   expect(text).toMatch(/^ {4}02 Explore/m)                                                 // unfolded
   expect(text).not.toContain('done under')
   await settled()
+})
+
+/** Mocks for a routing test with a status of one's own, a clock that can move and a status line that is kept. */
+const CUSTOM_MOCKS = (on: On, seen: Record<string, unknown>[], statusJson: unknown, clock: { now: number }, pinned: (string | undefined)[] = [], failing: string | null = null) => {
+  on('command.register', () => ({ value: { command: 'router' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('clock.now', () => ({ value: clock.now }))
+  on('clock.every', () => ({ value: undefined }))
+  mock.env(on, { HOME: '/home/me' })
+  on('fs.exists', () => ({ value: true }))
+  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(statusJson) } }))
+  on('ui.status', (_, e) => { pinned.push(e.text); return { value: undefined } })
+  on('ui.toast', () => ({ value: undefined }))
+  on('session.model', () => ({ value: 'claude-fable-5-1' }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('tool.call', (_, e) => {
+    seen.push(e as unknown as Record<string, unknown>)
+    if (e.tool === 'AskUserQuestion') return { deny: 'no one to ask' }
+    return failing && e.tool === failing ? { result: {}, isError: true } : { result: {} }
+  })
+  SPAWN_MOCKS(on, seen)
+}
+
+test('only a call that asks for something dearer is routed: the decided model with no effort said is left alone and not counted, a cheaper model is left alone, the decided model above its effort goes down', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const withNotes = { ...STATUS, families: [...STATUS.families, { name: 'research_synthesis', model: 'sonnet', effort: 'low', variant: '', rate: '12/12', cost_per_success: 0.0935, can_run: true, why: '', last_check: null }] }
+  CUSTOM_MOCKS(on, seen, withNotes, { now: 1_762_000_000_000 })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  const onHaiku = { ...EXPLORE, tool_use_id: 'tu-h', model: 'haiku' } as const           // the decided model, the effort unsaid: nothing to route
+  await $.tool.call(onHaiku)
+  await $.agent.spawn(spawnOf(onHaiku))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
+  const cheaper = { tool: 'Agent', tool_use_id: 'tu-n', description: 'compare options', prompt: 'Research and compare three message queues; write up a report.', subagent_type: 'general-purpose', model: 'haiku' } as const
+  await $.tool.call(cheaper)                                                              // a note asked at haiku is not moved up to sonnet
+  await $.agent.spawn(spawnOf(cheaper))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).not.toContain('routed this session')
+  const higher = { ...EXPLORE, tool_use_id: 'tu-hh', model: 'haiku', effort: 'high' } as const   // the decided model above its effort: routed down
+  await $.tool.call(higher)
+  await $.agent.spawn(spawnOf(higher))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  const bigger = { ...EXPLORE, tool_use_id: 'tu-o', model: 'opus', effort: 'low' } as const
+  await $.tool.call(bigger)
+  await $.agent.spawn(spawnOf(bigger))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).toContain('routed this session: 2 routed, 0 kept (mode auto')
+  expect(text).toContain('Explore: haiku high -> haiku low  [find_feature] auto')
+  expect(text).toContain('Explore: opus low -> haiku low  [find_feature] auto')
+  await settled()
+})
+
+test("the status line's routed count is what the router moved: a kept answer is not a routing", { options: { routing: 'ask' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const pinned: (string | undefined)[] = []
+  CUSTOM_MOCKS(on, seen, STATUS, { now: 1_762_000_000_000 }, pinned)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)                                   // no one to ask: kept
+  await $.tool.call({ ...EXPLORE, tool_use_id: 'tu-explore-2', description: 'find the schema loader' })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('routed this session: 0 routed, 2 kept')
+  expect(pinned.at(-1)).not.toContain('routed ')
+  await settled()
+})
+
+test('an escalation is stamped when the routed call failed and is over half an hour later: the pane drops it and the family is routed again', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const clock = { now: 1_762_000_000_000 }
+  CUSTOM_MOCKS(on, seen, STATUS, clock, [], 'Agent')
+  on('tool.call', { tool: 'Agent' }, async (_, e) => { clock.now += 20 * 60_000; seen.push(e as unknown as Record<string, unknown>); return { result: {}, isError: true } })   // the call runs 20 minutes, then fails
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'find where the config loader is', turnId: 't1' })
+  await $.tool.call(EXPLORE)
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  clock.now += 25 * 60_000                                     // 25 minutes after the failure (45 after the call began): still escalated
+  const again = { ...EXPLORE, tool_use_id: 'tu-explore-2', description: 'find the schema loader' } as const
+  await $.tool.call(again)
+  await $.agent.spawn(spawnOf(again))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('escalated: find_feature (a call routed to haiku low failed)')
+  clock.now += 10 * 60_000                                     // past the half hour: over
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).not.toContain('escalated: find_feature')
+  const later = { ...EXPLORE, tool_use_id: 'tu-explore-3', description: 'find the route table' } as const
+  await $.tool.call(later)
+  await $.agent.spawn(spawnOf(later))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  await settled()
+})
+
+test('the ledger and the router classify alike: the type first (a reviewer is never a lookup, a browser agent is one on a word), then the orchestrator rule, then the prompt', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const withFlows = { ...STATUS, families: [...STATUS.families,
+    { name: 'web_research', model: 'haiku', effort: 'low', variant: '', rate: '76/78', cost_per_success: 0.0197, can_run: true, why: '', last_check: null },
+    { name: 'browser_flow', model: 'haiku', effort: 'low', variant: '', rate: '63/63', cost_per_success: 0.064, can_run: true, why: '', last_check: null }] }
+  CUSTOM_MOCKS(on, seen, withFlows, { now: 1_762_000_000_000 })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  // the same cases as tools/test_status.py, test_the_type_first_then_the_orchestrator_rule_then_the_prompt
+  const cases: [string, string, string | undefined][] = [
+    ['Code Reviewer', 'what is the default value of X?', undefined],
+    ['browser-tester', 'click the login button', 'haiku'],
+    ['general-purpose', 'in the browser, click through the checkout; use the Agent tool for the rest', undefined],
+    ['general-purpose', 'open the web page and click sign in', 'haiku'],
+    ['general-purpose', 'what is the default value of X?', 'haiku'],
+  ]
+  for (const [i, [type, prompt, model]] of cases.entries()) {
+    const call = { tool: 'Agent', tool_use_id: `tu-c${i}`, description: `case ${i}`, prompt, subagent_type: type } as const
+    await $.tool.call(call)
+    await $.agent.spawn(spawnOf(call))
+    expect([type, prompt, spawnSeen(seen)?.model]).toEqual([type, prompt, model])
+  }
+  await settled()
+})
+
+test("a secret in a subagent's Bash line or answer is redacted before the monitor keeps it and the run is saved", { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, null)
+  const written: Record<string, string> = {}
+  on('fs.write', (_, e) => { written[posix(e.path)] = (e as { text: string }).text; return { value: undefined } })
+  on('agent.spawn', (_, e) => ({ model: e.model ?? 'claude-fable-5-1', agentId: 'r1' }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.close', () => ({ value: undefined }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.agent.spawn({ tool_use_id: 'tr1', prompt: 'Find where the config file is parsed.', description: 'find the parser', subagentType: 'Explore', provider: { kind: 'model' }, parentModel: 'claude-fable-5-1', model: 'claude-haiku-5-5' })
+  await $.tool.call({ tool: 'Bash', command: 'curl -H "Authorization: Bearer sk-ant-abcdef0123456789" https://api.example/v1', agentId: 'r1' })
+  await $.tool.call({ tool: 'Bash', command: 'GITHUB_TOKEN=ghp_ZZZZZZZZZZZZZZZZ gh api repos', agentId: 'r1' })
+  await $.tool.call({ tool: 'WebFetch', url: 'https://x.example/data?api_key=0123456789abcdef&page=2', agentId: 'r1' })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
+  expect(text).toContain('Bearer [redacted]')
+  expect(text).toContain('GITHUB_TOKEN=[redacted]')
+  expect(text).toContain('api_key=[redacted]&page=2')
+  expect(text).not.toContain('abcdef0123456789')
+  expect(text).not.toContain('ghp_ZZZZ')
+  await $.turn.complete({ answer: 'done; the password: hunter2hunter2 worked, 23k tokens: fine', durationMs: 1000, isAborted: false, turnId: 'tr1', reason: 'answer', agentId: 'r1', usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 10000, cache_creation_input_tokens: 0 } })
+  await settled()
+  const saved = Object.entries(written).find(([p]) => p.includes('/runs/'))
+  expect(saved).toBeDefined()
+  expect(saved![1]).toContain('password: [redacted]')
+  expect(saved![1]).toContain('23k tokens: fine')
+  expect(saved![1]).not.toContain('hunter2')
+  expect(saved![1]).not.toContain('ghp_ZZZZ')
 })

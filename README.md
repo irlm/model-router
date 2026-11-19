@@ -177,8 +177,10 @@ requests), never by rewriting the Agent tool's input, so auto mode's own review 
 Nothing unmeasured is touched: a research report, a design, a review, a plan keep their model; a prompt
 that names a test runner or asks for a code change is never read as a research note, however it is worded.
 The same keyword rule classifies the ledger, and a test keeps the two copies identical. A routed
-call that fails, or that the main model re-issues within ten minutes, escalates its family for the rest
-of the session. `/router effort advise|auto|off` extends the same rule to the main session's own
+call that fails, or that the main model re-issues within ten minutes, escalates its family for half an
+hour: its calls run as asked, then the routing resumes. Only a call that asks for something dearer is
+routed: a call already on the decided model, or on a cheaper one, is left alone and not counted.
+`/router effort advise|auto|off` extends the same rule to the main session's own
 requests: a prompt that reads as a measured family runs at that family's measured effort, back up after
 3 tool errors; advise (the default) only says what auto would have done and the estimate.
 

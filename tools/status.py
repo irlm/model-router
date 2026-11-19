@@ -165,11 +165,21 @@ def install_state(version, git, agents, usage, wv, tagged, pins):
 
 
 def variant_of(requires):
-    s = ' '.join(requires or [])
+    s = ' '.join(requires or []).lower()   # routing.json writes "(KUnit)"; the evidence key is lower-case
     for v in ('kunit', 'vitest'):
         if v in s:
             return v
     return ''
+
+
+def evidence_of(rf):
+    """A family's variant ('kunit', 'vitest' or '') and the evidence cell of its default model, effort and variant in
+    routing.json, {} when no cell has that key (the pane then shows no rate, not another cell's)."""
+    d = rf.get('default') or {}
+    model_id = next((mid for mid, alias in decide.ALIAS.items() if alias == d.get('model')), d.get('model'))
+    variant = variant_of(rf.get('requires'))
+    key = f"{model_id} {d.get('effort')}{'+' + variant if variant else ''}"
+    return variant, ((rf.get('decided') or {}).get('evidence') or {}).get(key) or {}
 
 
 def can_run(bench):
@@ -598,8 +608,9 @@ def price_tokens(tok, model):
     if not entry or not tok:
         return None
     r = price.rates(entry)
+    w5, w1 = price.cache_write_split(tok)   # the writes at their lifetime, as the actual side was priced (the CLI's default is 1h)
     return (tok.get('input_tokens', 0) * r['in'] + tok.get('output_tokens', 0) * r['out']
-            + tok.get('cache_read_input_tokens', 0) * r['cache_read'] + tok.get('cache_creation_input_tokens', 0) * r['write_5m'])
+            + tok.get('cache_read_input_tokens', 0) * r['cache_read'] + w5 * r['write_5m'] + w1 * r['write_1h'])
 
 
 def dominant(models):
@@ -718,9 +729,14 @@ def realized_savings(usage, events, families):
                 'after': {'msgs': a['main_msgs'], 'cost': a['main_total'], 'per_msg': pa, 'tok_per_msg': round(atk / a['main_msgs']) if a['main_msgs'] else None},
                 'saved': sw_main if sw_main is not None else per_msg_saved, 'saved_per_msg': per_msg_saved, 'same_work': sw_main is not None,
                 'ref': top_pair(b), 'rows': rows, 'baseline_per_msg': base_main, 'vs_baseline': vs_base_main}
-        saved = round(sum(c['saved'] or 0 for c in classes) + (main['saved'] or 0), 2)
-        vs_baseline = round(sum(c['vs_baseline'] or 0 for c in classes) + (main['vs_baseline'] or 0), 2)
-        windows.append({'since': ev['at'], 'until': nxt, 'span': span(ev['at'], nxt), 'kind': ev['kind'], 'what': ev['detail'],
+        # A change to the Agent calls (routing, apply, revert) is scored on them alone: the main sessions' delta is shown
+        # but not credited, or a quiet day in the main session reads as the routing's saving. A mark is a note on
+        # anything (an effort, a model), so everything counts for it.
+        scored = 'all' if ev['kind'] == 'mark' else 'agents'
+        main['scored'] = scored == 'all'
+        saved = round(sum(c['saved'] or 0 for c in classes) + ((main['saved'] or 0) if scored == 'all' else 0), 2)
+        vs_baseline = round(sum(c['vs_baseline'] or 0 for c in classes) + ((main['vs_baseline'] or 0) if scored == 'all' else 0), 2)
+        windows.append({'since': ev['at'], 'until': nxt, 'span': span(ev['at'], nxt), 'kind': ev['kind'], 'what': ev['detail'], 'scored': scored,
                         'projected': ev.get('projected'), 'days': days_since(ev['at'][:10], datetime.date.today()),
                         'classes': classes, 'main': main, 'saved': saved, 'vs_baseline': vs_baseline, 'baseline_since': usage.get('since')})
     windows.reverse()
@@ -736,10 +752,7 @@ def collect(fetch=False):
         d = rf.get('default') or {}
         bench = (decide.FAMILIES.get(fam) or {}).get('benches', [fam])[0]
         ok, why = can_run(bench)
-        model_id = next((mid for mid, alias in decide.ALIAS.items() if alias == d.get('model')), d.get('model'))
-        variant = variant_of(rf.get('requires'))
-        key = f"{model_id} {d.get('effort')}{'+' + variant if variant else ''}"
-        ev = ((rf.get('decided') or {}).get('evidence') or {}).get(key) or {}
+        variant, ev = evidence_of(rf)
         families.append({'name': fam, 'bench': bench, 'status': rf.get('status'), 'model': d.get('model'), 'effort': d.get('effort'),
                          'requires': rf.get('requires') or [], 'variant': variant, 'rate': f"{ev['success']}/{ev['n'] - ev.get('not_model', 0)}" if ev else None,
                          'ci': ev.get('ci'), 'cost_per_success': ev.get('cost_per_success'), 'can_run': ok, 'why': why})

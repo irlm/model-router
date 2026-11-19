@@ -98,7 +98,18 @@ const limitsText = (limits: RateLimit[]) => limits.map(l => `${windowName(l.kind
 
 /** The status line under the prompt: the rate-limit windows, then what is worth doing. */
 type StatusMode = 'full' | 'minimal' | 'off'
-const savingsUpTo = (s: StatusJson, kind?: string) => (s.suggestions ?? []).filter(g => !kind || g.kind === kind).reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
+/** A suggestion on the Agent calls (a measured family's class) is disjoint from the others; the rest (effort, tier, the prefix,
+ * what a project re-reads or re-writes) each price the same main-session messages another way, so they do not add up:
+ * summed, they once read "up to $557 less" on $557 spent. */
+const AGENT_SIDE = new Set(['lookups', 'explore', 'browser', 'synthesis'])
+const onAgents = (g: { id: string }) => AGENT_SIDE.has(g.id) || g.id.startsWith('learned:')
+/** The upper bound of what the suggestions could save together: the Agent-call ones summed, plus the largest main-session one. */
+const savingsUpTo = (s: StatusJson, kind?: string) => {
+  const gs = (s.suggestions ?? []).filter(g => !kind || g.kind === kind)
+  const agents = gs.filter(onAgents).reduce((n, g) => n + (g.saving?.[1] ?? 0), 0)
+  return agents + Math.max(0, ...gs.filter(g => !onAgents(g)).map(g => g.saving?.[1] ?? 0))
+}
+const mainSideCount = (s: StatusJson) => (s.suggestions ?? []).filter(g => !onAgents(g) && (g.saving?.[1] ?? 0) >= 1).length
 /** The suggestions' upper savings by evidence kind, for the window that was: what it would have consumed less, not what will. */
 const savingsMix = (s: StatusJson) => ['measured', 'extrapolated', 'unmeasured'].map(k => [k, savingsUpTo(s, k)] as const).filter(([, v]) => v >= 1).map(([k, v]) => `${money(v)} ${k}`).join(', ')
 /** What the window consumed, main sessions and subagents. */
@@ -106,6 +117,8 @@ const spent = (s: StatusJson) => (s.usage ? s.usage.main_total + s.usage.subagen
 /** `n` as a share of `of`, as "12%; " for a status line, or '' when there is nothing to divide by. */
 const share = (n: number, of: number) => (of > 0 && n > 0 ? `${Math.round((100 * n) / of)}%; ` : '')
 
+/** The calls the router moved this session: a kept answer and an escalation are rows of the log, not routings. */
+const routedCount = (rows: Routed[]) => rows.filter(r => r.decision === 'routed' || r.decision === 'auto').length
 /** The status line under the prompt (the host prefixes the plugin's name): the rate-limit windows, what the
  * router did this session, what a change saved, what the suggestions add up to, what to check. Only what
  * changes a decision; `minimal` keeps the windows, the routed count and the to-check count. */
@@ -129,11 +142,11 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.30.0'
+const WIDGET_VERSION = '0.30.1'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
-  if (have && have !== WIDGET_VERSION) return [line(`widget ${WIDGET_VERSION} loaded; the checkout has ${have}: /reload-plugins loads it`, { color: 'yellow' })]
+  if (have && have !== WIDGET_VERSION) return [line(`widget ${WIDGET_VERSION} loaded; the checkout has ${have}: /router upgrade (then /reload-plugins; a checkout added as the marketplace needs only the reload)`, { color: 'yellow' })]
   return full ? [line(`widget ${WIDGET_VERSION} loaded`, { dim: true })] : []
 }
 
@@ -246,7 +259,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     }
     const m = r.main
     const mb = mtok(m.before), ma = mtok(m.after)
-    lines.push(line(`  ${'main sessions'.padEnd(19)}$/Mtok ${(mb ?? 0).toFixed(2).padStart(7)} -> ${(ma ?? 0).toFixed(2).padEnd(7)} ${pair(mb, ma)}  ${saidSaved(m.saved).padEnd(14)} ${m.same_work ? 'same work' : 'per msg'} · ${m.after.msgs} msgs after · ${kilo(m.before.tok_per_msg)} -> ${kilo(m.after.tok_per_msg)} tok/msg${m.vs_baseline != null ? ` · vs baseline ${saidSaved(m.vs_baseline)}` : ''}`, { color: savedColor(m.saved) }))
+    lines.push(line(`  ${'main sessions'.padEnd(19)}$/Mtok ${(mb ?? 0).toFixed(2).padStart(7)} -> ${(ma ?? 0).toFixed(2).padEnd(7)} ${pair(mb, ma)}  ${saidSaved(m.saved).padEnd(14)} ${m.same_work ? 'same work' : 'per msg'} · ${m.after.msgs} msgs after · ${kilo(m.before.tok_per_msg)} -> ${kilo(m.after.tok_per_msg)} tok/msg${m.vs_baseline != null ? ` · vs baseline ${saidSaved(m.vs_baseline)}` : ''}${m.scored === false ? ' · shown, not scored: a change to the Agent calls cannot move it' : ''}`, { color: savedColor(m.saved) }))
   } else if (full) {
     lines.push(BLANK, line('no change recorded yet: Apply agents (when it changes a file), /router routing auto, /router prefer and /router mark <note> start the before/after count', { dim: true }))
   }
@@ -257,6 +270,7 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
   lines.push(BLANK, line(sug.length === 0 ? `suggestions: none${gone ? ` (${gone} dismissed)` : ''}`
     : full ? `suggestions (the last ${days} days could have consumed up to ${money(upTo)} less of ${money(total)}${total > 0 && upTo > 0 ? ` (${Math.round((100 * upTo) / total)}%)` : ''}: ${savingsMix(s) || 'nothing measured'}${gone ? `; ${gone} dismissed` : ''}):`
     : `suggestions · up to ${money(upTo)} less last ${days}d${total > 0 && upTo > 0 ? ` (${Math.round((100 * upTo) / total)}%)` : ''} · ${sug.length} (Details has basis and action):`, { bold: true }))
+  if (full && mainSideCount(s) > 1) lines.push(line('  the main-session lines (effort, tier, the prefix, what a project re-reads) price the same messages, each its own way: the total takes the largest of them, not their sum', { dim: true }))
   const GLANCE = 4
   const shownSug = full ? sug : sug.slice(0, GLANCE)
   shownSug.forEach((g, i) => {
@@ -478,8 +492,16 @@ const clockS = (ms: number) => {
   const d = new Date(ms)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
 }
+/** Secrets out of what the monitor keeps and the saved runs carry (a Bash line, a URL, an answer): a value after a key-like
+ * name (`GITHUB_TOKEN=…`, `password: …`, `?api_key=…`), a bearer token, and the common key shapes. Eight characters or more:
+ * a count after "tokens:" is not a secret. */
+const redact = (s: string): string => s
+  .replace(/\b(bearer)\s+[A-Za-z0-9._\-=+/]{8,}/gi, '$1 [redacted]')
+  .replace(/\b([A-Za-z_-]*(?:token|secret|password|passwd|api[_-]?key|apikey|access[_-]?key|authorization)[A-Za-z_-]*)(\s*[:=]\s*)["']?[^\s"',;&]{8,}/gi, '$1$2[redacted]')
+  .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{8,}|gho_[A-Za-z0-9]{8,}|github_pat_[A-Za-z0-9_]{8,}|xox[abp]-[A-Za-z0-9-]{8,}|AKIA[A-Z0-9]{12,})/g, '[redacted]')
 /** One tool call in a few words, for the monitor's tail. */
-const toolText = (e: Record<string, unknown>): string => {
+const toolText = (e: Record<string, unknown>): string => redact(toolTextRaw(e))
+const toolTextRaw = (e: Record<string, unknown>): string => {
   const str = (k: string) => (typeof e[k] === 'string' ? (e[k] as string) : '')
   switch (e.tool) {
     case 'Bash': return `$ ${str('command').replace(/\s+/g, ' ').slice(0, 70)}`
@@ -936,14 +958,14 @@ const sceneOf = (lv: Live, now: number, width: number): Scene => {
   return { boxes, rows, width: (D + 1) * (w + GAP) - GAP, height: Math.max(BOX_H, total.height - 1) }
 }
 
-const liveLines = (lv: Live, ctxNow: number | null, modelNow: string, s: StatusJson | null, mode: MainEffortMode): Line[] => {
+const liveLines = (lv: Live, ctxNow: number | null, modelNow: string, s: StatusJson | null, mode: MainEffortMode, now: number): Line[] => {
   const ts = lv.turns
   const head = `this session · ${ts.length === 0 ? 'no turn yet' : `${ts.length} turn${ts.length === 1 ? '' : 's'} · ${money(ts.reduce((n, t) => n + t.cost, 0))}`}`
   const read = ts.reduce((n, t) => n + t.cacheRead, 0), fresh = ts.reduce((n, t) => n + t.in + t.cacheWrite, 0)
   const hit = read + fresh > 0 ? ` · cache hit ${Math.round((100 * read) / (read + fresh))}%` : ''
   const eff = ts.at(-1)?.sessionEffort
   const lines = [line(`${head}${hit}${ctxNow !== null ? ` · ctx ${kilo(ctxNow)}` : ''}${modelNow ? ` · ${modelNow.replace(/^claude-/, '')}${eff ? ' ' + eff : ''}` : ''}`, { bold: true })]
-  const esc = Object.entries(lv.escalated)
+  const esc = Object.entries(lv.escalated).filter(([f]) => escalationOf(lv, f, now) !== undefined)   // an expired one is over: the calls are routed again
   const agentsLine = (calls: number, routedN: number) => line(`  agents   ${calls} call${calls === 1 ? '' : 's'} · ${routedN} routed${esc.length ? ` · escalated: ${esc.map(([f, w]) => `${f} (${w})`).join('; ')}` : ''}`, { dim: true })
   if (ts.length === 0) {
     if (esc.length) lines.push(agentsLine(0, 0))
@@ -1073,7 +1095,7 @@ async function refresh($: Dollar, fetch = false) {
     const rateLimits = await readLimits($)
     await update($, status, () => ({ at, json, error: null, rateLimits, where }))
     const ctx = await contextTokens($)
-    $.ui.status(statusMode === 'off' ? undefined : statusLine(json, rateLimits, (await read($, routed)).length, statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
+    $.ui.status(statusMode === 'off' ? undefined : statusLine(json, rateLimits, routedCount(await read($, routed)), statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
     python = ''   // probed again next time: a Python installed or removed since (the Store stub on Windows) is seen then
@@ -1311,12 +1333,14 @@ const RUNNER_NOTE = '\n\nRun the test command before you finish; the task counts
 type Match = { family: string; why: string }
 /** The measured family a call belongs to, from its agent type and prompt; null where none covers it (no blind downgrade). */
 const matchFamily = (agent: string, prompt: string): Match | null => {
-  const p = prompt.toLowerCase()
+  const p = prompt.toLowerCase(), t = agent.toLowerCase()
+  // The same order as tools/consumption.py's classify, so what the ledger counts and what is routed agree (a test runs the
+  // same cases through both): the type first, then the orchestrator rule, then the prompt's words.
   if (EXPLORE_TYPES.has(agent)) return { family: 'find_feature', why: `${agent}: read-only code search` }
   if (agent === 'Web Researcher') return { family: 'web_research', why: 'the lookup agent' }
-  if (agent === 'Evidence Collector') return { family: 'browser_flow', why: 'the browser agent' }
+  if (agent === 'Evidence Collector' || t.includes('browser')) return { family: 'browser_flow', why: agent === 'Evidence Collector' ? 'the browser agent' : `${agent}: a browser agent` }
+  if (t.includes('review')) return null   // a code review is not measured, whatever its prompt asks on the way
   if (ORCHESTRATE.some(k => p.includes(k))) return null
-  // The same order as tools/consumption.py's classify, so what the ledger counts and what is routed agree.
   if (BROWSER.filter(k => p.includes(k)).length >= 2) return { family: 'browser_flow', why: 'a browser flow' }
   if (p.length < 900 && LOOKUP.some(k => p.includes(k))) return { family: 'web_research', why: 'a short fact lookup' }
   // A prompt that runs a test command, or asks for a code change, is not a research note, whatever else it says
@@ -1334,7 +1358,26 @@ const FAMILY_CLASS: Record<string, string> = { find_feature: 'code-explore', web
 /** The consumption scan's class of this call, for the per-project overrides. */
 const classOf = (agent: string, family: string | null) => family ? FAMILY_CLASS[family] ?? 'other' : agent.toLowerCase().includes('review') ? 'code-review' : 'other'
 
-const decideCall = (s: StatusJson, agent: string, prompt: string, model?: string, effort?: string): Candidate | null => {
+const TIER: Record<string, number> = { haiku: 0, sonnet: 1, opus: 2, fable: 3 }
+const EFFORT_RANK: Record<string, number> = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 }
+/** The tier and effort named in "fable high", "claude-opus-5-5", "haiku (default effort)"; null for what is not named. */
+const askedOf = (asked: string) => {
+  const a = asked.toLowerCase()
+  const tier = a.match(/haiku|sonnet|opus|fable/)?.[0], eff = a.match(/\b(low|medium|high|xhigh|max)\b/)?.[1]
+  return { tier: tier ? TIER[tier] : null, effort: eff ? EFFORT_RANK[eff] : null }
+}
+/** Whether the call asks for something dearer than the family's decision: a bigger model, or the same one above the decided
+ * effort. 'inherit' is the session's model. A model the widget does not know counts as dearer; the same model with no effort
+ * said does not (the README promises routing only downward: a call already on haiku is not "routed", and a research note
+ * asked at haiku is not moved up to sonnet). */
+const dearer = (asked: string, model: string, effort: string, sessionModel: string): boolean => {
+  const a = askedOf(asked === 'inherit' ? sessionModel : asked)
+  if (a.tier === null) return true
+  if (a.tier !== TIER[model]) return a.tier > TIER[model]
+  return a.effort !== null && a.effort > EFFORT_RANK[effort]
+}
+
+const decideCall = (s: StatusJson, agent: string, prompt: string, model?: string, effort?: string, sessionModel = ''): Candidate | null => {
   const m = matchFamily(agent, prompt)
   const asked = model ? `${model} ${effort ?? '(default effort)'}` : (s.agents.routed.find(r => r.name === agent)?.have ?? 'inherit')
   // The person's override for this project and class comes first: what they chose after a learned suggestion.
@@ -1346,7 +1389,7 @@ const decideCall = (s: StatusJson, agent: string, prompt: string, model?: string
   if (!m) return null
   const f = s.families.find(x => x.name === m.family)
   if (!f?.model || !f.effort || !MODELS.has(f.model) || !EFFORTS.has(f.effort)) return null
-  if (asked === `${f.model} ${f.effort}`) return null
+  if (asked === `${f.model} ${f.effort}` || !dearer(asked, f.model, f.effort, sessionModel)) return null
   return { family: f.name, why: m.why, agent, asked, model: f.model, effort: f.effort, rate: f.rate ?? '?',
     cost: f.cost_per_success === null ? '?' : f.cost_per_success.toFixed(3) }
 }
@@ -1466,7 +1509,7 @@ export const register: Register = (on, options) => {
     const s = await read($, status)
     if (s?.json && statusMode !== 'off') {
       const ctx = await contextTokens($)
-      $.ui.status(statusLine(s.json, s.rateLimits, (await read($, routed)).length, statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
+      $.ui.status(statusLine(s.json, s.rateLimits, routedCount(await read($, routed)), statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
     }
     if (e.agentId !== undefined) {
       const id = e.agentId
@@ -1476,7 +1519,7 @@ export const register: Register = (on, options) => {
         if (!a) return v
         const u = e.usage
         const stopped = e.reason === 'aborted' || e.isAborted
-        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, usage: u ? { input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_input_tokens: u.cache_read_input_tokens, cache_creation_input_tokens: u.cache_creation_input_tokens } : null, failed: e.reason === 'error' || e.reason === 'refusal', stopped, model: u?.model ?? a.model, answer: (e.answer ?? '').slice(0, 2000) }
+        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, usage: u ? { input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_input_tokens: u.cache_read_input_tokens, cache_creation_input_tokens: u.cache_creation_input_tokens } : null, failed: e.reason === 'error' || e.reason === 'refusal', stopped, model: u?.model ?? a.model, answer: redact((e.answer ?? '').slice(0, 2000)) }
         const { [id]: _gone, ...rest } = v.agents
         const nn = String(a.n).padStart(2, '0')
         const ev: RunEvent = done.stopped
@@ -1557,7 +1600,8 @@ export const register: Register = (on, options) => {
       const ctx = await contextTokens($)
       const modelNow = await $.session.model().catch(() => '')
       const lv = await read($, live)
-      return { text: [...liveLines(lv, ctx?.tokens ?? null, modelNow, s?.json ?? null, mainEffortMode), ...agentsLines(lv, await $.clock.now(), true), ...versionLines(s?.json ?? null, true), BLANK, ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, modelNow) : [line(s?.error ?? 'no status')])].map(l => l.text).join('\n') }
+      const nowL = await $.clock.now()
+      return { text: [...liveLines(lv, ctx?.tokens ?? null, modelNow, s?.json ?? null, mainEffortMode, nowL), ...agentsLines(lv, nowL, true), ...versionLines(s?.json ?? null, true), BLANK, ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, modelNow) : [line(s?.error ?? 'no status')])].map(l => l.text).join('\n') }
     }
     if (verb === 'prefer') {
       const words = e.args.trim().split(/\s+/).slice(1)
@@ -1816,7 +1860,7 @@ export const register: Register = (on, options) => {
         return next(e)
       }
     }
-    const c = s?.json ? decideCall(s.json, agent, e.prompt, e.model, e.effort) : null
+    const c = s?.json ? decideCall(s.json, agent, e.prompt, e.model, e.effort, await $.session.model().catch(() => '')) : null
     if (!c) return next(e)
     let decision: Routed['decision'] = 'auto'
     if (routingMode === 'ask') {
@@ -1838,9 +1882,11 @@ export const register: Register = (on, options) => {
     // Not a rewrite of the tool input (auto mode would bounce the call): the spawn inside this call picks it up.
     pendingRoutes.set(e.tool_use_id ?? `${at}:${e.description}`, { at, description: e.description, prompt: e.prompt, model: c.model, effort: c.effort, family: c.family })
     const r = await next(e)
-    // The routed call failed: the family runs as asked for the next half hour, and the pane says why.
+    // The routed call failed: the family runs as asked for the next half hour from now, and the pane says why.
+    // (Stamped at the call's start, a call that failed after 31 minutes wrote an escalation already expired.)
     if ((r as { isError?: boolean }).isError && c.family !== 'override') {
-      await update($, live, v => ({ ...v, escalated: { ...v.escalated, [c.family]: `a call routed to ${c.model} ${c.effort} failed` }, escalatedAt: { ...v.escalatedAt, [c.family]: at } }))
+      const failedAt = await $.clock.now()
+      await update($, live, v => ({ ...v, escalated: { ...v.escalated, [c.family]: `a call routed to ${c.model} ${c.effort} failed` }, escalatedAt: { ...v.escalatedAt, [c.family]: failedAt } }))
       $.ui.toast(`router: the ${c.family} call on ${c.model} ${c.effort} failed; the next ones run as asked for half an hour`)
     }
     return r
@@ -2081,7 +2127,7 @@ export const register: Register = (on, options) => {
         {lines.map(row)}
       </Box>
     ))
-    const liveAll = liveLines(lv, ctx, modelNow, s?.json ?? null, mainEffortMode)
+    const liveAll = liveLines(lv, ctx, modelNow, s?.json ?? null, mainEffortMode, now)
     const ver = versionLines(s?.json ?? null, true)[0]
     const worst = Math.max(0, ...limits.map(l => l.percentUsed))
     const summary = s?.json

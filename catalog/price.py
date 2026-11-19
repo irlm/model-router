@@ -45,18 +45,28 @@ def rates(entry):
             'write_5m': inp * mult.get('5m', 1.25) / 1e6, 'write_1h': inp * mult.get('1h', 2.0) / 1e6}
 
 
+def cache_write_split(usage):
+    """The cache-write tokens of a receipt's `usage` block, or of a token sum, as (5m, 1h): the receipt's own breakdown
+    when it has one, the summed `cache_write_5m`/`cache_write_1h` of tools/consumption.py, else all of it at 1h, the
+    CLI's default. Every price of a write goes through here, so an actual and a counterfactual never differ by the lifetime."""
+    cc = usage.get('cache_creation') or {}
+    w5, w1 = cc.get('ephemeral_5m_input_tokens'), cc.get('ephemeral_1h_input_tokens')
+    if w5 is None and w1 is None:
+        w5, w1 = usage.get('cache_write_5m'), usage.get('cache_write_1h')
+    if w5 is None and w1 is None:
+        w5, w1 = 0, usage.get('cache_creation_input_tokens', 0) or 0
+    return w5 or 0, w1 or 0
+
+
 def price_usage(usage, entry):
     """USD for one receipt's `usage` block under the given catalog entry, or None."""
     r = rates(entry)
     if r is None or not usage:
         return None
-    cc = usage.get('cache_creation') or {}
-    w5, w1 = cc.get('ephemeral_5m_input_tokens'), cc.get('ephemeral_1h_input_tokens')
-    if w5 is None and w1 is None:  # no breakdown: assume the CLI's default 1h cache
-        w5, w1 = 0, usage.get('cache_creation_input_tokens', 0) or 0
+    w5, w1 = cache_write_split(usage)
     return (usage.get('input_tokens', 0) * r['in'] + usage.get('output_tokens', 0) * r['out']
             + usage.get('cache_read_input_tokens', 0) * r['cache_read']
-            + (w5 or 0) * r['write_5m'] + (w1 or 0) * r['write_1h'])
+            + w5 * r['write_5m'] + w1 * r['write_1h'])
 
 
 def price_model_usage(model_usage, cat=None):

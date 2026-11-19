@@ -24,6 +24,7 @@ import fixed_text  # noqa: E402
 import prune_agents  # noqa: E402
 import release  # noqa: E402
 import status  # noqa: E402
+import price  # noqa: E402   (catalog/, on the path once status is imported)
 import upgrade  # noqa: E402
 
 
@@ -51,6 +52,17 @@ class Classify(unittest.TestCase):
         self.assertEqual(c('Plan', 'plan the migration'), 'other')
         self.assertEqual(c('general-purpose', 'use the Agent tool to launch an Explore subagent: what is the default value of X'), 'other')   # an orchestrator, whatever it delegates   # not an Explore: the widget does not route it, so the ledger does not count it as measured
         self.assertEqual(c('general-purpose', 'hello'), 'other')
+
+    def test_the_type_first_then_the_orchestrator_rule_then_the_prompt(self):
+        # The same cases run through the widget's matchFamily in mod/tests/router.test.tsx ('the ledger and the router
+        # classify alike'): a reviewer with a lookup in its prompt was routed to haiku and counted as a review (2026-11-18).
+        c = consumption.classify
+        self.assertEqual(c('Code Reviewer', 'what is the default value of X?'), 'code-review')                 # the type says review: not a lookup
+        self.assertEqual(c('browser-tester', 'click the login button'), 'browser-flow')                         # the type says browser: one word is enough
+        self.assertEqual(c('general-purpose', 'in the browser, click through the checkout; use the Agent tool for the rest'), 'other')   # an orchestrator, even with browser words
+        self.assertEqual(c('general-purpose', 'open the web page and click sign in'), 'browser-flow')
+        self.assertEqual(c('general-purpose', 'Research and compare three message queues; write up a report.'), 'research-synthesis')
+        self.assertEqual(c('general-purpose', 'fix the failing test; run pytest until it passes'), 'code-change')
 
     def test_the_widget_and_the_ledger_share_the_keyword_lists(self):
         # The widget routes by these words and the ledger counts by them: one copy each, kept identical by this test.
@@ -213,6 +225,43 @@ class Realized(unittest.TestCase):
         self.assertEqual((first['until'], first['span']), ('2026-11-02T10:00Z', '24.0 h'))
         self.assertAlmostEqual(first['main']['saved'], (0.2 - 0.1) * 50, 2)    # per message, times the 50 after
         self.assertAlmostEqual(first['classes'][0]['saved'], (1.5 - 1.6) * 1, 2)
+
+    def test_a_routing_change_is_scored_on_the_agent_calls_only(self):
+        # The main sessions got cheaper per message on their own; a routing change cannot have done that, so it is shown, not credited
+        events = [{'at': '2026-11-02T10:00Z', 'kind': 'routing', 'detail': 'auto'}]
+        calls = [{'class': 'code-explore', 'ts': '2026-11-01T12:00', 'cost': 1.6, 'model': 'claude-opus-5-5'},
+                 {'class': 'code-explore', 'ts': '2026-11-02T11:00', 'cost': 0.01, 'model': 'claude-haiku-5-5'}]
+        seg = lambda msgs, total: {'main_msgs': msgs, 'main_total': total, 'main_rows': [{'model': 'm', 'effort': 'xhigh', 'msgs': msgs, 'cost': total}]}
+        w = status.realized_savings({'subagents': {'calls': calls}, 'segments': [seg(100, 20.0), seg(50, 5.0)]}, events, [])['latest']
+        self.assertAlmostEqual(w['main']['saved'], (0.2 - 0.1) * 50, 2)
+        self.assertFalse(w['main']['scored'])
+        self.assertAlmostEqual(w['saved'], 1.6 - 0.01, 2)
+        self.assertEqual(w['scored'], 'agents')
+        w = status.realized_savings({'subagents': {'calls': calls}, 'segments': [seg(100, 20.0), seg(50, 5.0)]}, [{**events[0], 'kind': 'mark'}], [])['latest']
+        self.assertAlmostEqual(w['saved'], 1.6 - 0.01 + 5.0, 2)   # a mark is a note on anything: all of it counts
+
+    def test_cache_writes_are_priced_by_their_lifetime_as_the_actual_side_was(self):
+        # Every row here writes 1h caches; the counterfactual priced them at the 5m rate (0.625x), so the same work on the
+        # same model read as "cost up" (2026-11-18)
+        entry = price.model_entry('claude-opus-5-5')
+        r = price.rates(entry)
+        tok = {'input_tokens': 0, 'output_tokens': 0, 'cache_read_input_tokens': 0, 'cache_creation_input_tokens': 30000}
+        self.assertAlmostEqual(status.price_tokens(tok, 'claude-opus-5-5'), 30000 * r['write_1h'], 6)                        # no breakdown: the CLI's 1h default
+        split = {**tok, 'cache_write_5m': 10000, 'cache_write_1h': 20000}
+        self.assertAlmostEqual(status.price_tokens(split, 'claude-opus-5-5'), 10000 * r['write_5m'] + 20000 * r['write_1h'], 6)
+        actual = price.price_usage({'cache_creation_input_tokens': 30000, 'cache_creation': {'ephemeral_1h_input_tokens': 30000}}, entry)
+        self.assertAlmostEqual(status.same_work([{'cost': actual, 'tok': tok, 'model': 'claude-opus-5-5'}], 'claude-opus-5-5'), 0.0, 2)
+        self.assertEqual(price.cache_write_split({'cache_creation_input_tokens': 7, 'cache_creation': {'ephemeral_5m_input_tokens': 7}}), (7, 0))
+
+    def test_every_decided_family_finds_its_evidence_cell(self):
+        # "(KUnit)" in requires hid the kunit cell: the pane said fix_bug 16/21 and write_tests 5/10 for families measured 63/63 and 30/30
+        routing = json.loads((Path(__file__).resolve().parents[1] / 'routing.json').read_text(encoding='utf-8'))
+        for fam, rf in routing['families'].items():
+            if rf.get('status') != 'decided':
+                continue
+            variant, ev = status.evidence_of(rf)
+            self.assertTrue(ev, f"{fam}: no evidence cell for its default ({variant or 'no variant'})")
+        self.assertEqual(status.variant_of(['the test runner in the loop (KUnit)']), 'kunit')
 
     def test_same_work_prices_the_after_tokens_at_the_before_model(self):
         tok = {'input_tokens': 20000, 'output_tokens': 1000, 'cache_read_input_tokens': 100000, 'cache_creation_input_tokens': 0}

@@ -97,8 +97,11 @@ export type Realized = {
   days: number | null
   /** saved: the same-work figure when `same_work` (the after tokens priced at `ref_model`, minus actual), else per call */
   classes: { class: string; family: string | null; before: RealizedSide; after: RealizedSide; saved: number | null; saved_per_call?: number | null; same_work?: boolean; ref_model?: string | null; vs_baseline?: number | null; baseline_per_call?: number | null; check: { sample: string; successes: string; verdict: string } | null }[]
-  main: { before: RealizedMainSide; after: RealizedMainSide; saved: number | null; saved_per_msg?: number | null; same_work?: boolean; ref?: [string, string] | null; vs_baseline?: number | null; baseline_per_msg?: number | null; rows: { model: string; effort: string; before: { msgs: number; per_msg: number } | null; after: { msgs: number; per_msg: number } | null }[] }
+  /** scored: false when the change was to the Agent calls (routing, override, apply), whose window shows the main sessions' delta but does not credit it */
+  main: { before: RealizedMainSide; after: RealizedMainSide; saved: number | null; saved_per_msg?: number | null; same_work?: boolean; ref?: [string, string] | null; vs_baseline?: number | null; baseline_per_msg?: number | null; scored?: boolean; rows: { model: string; effort: string; before: { msgs: number; per_msg: number } | null; after: { msgs: number; per_msg: number } | null }[] }
   saved: number
+  /** what `saved` counts: 'agents' for a change to the Agent calls, 'all' for a mark */
+  scored?: 'agents' | 'all'
   /** against the baseline before the first change: what all the changes did together */
   vs_baseline?: number
   baseline_since?: string

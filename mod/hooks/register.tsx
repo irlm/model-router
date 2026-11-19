@@ -17,7 +17,7 @@ const routed = atom({ plugin: 'model-router', key: 'routed' } as const, [] as Ro
 const details = atom({ plugin: 'model-router', key: 'details' } as const, false, { shape: 'details-1' })
 // switches-1: prompts that read as a different task in a session re-reading a lot per turn, and what was done
 const switches = atom({ plugin: 'model-router', key: 'switches' } as const, [] as Switch[], { shape: 'switches-1' })
-const LIVE0: Live = { turns: [], escalated: {}, escalatedAt: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, stoppedN: 0, events: [], nextN: 1, runs: [], task: null, main: { busy: false, since: 0, lastAt: 0, recent: [] } }
+const LIVE0: Live = { turns: [], escalated: {}, escalatedAt: {}, escalatedRung: {}, agents: {}, finished: [], doneN: 0, doneCost: 0, failedN: 0, stoppedN: 0, events: [], nextN: 1, runs: [], task: null, main: { busy: false, since: 0, lastAt: 0, recent: [] } }
 // live-10: escalations carry their time and expire; an agent carries what its call asked for, the decision and its tokens
 const live = atom({ plugin: 'model-router', key: 'live' } as const, LIVE0, { shape: 'live-10' })
 /** A second counter while agents run: the elapsed clocks and the spinner move between events. */
@@ -94,7 +94,39 @@ const clock = (ms: number) => {
 
 const windowName = (kind: string) => (kind === 'five_hour' ? '5h' : kind === 'seven_day' ? '7d' : kind)
 
-const limitsText = (limits: RateLimit[]) => limits.map(l => `${windowName(l.kind)} ${Math.round(l.percentUsed)}%`).join(' · ')
+/** The windows as this session read them, oldest first, for the burn rate: a reading at each refresh and each turn's end. A reset
+ * (the figure falls) starts the history again. */
+const limitHist: Record<string, { at: number; pct: number }[]> = {}
+const HIST_MS = 3 * 3600000
+const PACE_MIN_MS = 10 * 60000   // readings closer than this say nothing about the pace
+let pressure = 80                // percent of a window from which routing and effort go auto for the rest of it (0: off); /config
+let pressureOn = false
+const noteLimits = (limits: RateLimit[], now: number) => {
+  for (const l of limits) {
+    const h = (limitHist[l.kind] ??= [])
+    const last = h[h.length - 1]
+    if (last && l.percentUsed < last.pct - 1) h.length = 0   // the window reset: the old pace is over
+    if (!last || last.pct !== l.percentUsed || h.length === 0) h.push({ at: now, pct: l.percentUsed })
+    while (h.length > 2 && now - h[0]!.at > HIST_MS) h.shift()
+  }
+}
+/** At the pace of the readings so far, when the window runs out: null when the pace is flat or unknown. */
+const paceOut = (l: RateLimit, now: number): number | null => {
+  const h = limitHist[l.kind] ?? []
+  if (h.length < 2) return null
+  const a = h[0]!, b = h[h.length - 1]!
+  if (b.at - a.at < PACE_MIN_MS || b.pct <= a.pct) return null
+  return now + ((100 - l.percentUsed) * (b.at - a.at)) / (b.pct - a.pct)
+}
+/** "out ~15:40" when the pace empties the window before its reset, '' otherwise. */
+const outText = (l: RateLimit, now: number | null): string => {
+  if (now === null) return ''
+  const t = paceOut(l, now)
+  if (t === null) return ''
+  const reset = l.resetsAt ? Date.parse(l.resetsAt) : NaN
+  return Number.isNaN(reset) || t < reset ? ` (out ~${clock(t)})` : ''
+}
+const limitsText = (limits: RateLimit[], now: number | null = null) => limits.map(l => `${windowName(l.kind)} ${Math.round(l.percentUsed)}%${outText(l, now)}`).join(' · ')
 
 /** The status line under the prompt: the rate-limit windows, then what is worth doing. */
 type StatusMode = 'full' | 'minimal' | 'off'
@@ -122,8 +154,8 @@ const routedCount = (rows: Routed[]) => rows.filter(r => r.decision === 'routed'
 /** The status line under the prompt (the host prefixes the plugin's name): the rate-limit windows, what the
  * router did this session, what a change saved, what the suggestions add up to, what to check. Only what
  * changes a decision; `minimal` keeps the windows, the routed count and the to-check count. */
-const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: StatusMode = 'full', ctx: number | null = null, model = '') => {
-  const parts = [limitsText(limits)]
+const statusLine = (s: StatusJson, limits: RateLimit[], routedN = 0, mode: StatusMode = 'full', ctx: number | null = null, model = '', now: number | null = null) => {
+  const parts = [limitsText(limits, now)]
   // The context size always (when the host reports it); what re-reading it costs per turn, from the warning size on.
   if (ctx !== null) parts.push(ctx >= contextWarn ? `ctx ${kilo(ctx)} (${money((ctx / 1e6) * cacheRate(model))}/turn re-read)` : `ctx ${kilo(ctx)}`)
   if (routedN > 0) parts.push(`routed ${routedN}`)
@@ -142,7 +174,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.30.1'
+const WIDGET_VERSION = '0.31.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -190,10 +222,17 @@ const rateColor = (f: number | null) => (f === null ? undefined : f >= 0.9 ? 'gr
 const KIND_COLOR: Record<string, string | undefined> = { measured: 'green', extrapolated: 'cyan', learned: 'magenta' }
 
 /** The rate-limit windows as bars, one line each. */
-const limitLines = (limits: RateLimit[]): Line[] =>
-  limits.map(l =>
-    line(`${windowName(l.kind).padEnd(4)}${bar(l.percentUsed / 100, 20)} ${String(Math.round(l.percentUsed)).padStart(3)}% used${l.resetsAt ? ', resets ' + clock(Date.parse(l.resetsAt)) : ''}`,
-      { color: l.percentUsed >= 80 ? 'red' : l.percentUsed >= 50 ? 'yellow' : 'green', bold: true }))
+const limitLines = (limits: RateLimit[], now: number | null = null): Line[] => {
+  const out = limits.map(l => {
+    const t = now === null ? null : paceOut(l, now)
+    const reset = l.resetsAt ? Date.parse(l.resetsAt) : NaN
+    const pace = t === null ? '' : Number.isNaN(reset) || t < reset ? ` · at this pace out ~${clock(t)}` : ' · lasts to the reset at this pace'
+    return line(`${windowName(l.kind).padEnd(4)}${bar(l.percentUsed / 100, 20)} ${String(Math.round(l.percentUsed)).padStart(3)}% used${l.resetsAt ? ', resets ' + clock(reset) : ''}${pace}`,
+      { color: l.percentUsed >= 80 ? 'red' : l.percentUsed >= 50 ? 'yellow' : 'green', bold: true })
+  })
+  if (limits.length && pressure > 0) out.push(line(pressureOn ? `above ${pressure}%: routing auto and effort auto until the window comes back under (the pressure line, /config)` : `from ${pressure}% of a window, routing and effort go auto for the rest of it (the pressure line, /config)`, { dim: !pressureOn, color: pressureOn ? 'yellow' : undefined }))
+  return out
+}
 
 /** The suggestions in the order the pane shows them: largest saving first, a learned one by what its calls cost,
  * unknown last; dismissed ones out unless asked. */
@@ -365,9 +404,9 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     if (full) for (const x of sw.slice(-5)) lines.push(line(`  ${clock(x.at)}  ${kilo(x.ctx)} tokens: ${x.why} -> ${x.action}`, { dim: true }))
   }
   if (seen.length > 0) {
-    const kept = seen.filter(x => x.decision === 'kept').length
-    lines.push(BLANK, line(`routed this session: ${seen.length - kept} routed, ${kept} kept (mode ${routingMode}; /router routing ask|auto|off${full ? '' : '; Details lists them'})`, { bold: true }))
-    if (full) for (const x of seen.slice(-8)) lines.push(line(`  ${clock(x.at)}  ${x.agent}: ${x.from} -> ${x.to}  [${x.family}] ${x.decision}  ${x.description}`, { dim: x.decision === 'kept' }))
+    const kept = seen.filter(x => x.decision === 'kept').length, floored = seen.filter(x => x.decision === 'floor').length
+    lines.push(BLANK, line(`routed this session: ${seen.length - kept - floored} routed, ${kept} kept${floored ? `, ${floored} held by the risk floor` : ''} (mode ${routingMode}${pressureOn ? ', auto under window pressure' : ''}; /router routing ask|auto|off${full ? '' : '; Details lists them'})`, { bold: true }))
+    if (full) for (const x of seen.slice(-8)) lines.push(line(`  ${clock(x.at)}  ${x.agent}: ${x.from} -> ${x.to}  [${x.family}] ${x.decision}  ${x.description}`, { dim: x.decision === 'kept' || x.decision === 'floor' }))
   }
   return lines
 }
@@ -397,12 +436,12 @@ const agentsLines = (lv: Live, now: number, full: boolean): Line[] => {
   const lines = [line(head + (full ? ' · graph: /router monitor' : ''), { bold: true, color: running.length ? 'cyan' : undefined })]
   const row = (a: RunningAgent, depth: number) => {
     const quiet = a.done === null && now - a.lastStepAt > QUIET_MS
-    const mark = a.done === null ? '|' : bad(a) ? '✗' : '✓'
+    const mark = a.done === null ? '|' : bad(a) ? '✗' : a.unverified ? '!' : '✓'
     const lead = depth ? '  '.repeat(depth) + '└ ' : '  '
     const who = `${lead}${mark} ${a.type}`.padEnd(26)
     const what = `${shortModel(a.model)} ${a.effort || ''}`.trim().padEnd(12) + (a.family ?? 'unmeasured').padEnd(15) + a.description.slice(0, 34).padEnd(35)
-    const tail = `${String(a.steps).padStart(3)} step${a.steps === 1 ? ' ' : 's'} ${secs((a.done ?? now) - a.startedAt).padStart(6)}` + (a.cost !== null ? `  ${money(a.cost)}` : quiet ? '  quiet' : '')
-    return line(`${who}${what}${tail}`, { dim: a.done !== null && !bad(a), color: bad(a) ? 'red' : quiet ? 'yellow' : undefined })
+    const tail = `${String(a.steps).padStart(3)} step${a.steps === 1 ? ' ' : 's'} ${secs((a.done ?? now) - a.startedAt).padStart(6)}` + (a.cost !== null ? `  ${money(a.cost)}` : quiet ? '  quiet' : '') + (a.unverified ? `  ${a.unverified}` : '')
+    return line(`${who}${what}${tail}`, { dim: a.done !== null && !bad(a) && !a.unverified, color: bad(a) ? 'red' : quiet || a.unverified ? 'yellow' : undefined })
   }
   const rows: Line[] = []
   const tree = (parent: string | null, depth: number) => {
@@ -440,6 +479,7 @@ const similar = (a: string, b: string) => {
 let statusMode: StatusMode = 'full'
 let struggleOption = 25
 let contextWarn = 100000   // tokens re-read per turn from which a task switch is worth a word
+let ledgerAutoDay = ''     // the day the widget last wrote the monthly ledger itself
 
 // ---- Context drift: a prompt that reads as a different task, in a session that already re-reads a lot every turn.
 // The cost is the API's, the same in the terminal, the desktop app and VS Code: every turn re-reads the whole session
@@ -817,13 +857,16 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
     const ran = `${shortModel(a.model)}${a.effort ? ' ' + a.effort : ''}`.trim()
     const routed = a.decision === 'auto' || a.decision === 'routed'
     const fam = familiesNow.find(f => f.name === a.family)
-    const why = a.decision === 'escalated' ? (lvAll.escalated[a.family ?? ''] ?? 'a routed call failed or was re-issued') + ': runs as asked for half an hour'
+    const why0 = a.decision === 'floor' ? 'risk floor: auth, payments, a migration or destructive words in the ask; runs as asked'
+      : a.decision === 'escalated' ? (lvAll.escalated[a.family ?? ''] ?? 'a routed call failed or was re-issued') + (a.asked !== `${shortModel(a.model)} ${a.effort}`.trim() && fam?.step_up && shortModel(a.model) === fam.step_up.model ? ': on the measured step up for half an hour' : ': runs as asked for half an hour')
       : routed ? (fam ? `measured ${fam.rate}, $${(fam.cost_per_success ?? 0).toFixed(4)}/success` : 'measured')
       : a.decision === 'kept' ? 'kept as asked'
       : a.type.startsWith('fork /') ? 'a fork of this session: runs on its model, no Agent call to route'
       : !a.family ? 'no measured family covers it'
       : !fam ? 'family not decided yet: runs as asked'
+      : fam.last_check?.verdict === 'REGRESSED' ? 'family regressed on this Claude Code version: runs as asked until a check passes'
       : shortModel(a.model) === fam.model ? 'already on the routed model' : 'no Agent call seen for it: not routed'
+    const why = a.unverified ? `${why0} · ${a.unverified}` : why0
     const arrow = routed ? `${a.asked} → ${ran}` : a.asked === 'inherit' ? `inherit (${ran})` : a.asked
     const est = a.cost !== null ? (routed ? costAsAsked(a) : a.cost) : null
     rows.push({ l: line(`  ${String(a.n).padStart(2, '0')} ${`${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''}`.padEnd(26).slice(0, 26)} ${arrow.padEnd(28)} ${(a.family ?? 'unmeasured').padEnd(19)} ${(a.decision ?? 'kept').padEnd(10)} ${why}`, { color: routed ? 'cyan' : a.decision === 'escalated' ? 'yellow' : undefined, dim: !routed && a.decision !== 'escalated' }),
@@ -1072,7 +1115,14 @@ async function readLimits($: Dollar): Promise<RateLimit[]> {
   try {
     const u = await $.session.usage()
     unavailable.delete('rate limits')
-    return u.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
+    const limits = u.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
+    noteLimits(limits, await $.clock.now())
+    const on = pressure > 0 && limits.some(l => l.percentUsed >= pressure)
+    if (on !== pressureOn) {
+      pressureOn = on
+      $.ui.toast(on ? `router: a window is at ${pressure}% or more: routing auto and effort auto until it comes back under` : 'router: the windows are back under the pressure line; your own modes again')
+    }
+    return limits
   } catch (err) {
     unread('rate limits', err)
     return []
@@ -1095,7 +1145,16 @@ async function refresh($: Dollar, fetch = false) {
     const rateLimits = await readLimits($)
     await update($, status, () => ({ at, json, error: null, rateLimits, where }))
     const ctx = await contextTokens($)
-    $.ui.status(statusMode === 'off' ? undefined : statusLine(json, rateLimits, routedCount(await read($, routed)), statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
+    $.ui.status(statusMode === 'off' ? undefined : statusLine(json, rateLimits, routedCount(await read($, routed)), statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => ''), at))
+    // The monthly ledger on any OS (the systemd timer did it on Linux only): a checkout of your own whose last ledger is a month
+    // old gets one written now, once a day at most; a machine that never wrote one is left to /router ledger.
+    const lim = json.thresholds?.ledger_days ?? 35
+    const lastLedger = json.ledger.usage_last ? Date.parse(json.ledger.usage_last) : NaN
+    const dayKey = new Date(at).toISOString().slice(0, 10)
+    if (where !== 'marketplace clone' && ledgerAutoDay !== dayKey && !Number.isNaN(lastLedger) && at - lastLedger > (lim - 4) * 86400000) {
+      ledgerAutoDay = dayKey
+      void runJob($, 'ledger')
+    }
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
     python = ''   // probed again next time: a Python installed or removed since (the Store stub on Windows) is seen then
@@ -1307,6 +1366,18 @@ const BROWSER = ['in the browser', 'chrome', 'web page', 'the page at', 'fill th
 // lookup it describes is for its subagent, and a routed orchestrator has been seen without the Agent tool.
 const ORCHESTRATE = ['agent tool', 'subagent', 'sub-agent', 'launch, in parallel', 'spawn a']
 const EXPLORE_TYPES = new Set(['Explore', 'Codebase Onboarding Engineer'])
+// A short question about the code in front of the model (a crash, a trace, a file) is not a fact lookup for the Web Researcher:
+// "what is the cause of this crash in parser.c?" went to haiku low as one. The same list in tools/consumption.py, kept identical by its test.
+const CODEREF = ['crash', 'stack trace', 'traceback', 'this repo', 'the repo', 'this code', 'the codebase', 'in the code', 'this function', 'the function', 'this file']
+const FILE_RE = /\b[\w-]+\.(?:c|h|cc|cpp|py|ts|tsx|js|jsx|go|rs|java|rb|json|ya?ml|toml)\b/
+// The risk floor: a change or a browser flow that touches these is never moved down, whatever family it reads as. A measured
+// 72/72 on a test suite says nothing about a payments migration or a production deploy; the call runs as asked and the log says why.
+const RISK = ['auth', 'password', 'secret', 'credential', 'payment', 'billing', 'invoice', 'migration', 'drop table', 'rm -rf', 'force push', '--force', 'production', 'deploy', 'terraform', 'kubectl', 'wipe', 'delete all']
+const FLOORED = new Set(['repo_fix', 'browser_flow'])
+// A test command in a subagent's own Bash call: the runner-in-the-loop condition a routed fix was measured under.
+const RUNNER_CMD = ['pytest', 'npm test', 'npm run test', 'pnpm test', 'yarn test', 'vitest', 'jest', 'cargo test', 'go test', 'make test', 'make check', 'tox', 'unittest', 'phpunit', 'rspec', 'mvn test', 'gradle test', 'ctest', 'kunit']
+/** A routed code search that found nothing: an empty result is not a success, and the row says so. */
+const EMPTY_ANSWER = /\b(?:not found|could not (?:be )?find|could not be found|couldn't (?:be )?find|cannot be found|unable to (?:find|locate)|no such \w+|no match(?:es)?\b|does not exist|doesn't exist|nothing (?:named|called|matching))/i
 const MODELS = new Set(['sonnet', 'opus', 'haiku', 'fable'])
 const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max'])
 /** A routing decision waiting for its spawn: the Agent call's id (and its words, for a spawn whose id is not known) → what the subagent runs on. */
@@ -1342,7 +1413,7 @@ const matchFamily = (agent: string, prompt: string): Match | null => {
   if (t.includes('review')) return null   // a code review is not measured, whatever its prompt asks on the way
   if (ORCHESTRATE.some(k => p.includes(k))) return null
   if (BROWSER.filter(k => p.includes(k)).length >= 2) return { family: 'browser_flow', why: 'a browser flow' }
-  if (p.length < 900 && LOOKUP.some(k => p.includes(k))) return { family: 'web_research', why: 'a short fact lookup' }
+  if (p.length < 900 && LOOKUP.some(k => p.includes(k)) && !CODEREF.some(k => p.includes(k)) && !FILE_RE.test(p)) return { family: 'web_research', why: 'a short fact lookup' }
   // A prompt that runs a test command, or asks for a code change, is not a research note, whatever else it says
   // ("run pytest and report the failures", "compare the two parsers and fix the bug").
   const runs = RUNNER.some(k => p.includes(k))
@@ -1352,7 +1423,14 @@ const matchFamily = (agent: string, prompt: string): Match | null => {
   return null
 }
 
-type Candidate = { family: string; why: string; agent: string; asked: string; model: string; effort: string; rate: string; cost: string }
+type Candidate = { family: string; why: string; agent: string; asked: string; model: string; effort: string; rate: string; cost: string; floor?: string }
+/** The measured step up of a family (routing.json): where an escalation goes first; null when the family has none. */
+const stepUpOf = (fam: string) => {
+  const su = familiesNow.find(f => f.name === fam)?.step_up
+  return su && MODELS.has(su.model) && EFFORTS.has(su.effort) ? su : null
+}
+/** The rung an escalation from the default starts on: 1 (the step up) when the family has one, else 2 (as asked). */
+const rungFor = (fam: string) => (stepUpOf(fam) ? 1 : 2)
 /** What the evidence says this call should run on, or null when it already does or nothing measured covers it. */
 const FAMILY_CLASS: Record<string, string> = { find_feature: 'code-explore', web_research: 'fact-lookup', browser_flow: 'browser-flow', repo_fix: 'code-change', research_synthesis: 'research-synthesis' }
 /** The consumption scan's class of this call, for the per-project overrides. */
@@ -1389,9 +1467,11 @@ const decideCall = (s: StatusJson, agent: string, prompt: string, model?: string
   if (!m) return null
   const f = s.families.find(x => x.name === m.family)
   if (!f?.model || !f.effort || !MODELS.has(f.model) || !EFFORTS.has(f.effort)) return null
+  if (f.last_check?.verdict === 'REGRESSED') return null   // the family failed its last check on this Claude Code version: as asked until a check passes
   if (asked === `${f.model} ${f.effort}` || !dearer(asked, f.model, f.effort, sessionModel)) return null
+  const risk = FLOORED.has(f.name) ? RISK.find(k => prompt.toLowerCase().includes(k)) : undefined
   return { family: f.name, why: m.why, agent, asked, model: f.model, effort: f.effort, rate: f.rate ?? '?',
-    cost: f.cost_per_success === null ? '?' : f.cost_per_success.toFixed(3) }
+    cost: f.cost_per_success === null ? '?' : f.cost_per_success.toFixed(3), ...(risk ? { floor: risk } : {}) }
 }
 
 /** Asks the person; 'keep' when they keep what was asked, dismiss, or no one can be asked (a -p run, a background loop). */
@@ -1421,6 +1501,8 @@ export const register: Register = (on, options) => {
   statusMode = sm === 'minimal' || sm === 'off' ? sm : 'full'
   struggleOption = Math.max(5, Math.min(95, Number(options.struggle ?? 25) || 25))
   contextWarn = Math.max(20000, Number(options.contextWarn ?? 100000) || 100000)
+  pressure = Math.max(0, Math.min(100, Number(options.pressure ?? 80)))
+  if (Number.isNaN(pressure)) pressure = 80
   vocab.clear(); ticketsSeen.clear(); vocabSeeded = false; lastSwitchTurn = -100; driftOff = false
   repo = repoOption
   python = ''
@@ -1507,29 +1589,50 @@ export const register: Register = (on, options) => {
       }
     }
     const s = await read($, status)
-    if (s?.json && statusMode !== 'off') {
-      const ctx = await contextTokens($)
-      $.ui.status(statusLine(s.json, s.rateLimits, routedCount(await read($, routed)), statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => '')))
+    if (s?.json) {
+      // The windows again at each turn's end: the burn rate and the pressure line follow the session, not the half-hour refresh.
+      const rateLimits = await readLimits($)
+      await update($, status, v => (v ? { ...v, rateLimits } : v))
+      if (statusMode !== 'off') {
+        const ctx = await contextTokens($)
+        $.ui.status(statusLine(s.json, rateLimits, routedCount(await read($, routed)), statusMode, ctx?.tokens ?? null, await $.session.model().catch(() => ''), await $.clock.now()))
+      }
     }
     if (e.agentId !== undefined) {
       const id = e.agentId
       const now = await $.clock.now()
+      // A routed fix was measured with the runner in the loop (72/72): one that ends without a test command of its own is not that
+      // measurement, so the row says so and the family escalates as after a failure. A routed search that answers "not found" is an
+      // empty result: marked, not escalated (what it looked for may not exist).
+      const a0 = (await read($, live)).agents[id]
+      const moved = a0?.decision === 'auto' || a0?.decision === 'routed'
+      const ended = e.reason === 'error' || e.reason === 'refusal' || e.reason === 'aborted' || e.isAborted === true
+      const noRunner = !!a0 && moved && a0.family === 'repo_fix' && !a0.ranTests && !ended
+      const empty = !!a0 && moved && a0.family === 'find_feature' && !ended && EMPTY_ANSWER.test(e.answer ?? '')
+      const unverified = noRunner ? 'finished without running the tests' : empty ? 'answered "not found"' : null
       await update($, live, v => {
         const a = v.agents[id]
         if (!a) return v
         const u = e.usage
         const stopped = e.reason === 'aborted' || e.isAborted
-        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, usage: u ? { input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_input_tokens: u.cache_read_input_tokens, cache_creation_input_tokens: u.cache_creation_input_tokens } : null, failed: e.reason === 'error' || e.reason === 'refusal', stopped, model: u?.model ?? a.model, answer: redact((e.answer ?? '').slice(0, 2000)) }
+        const done: RunningAgent = { ...a, done: now, cost: u ? turnCost(u) : null, out: u?.output_tokens ?? 0, usage: u ? { input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_input_tokens: u.cache_read_input_tokens, cache_creation_input_tokens: u.cache_creation_input_tokens } : null, failed: e.reason === 'error' || e.reason === 'refusal', stopped, model: u?.model ?? a.model, answer: redact((e.answer ?? '').slice(0, 2000)), unverified }
         const { [id]: _gone, ...rest } = v.agents
         const nn = String(a.n).padStart(2, '0')
         const ev: RunEvent = done.stopped
           ? { at: now, runId: a.runId, text: `${nn} ${a.type} stopped after ${secs(now - a.startedAt)}`, color: 'red' }
           : done.failed
             ? { at: now, runId: a.runId, text: `${nn} ${a.type} failed (${e.reason}) after ${secs(now - a.startedAt)}`, color: 'red' }
-            : { at: now, runId: a.runId, text: `${nn} ${a.type} done in ${secs(now - a.startedAt)}${done.cost !== null ? `, ${money(done.cost)}` : ''}`, color: 'green' }
+            : unverified
+              ? { at: now, runId: a.runId, text: `${nn} ${a.type} ${unverified} after ${secs(now - a.startedAt)}${noRunner ? `: ${a.family} escalated` : ''}`, color: 'yellow' }
+              : { at: now, runId: a.runId, text: `${nn} ${a.type} done in ${secs(now - a.startedAt)}${done.cost !== null ? `, ${money(done.cost)}` : ''}`, color: 'green' }
         const runs = v.runs.map(r => (r.id === a.runId ? { ...r, cost: r.cost + (done.cost ?? 0), failedN: r.failedN + (done.failed ? 1 : 0), stoppedN: r.stoppedN + (done.stopped ? 1 : 0) } : r))
         return { ...v, agents: rest, finished: [...v.finished, done].slice(-200), doneN: v.doneN + 1, doneCost: v.doneCost + (done.cost ?? 0), failedN: v.failedN + (done.failed ? 1 : 0), stoppedN: v.stoppedN + (done.stopped ? 1 : 0), events: [...v.events, ev].slice(-400), runs }
       })
+      if (noRunner && a0) {
+        const fam = a0.family!
+        await update($, live, v => ({ ...v, escalated: { ...v.escalated, [fam]: 'a routed fix finished without running the tests' }, escalatedAt: { ...v.escalatedAt, [fam]: now }, escalatedRung: { ...(v.escalatedRung ?? {}), [fam]: rungFor(fam) } }))
+        $.ui.toast(`router: ${a0.type} finished without running the tests; ${fam} runs ${stepUpOf(fam) ? 'on the measured step up' : 'as asked'} for half an hour`)
+      }
       await closeIdleRuns($)
     }
     if (e.agentId === undefined) {
@@ -1601,7 +1704,7 @@ export const register: Register = (on, options) => {
       const modelNow = await $.session.model().catch(() => '')
       const lv = await read($, live)
       const nowL = await $.clock.now()
-      return { text: [...liveLines(lv, ctx?.tokens ?? null, modelNow, s?.json ?? null, mainEffortMode, nowL), ...agentsLines(lv, nowL, true), ...versionLines(s?.json ?? null, true), BLANK, ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, modelNow) : [line(s?.error ?? 'no status')])].map(l => l.text).join('\n') }
+      return { text: [...liveLines(lv, ctx?.tokens ?? null, modelNow, s?.json ?? null, mainEffortMode, nowL), ...agentsLines(lv, nowL, true), ...limitLines(s?.rateLimits ?? [], nowL), ...versionLines(s?.json ?? null, true), BLANK, ...(s?.json ? summaryLines(s.json, s.at, await read($, routed), s.where, true, await read($, switches), ctx?.tokens ?? null, modelNow) : [line(s?.error ?? 'no status')])].map(l => l.text).join('\n') }
     }
     if (verb === 'prefer') {
       const words = e.args.trim().split(/\s+/).slice(1)
@@ -1650,7 +1753,7 @@ export const register: Register = (on, options) => {
       if (arg === 'ask' || arg === 'auto' || arg === 'off') {
         const was = routingMode
         routingMode = arg
-        await update($, live, v => ({ ...v, escalated: {}, escalatedAt: {} }))   // a fresh start for the families escalated this session
+        await update($, live, v => ({ ...v, escalated: {}, escalatedAt: {}, escalatedRung: {} }))   // a fresh start for the families escalated this session
         if (arg === 'auto' && was !== 'auto') void recordChange($, 'routing', 'auto for this session', measuredProjected((await read($, status))?.json))
       }
       return { text: `routing ${routingMode} for this session${arg ? '; escalated families cleared' : ' (routing ask|auto|off sets it)'}; /config makes it permanent.` }
@@ -1783,12 +1886,14 @@ export const register: Register = (on, options) => {
     if (!p) return yield* next(e)
     if (e.index === 0 || !p.sessionEffort) p.sessionEffort = typeof e.effort === 'string' ? e.effort : e.effort === undefined ? '' : String(e.effort)
     if (mainEffortMode === 'off' || !p.effort || p.effort === p.sessionEffort) return yield* next(e)
-    if (p.errors >= ESCALATE_ERRORS) {
-      if (p.applied && p.applied !== p.sessionEffort) { p.gear = 'up'; $.ui.toast(`router: ${p.errors} tool errors this turn: back to ${p.sessionEffort || 'the session\'s'} effort`) }
+    if (p.errors >= ESCALATE_ERRORS || p.agentCalls > 0) {
+      // Up again: three tool errors (the task is harder than its words), or an Agent call (the turn orchestrates; a family's
+      // effort was measured on the work itself, not on delegating it).
+      if (p.applied && p.applied !== p.sessionEffort) { p.gear = 'up'; $.ui.toast(p.agentCalls > 0 ? `router: this turn delegates: back to ${p.sessionEffort || 'the session\'s'} effort` : `router: ${p.errors} tool errors this turn: back to ${p.sessionEffort || 'the session\'s'} effort`) }
       p.applied = p.sessionEffort || null
       return yield* next(e)
     }
-    if (mainEffortMode === 'advise') { p.wouldApply = p.effort; return yield* next(e) }
+    if (mainEffortMode === 'advise' && !pressureOn) { p.wouldApply = p.effort; return yield* next(e) }   // under window pressure advise acts
     if (!p.applied) $.ui.toast(`router: this turn reads as ${p.family} (measured at ${p.effort}); running at ${p.effort}`)
     p.applied = p.effort
     p.gear = 'down'
@@ -1811,9 +1916,11 @@ export const register: Register = (on, options) => {
     }
     if (agentId !== undefined && (await read($, live)).agents[agentId]) {
       const rec: Recent = { at: await $.clock.now(), text: toolText(e as unknown as Record<string, unknown>), err: (r as { isError?: boolean }).isError === true }
+      const cmd = e.tool === 'Bash' ? String((e as { command?: string }).command ?? '').toLowerCase() : ''
+      const ranTests = cmd !== '' && RUNNER_CMD.some(k => cmd.includes(k))
       await update($, live, v => {
         const a = v.agents[agentId]
-        return a ? { ...v, agents: { ...v.agents, [agentId]: { ...a, recent: [...a.recent, rec].slice(-8) } } } : v
+        return a ? { ...v, agents: { ...v.agents, [agentId]: { ...a, recent: [...a.recent, rec].slice(-8), ranTests: a.ranTests || ranTests } } } : v
       })
     }
     if (agentId === undefined) {
@@ -1836,6 +1943,7 @@ export const register: Register = (on, options) => {
   // A family escalated this session (a routed call failed, or was re-issued within minutes) runs as asked.
   on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
     if (routingMode === 'off') return next(e)
+    const mode: RoutingMode = routingMode === 'ask' && pressureOn ? 'auto' : routingMode   // a window near its limit: the measured route, no question
     const s = await read($, status)
     const agent = e.subagent_type ?? 'general-purpose'
     const fam = matchFamily(agent, e.prompt)?.family ?? null
@@ -1849,11 +1957,31 @@ export const register: Register = (on, options) => {
       const standing = escalationOf(lv, fam, now)
       // A re-issue is the same call again in the same run (prompt or task): a similar search under a new prompt is new work.
       const runNow = currentRunId(lv)
-      const reissued = !standing && !siblingRunning && (await read($, routed)).some(r => r.family === fam && r.agent === agent && r.decision !== 'kept' && r.decision !== 'escalated' && now - r.at < REISSUE_MS && now - r.at >= SIBLING_MS && r.runId === runNow && similar(r.description, e.description))
-      const why = standing ?? (reissued ? 're-issued within 10 min of a routed call' : null)
+      const prior = siblingRunning ? undefined : (await read($, routed)).find(r => r.family === fam && r.agent === agent && (r.decision === 'auto' || r.decision === 'routed' || r.step) && now - r.at < REISSUE_MS && now - r.at >= SIBLING_MS && r.runId === runNow && similar(r.description, e.description))
+      const reissued = !standing && !!prior
+      const stepReissued = !!standing && !!prior?.step   // the step up was re-issued too: the next rung
+      const why = stepReissued ? `the step up was re-issued too` : standing ?? (reissued ? 're-issued within 10 min of a routed call' : null)
       if (why) {
-        if (reissued) await update($, live, v => ({ ...v, escalated: { ...v.escalated, [fam]: why }, escalatedAt: { ...v.escalatedAt, [fam]: now } }))
+        // The rung: a family escalated from its default goes to its measured step up first (find_feature: sonnet low, 144/144, a
+        // tenth of the session model), and to "as asked" when the step up fails or is re-issued too, or when it has none.
+        const rung = stepReissued ? 2 : reissued ? rungFor(fam) : (lv.escalatedRung?.[fam] ?? 2)
+        if (reissued || stepReissued) await update($, live, v => ({ ...v, escalated: { ...v.escalated, [fam]: why }, escalatedAt: { ...v.escalatedAt, [fam]: now }, escalatedRung: { ...(v.escalatedRung ?? {}), [fam]: rung } }))
         const asked = e.model ? `${e.model} ${e.effort ?? '(default effort)'}` : (s?.json?.agents.routed.find(r => r.name === agent)?.have ?? 'inherit')
+        const su = rung === 1 ? stepUpOf(fam) : null
+        if (su && dearer(asked, su.model, su.effort, await $.session.model().catch(() => ''))) {
+          const to = `${su.model} ${su.effort} (step up)`
+          await update($, routed, r => [...r, { at: now, agent, family: fam, from: asked, to, decision: 'escalated' as const, step: true, description: e.description, callId: e.tool_use_id, runId: currentRunId(lv) }].slice(-50))
+          await logRouted($, fam, agent, asked, to, 'escalated')
+          $.ui.toast(`router: ${agent} on ${su.model} ${su.effort}, the measured step up (${fam} escalated: ${why})`)
+          pendingRoutes.set(e.tool_use_id ?? `${now}:${e.description}`, { at: now, description: e.description, prompt: e.prompt, model: su.model, effort: su.effort, family: fam })
+          const r = await next(e)
+          if ((r as { isError?: boolean }).isError) {
+            const failedAt = await $.clock.now()
+            await update($, live, v => ({ ...v, escalated: { ...v.escalated, [fam]: `the step up (${su.model} ${su.effort}) failed too` }, escalatedAt: { ...v.escalatedAt, [fam]: failedAt }, escalatedRung: { ...(v.escalatedRung ?? {}), [fam]: 2 } }))
+            $.ui.toast(`router: the ${fam} step up failed too; the next calls run as asked for half an hour`)
+          }
+          return r
+        }
         await update($, routed, r => [...r, { at: now, agent, family: fam, from: asked, to: 'as asked', decision: 'escalated' as const, description: e.description, callId: e.tool_use_id, runId: currentRunId(lv) }].slice(-50))
         await logRouted($, fam, agent, asked, 'as asked', 'escalated')
         $.ui.toast(`router: ${agent} runs as asked (${fam} escalated this session: ${why})`)
@@ -1862,8 +1990,15 @@ export const register: Register = (on, options) => {
     }
     const c = s?.json ? decideCall(s.json, agent, e.prompt, e.model, e.effort, await $.session.model().catch(() => '')) : null
     if (!c) return next(e)
+    if (c.floor) {
+      // The risk floor: the call runs as asked, no question; the log and the Routing frame say which word held it.
+      const at0 = await $.clock.now(), run0 = currentRunId(await read($, live))
+      await update($, routed, r => [...r, { at: at0, agent, family: c.family, from: c.asked, to: 'as asked', decision: 'floor' as const, description: e.description, callId: e.tool_use_id, runId: run0 }].slice(-50))
+      await logRouted($, c.family, agent, c.asked, 'as asked', 'floor')
+      return next(e)
+    }
     let decision: Routed['decision'] = 'auto'
-    if (routingMode === 'ask') {
+    if (mode === 'ask') {
       const choice = await askRoute($, c)
       if (choice === 'auto') {
         routingMode = 'auto'
@@ -1886,8 +2021,8 @@ export const register: Register = (on, options) => {
     // (Stamped at the call's start, a call that failed after 31 minutes wrote an escalation already expired.)
     if ((r as { isError?: boolean }).isError && c.family !== 'override') {
       const failedAt = await $.clock.now()
-      await update($, live, v => ({ ...v, escalated: { ...v.escalated, [c.family]: `a call routed to ${c.model} ${c.effort} failed` }, escalatedAt: { ...v.escalatedAt, [c.family]: failedAt } }))
-      $.ui.toast(`router: the ${c.family} call on ${c.model} ${c.effort} failed; the next ones run as asked for half an hour`)
+      await update($, live, v => ({ ...v, escalated: { ...v.escalated, [c.family]: `a call routed to ${c.model} ${c.effort} failed` }, escalatedAt: { ...v.escalatedAt, [c.family]: failedAt }, escalatedRung: { ...(v.escalatedRung ?? {}), [c.family]: rungFor(c.family) } }))
+      $.ui.toast(`router: the ${c.family} call on ${c.model} ${c.effort} failed; the next ones run ${stepUpOf(c.family) ? 'on the measured step up' : 'as asked'} for half an hour`)
     }
     return r
   }).catch(($, e, next) => {
@@ -2173,7 +2308,7 @@ export const register: Register = (on, options) => {
       : [
           frame('Session live', liveAll.slice(1), 'cyan'),
           frame('Agents', agentsLines(lv, now, full), Object.keys(lv.agents).length ? 'green' : undefined),
-          frame('Limits', limitLines(limits), worst >= 80 ? 'red' : worst >= 50 ? 'yellow' : 'green'),
+          frame('Limits', limitLines(limits, now), worst >= 80 ? 'red' : worst >= 50 ? 'yellow' : 'green'),
           ...shown.map(x => frame(x.t[0], x.g, x.t[1])),
         ]
     const header = (

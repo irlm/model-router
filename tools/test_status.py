@@ -63,11 +63,13 @@ class Classify(unittest.TestCase):
         self.assertEqual(c('general-purpose', 'open the web page and click sign in'), 'browser-flow')
         self.assertEqual(c('general-purpose', 'Research and compare three message queues; write up a report.'), 'research-synthesis')
         self.assertEqual(c('general-purpose', 'fix the failing test; run pytest until it passes'), 'code-change')
+        self.assertEqual(c('general-purpose', 'what is the cause of this crash in parser.c?'), 'other')          # a question about the code in front of the model, not a lookup
+        self.assertEqual(c('general-purpose', 'what is the default value of X in config.yaml here?'), 'other')
 
     def test_the_widget_and_the_ledger_share_the_keyword_lists(self):
         # The widget routes by these words and the ledger counts by them: one copy each, kept identical by this test.
         source = (Path(__file__).resolve().parents[1] / 'mod/hooks/register.tsx').read_text(encoding='utf-8')
-        for name in ('LOOKUP', 'SYNTHESIS', 'CODE', 'RUNNER', 'BROWSER', 'ORCHESTRATE'):
+        for name in ('LOOKUP', 'SYNTHESIS', 'CODE', 'RUNNER', 'BROWSER', 'ORCHESTRATE', 'CODEREF'):
             m = re.search(r"^const %s = \[(.*?)\]$" % name, source, re.S | re.M)
             self.assertIsNotNone(m, name)
             widget = re.findall(r"'((?:[^'\\]|\\.)*)'", m.group(1))
@@ -107,9 +109,43 @@ class Suggest(unittest.TestCase):
         rows = [{'model': 'claude-fable-5-1', 'effort': 'xhigh', 'cost': 100.0, 'msgs': 10}]
         out = {g['id']: g for g in status.suggest(usage(rows=rows), {})}
         self.assertEqual(out['effort']['kind'], 'extrapolated')
-        self.assertAlmostEqual(out['effort']['saving'][1], 100 * (1 - 1 / status.EFFORT_RATIO['xhigh']['claude-fable-5-1']), 2)
+        self.assertAlmostEqual(out['effort']['saving'][1], 100 * (1 - 1 / status.EFFORT_RATIO['xhigh']['fable']), 2)
         self.assertEqual(out['tier']['kind'], 'unmeasured')
         self.assertEqual(out['tier']['saving'], [60.0, 63.0])
+        self.assertIsNone(out['tier']['here'])
+
+    def test_a_newer_fable_is_in_the_tier_suggestion_and_your_own_opus_rows_beside_it(self):
+        rows = [{'model': 'claude-fable-5-2', 'effort': 'high', 'cost': 100.0, 'msgs': 100, 'out_cost': 40.0},
+                {'model': 'claude-opus-5', 'effort': 'high', 'cost': 20.0, 'msgs': 50, 'out_cost': 5.0}]
+        out = {g['id']: g for g in status.suggest(usage(rows=rows), {})}
+        self.assertEqual(out['tier']['stake'], 100.0)                                   # the 5.2 rows count (they dropped out when the key was the 5.1 id)
+        self.assertIn('claude-fable-5-2, which no family has receipts for', out['tier']['basis'])
+        self.assertEqual(out['tier']['here']['ratio'], 0.4)                              # $0.40 vs $1.00 per message
+        self.assertIn('Opus at 40% of Fable per message', out['tier']['basis'])
+        self.assertAlmostEqual(out['effort']['saving'][1], 100 * (1 - 1 / 1.16) + 20 * (1 - 1 / 1.06), 2)   # high, by tier
+
+    def test_the_largest_unmeasured_bucket_is_named(self):
+        bc = {'other': {'n': 33, 'cost': 11.6, 'types': {'general-purpose': 33}, 'models': {}, 'last': '2026-11-02T10:00'},
+              'fact-lookup': {'n': 8, 'cost': 0.5, 'types': {'Web Researcher': 8}, 'models': {}, 'last': '2026-11-02T10:00'}}
+        u = usage(bc)
+        u['subagents']['calls'] = [{'window': 'cur', 'class': 'other', 'description': 'review the plan'}] * 3 + [{'window': 'cur', 'class': 'other', 'description': 'draft the email'}]
+        out = {g['id']: g for g in status.suggest(u, {})}
+        self.assertEqual((out['other']['kind'], out['other']['saving']), ('unmeasured', None))
+        self.assertIn('33 Agent calls of no measured kind (general-purpose x33): $11.60', out['other']['title'])
+        self.assertIn('"review the plan"; "draft the email"', out['other']['basis'])
+        bc['fact-lookup']['cost'] = 20.0                                                   # not the largest bucket: no line
+        self.assertNotIn('other', {g['id'] for g in status.suggest(usage(bc), {})})
+
+    def test_models_without_receipts_and_the_check_floor(self):
+        routing = {'families': {'f': {'decided': {'evidence': {'claude-haiku-5-5 low': {}, 'claude-fable-5-1 low': {}}}}}}
+        u = {'main': {'rows': [{'model': 'claude-fable-5-2', 'msgs': 70, 'cost': 90.0}, {'model': 'claude-fable-5-1', 'msgs': 5, 'cost': 2.0}, {'model': 'x (no price)', 'msgs': 1, 'cost': 0}]},
+             'subagents': {'calls': [{'window': 'cur', 'model': 'claude-opus-5', 'cost': 3.0}, {'window': 'prev', 'model': 'claude-sonnet-5-5', 'cost': 3.0}]}}
+        self.assertEqual(status.unmeasured_models(u, routing), [{'model': 'claude-fable-5-2', 'msgs': 70, 'cost': 90.0}, {'model': 'claude-opus-5', 'msgs': 1, 'cost': 3.0}])
+        # regress.py's rule at n=6 against a lower bound of 0.95: 4/6 is REGRESSED (tail 0.033), 5/6 is ok (0.265); against 0.72 (10/10) even 2/6 passes
+        self.assertEqual(status.check_floor(6, 0.95), 4)
+        self.assertEqual(status.check_floor(6, 0.72), 1)
+        self.assertIsNone(status.check_floor(6, 0.05))
+        self.assertIsNone(status.check_floor(0, 0.72))
 
 
 class Learned(unittest.TestCase):

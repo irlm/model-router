@@ -11,6 +11,7 @@ Usage: python3 tools/status.py [--json] [--fetch]
 """
 import argparse
 import collections
+import math
 import datetime
 import json
 import os
@@ -45,7 +46,11 @@ ADVICE_REGRESS_DAYS = 60   # no regression check for this long: run one
 USAGE_DAYS = 30            # the consumption window the suggestions are computed on
 # Cost of a task at this effort divided by its cost at low, measured on results/cell8 repo_fix
 # (24 tasks, every effort solved every task): the only effort sweep with more than one tier.
-EFFORT_RATIO = {'xhigh': {'claude-opus-5-5': 1.30, 'claude-fable-5-1': 1.52}, 'high': {'claude-opus-5-5': 1.06, 'claude-fable-5-1': 1.16}}
+# Keyed by tier: the ratios were measured on Opus 5.5 and Fable 5.1 and are applied to any version of the tier the transcripts
+# run on (a 5.2 row dropped out of the suggestions when the key was the 5.1 id); the stale-model advice says when that is a guess.
+EFFORT_RATIO = {'xhigh': {'opus': 1.30, 'fable': 1.52}, 'high': {'opus': 1.06, 'fable': 1.16}}
+TIER_COMPARE_MSGS = 50        # messages on the other tier in the window before the pane compares your own Opus and Fable rows
+UNMEASURED_MODEL_FLOOR = 1.0  # dollars in the window on a model no family has receipts for before the advice names it
 # Opus 5.5 cost per success divided by Fable 5.1's on the families where both were run at the same effort:
 # repo_fix 0.178/0.481 = 0.37, web_research 0.12/0.30 = 0.40 (results/cell8), same results on both.
 OPUS_OVER_FABLE = (0.37, 0.40)
@@ -287,6 +292,43 @@ def timer_state():
     return {'kind': 'systemd', 'installed': True, 'next': ' '.join(cols[:4])}
 
 
+def tier_of(model_id):
+    """'haiku', 'sonnet', 'opus' or 'fable' from a model id of any version ('claude-fable-5-2'), '' for anything else."""
+    m = (model_id or '').lower()
+    return next((t for t in ('haiku', 'sonnet', 'opus', 'fable') if t in m), '')
+
+
+def unmeasured_models(usage, routing):
+    """The model ids of the window's rows (main sessions and subagent calls) that no family's evidence names: the routing has
+    no receipts for them, so what the pane says about them is a ratio from another model. Most used first."""
+    known = {key.split(' ')[0] for rf in routing['families'].values() for key in ((rf.get('decided') or {}).get('evidence') or {})}
+    seen, spend = collections.Counter(), collections.Counter()
+    for r in usage['main']['rows']:
+        if r['model'].endswith('(no price)'):   # its own advice line names it
+            continue
+        mid = r['model'].split(' ')[0]
+        seen[mid] += r['msgs']; spend[mid] += r['cost']
+    for c in usage['subagents'].get('calls', []):
+        if c.get('window') == 'cur' and c.get('model'):
+            seen[c['model']] += 1; spend[c['model']] += c.get('cost') or 0
+    return [{'model': m, 'msgs': n, 'cost': round(spend[m], 2)} for m, n in seen.most_common()
+            if m not in known and m != '?' and not m.startswith('<') and not m.endswith('(no price)')]
+
+
+def binom_tail(n, s, p):
+    """P(X <= s) for X ~ Binomial(n, p): the one-sided tail regress.py judges a sample by."""
+    return sum(math.comb(n, k) * p ** k * (1 - p) ** (n - k) for k in range(0, s + 1))
+
+
+def check_floor(n, p0, alpha=0.05):
+    """The most successes out of n that regress.py still calls REGRESSED against a decided lower bound p0 (None when even
+    0/n passes): the power of a small sample in one number, so 'ok 6/6' says what it could have caught."""
+    if not n or p0 is None:
+        return None
+    fails = [s for s in range(0, n + 1) if binom_tail(n, s, p0) < alpha]
+    return max(fails) if fails else None
+
+
 def days_since(iso, today):
     try:
         return (today - datetime.date.fromisoformat(iso)).days
@@ -308,7 +350,7 @@ def suggest(usage, agents, routing=None):
         lo = hi_ = 0.0
         for r in hi:
             ratios = EFFORT_RATIO[r['effort']]
-            rr = ratios.get(r['model'].split(' ')[0])
+            rr = ratios.get(tier_of(r['model']))
             rs = [rr] if rr else list(ratios.values())
             lo += r['cost'] * (1 - 1 / max(rs)) if rr else r['cost'] * (1 - 1 / min(rs))
             hi_ += r['cost'] * (1 - 1 / min(rs)) if rr else r['cost'] * (1 - 1 / max(rs))
@@ -368,15 +410,43 @@ def suggest(usage, agents, routing=None):
                     'basis': 'no family grades report writing yet; the fact-lookup result (Haiku 76/78) does not transfer to synthesis',
                     'action': f"worth measuring next: a synthesis rubric family (GAPS.md open item); until then no blind downgrade"})
     # 5. Fable in main sessions where the measured families saw Opus equal
-    fable = [r for r in rows if r['model'].startswith('claude-fable-5-1')]
+    fable = [r for r in rows if tier_of(r['model']) == 'fable']
     if fable:
         spend = sum(r['cost'] for r in fable)
+        opus = [r for r in rows if tier_of(r['model']) == 'opus']
+        om, fm = sum(r['msgs'] for r in opus), sum(r['msgs'] for r in fable)
+        local, here = '', None
+        if om >= TIER_COMPARE_MSGS and fm:
+            # The A/B that already ran on this machine: cost per message on each tier, output cost apart (the part the model's
+            # verbosity sets). Not the same work on both, so a hint beside the benchmark's ratio, not a measurement.
+            oc, fc = sum(r['cost'] for r in opus) / om, spend / fm
+            oo, fo = sum(r.get('out_cost', 0) for r in opus) / om, sum(r.get('out_cost', 0) for r in fable) / fm
+            here = {'opus': {'msgs': om, 'per_msg': round(oc, 4), 'out_per_msg': round(oo, 4)}, 'fable': {'msgs': fm, 'per_msg': round(fc, 4), 'out_per_msg': round(fo, 4)},
+                    'ratio': round(oc / fc, 2) if fc else None}
+            local = (f"; on this machine in the window: Opus ${oc:.3f} per message over {om} msgs (output ${oo:.3f}), Fable ${fc:.3f} over {fm} "
+                     f"(output ${fo:.3f}){f', Opus at {oc / fc:.0%} of Fable per message' if fc else ''}; not the same work on both, so a hint, not a measurement")
+        ids = sorted({r['model'].split(' ')[0] for r in fable})
+        other = [m for m in ids if m != 'claude-fable-5-1']
         out.append({'id': 'tier', 'kind': 'unmeasured', 'stake': round(spend, 2),
                     'saving': [round(spend * (1 - OPUS_OVER_FABLE[1]), 2), round(spend * (1 - OPUS_OVER_FABLE[0]), 2)],
-                    'title': f"main sessions on Fable 5.1: ${spend:.0f} in {USAGE_DAYS} days",
-                    'basis': 'on the measured families Opus 5.5 matched Fable (24/24 and 26/26) at 37-40% of the cost (results/cell8); '
-                             'main-session work is not measured, so the saving is what it would be if that held',
-                    'action': 'try `claude --model opus` for routine sessions and compare the next ledger; keep Fable where you see the difference'})
+                    'title': f"main sessions on Fable: ${spend:.0f} in {USAGE_DAYS} days",
+                    'basis': 'on the measured families Opus 5.5 matched Fable 5.1 (24/24 and 26/26) at 37-40% of the cost (results/cell8); '
+                             'main-session work is not measured, so the saving is what it would be if that held'
+                             + (f"; your rows run on {', '.join(other)}, which no family has receipts for" if other else '') + local,
+                    'here': here,
+                    'action': 'try `claude --model opus` for routine sessions, `/router mark model opus` to start the before/after count, and compare the next ledger; '
+                              'keep Fable where you see the difference'})
+    # 6. the largest subagent bucket is work no family covers: the router says nothing about it, and it should at least be named
+    oth = bc.get('other')
+    if oth and oth['n'] and oth['cost'] >= SUGGESTION_FLOOR and oth['cost'] >= max((b['cost'] for k, b in bc.items() if k != 'other'), default=0.0):
+        descs = collections.Counter(c['description'] for c in usage['subagents'].get('calls', [])
+                                    if c.get('window') == 'cur' and c.get('class') == 'other' and c.get('description'))
+        top = '; '.join(f'"{d}"' for d, _ in descs.most_common(3))
+        types = ', '.join(f'{t} x{n}' for t, n in sorted(oth['types'].items(), key=lambda kv: -kv[1])[:3])
+        out.append({'id': 'other', 'kind': 'unmeasured', 'stake': oth['cost'], 'saving': None,
+                    'title': f"{oth['n']} Agent calls of no measured kind ({types}): ${oth['cost']:.2f}, the largest subagent bucket",
+                    'basis': 'no family covers them, so they run as asked and the router says nothing' + (f"; what they were: {top}" if top else ''),
+                    'action': 'the kind that recurs here is the family to measure next (a bench/<family> with a checker, then decide.py); until then no blind downgrade'})
     return [g for g in out if g['saving'] is None or g['saving'][1] >= SUGGESTION_FLOOR]
 
 
@@ -511,17 +581,25 @@ def verdicts(suggestions, latest, days):
 
 def slots(usage, routed, days):
     """The window in weekly slots, oldest first: spend, Agent calls, struggled calls, routed calls."""
-    now = datetime.datetime.now(datetime.timezone.utc).date()
-    starts = [now - datetime.timedelta(days=d) for d in range(days - 1, -1, -7)]
+    # Seven local days each, the newest ending today, the oldest clipped to the window's start: every call of the window is
+    # in one slot (the old slots began a day after the window and left its first day in the total but in no slot).
+    today = datetime.date.today()
+    try:
+        since = datetime.date.fromisoformat(usage['since'])
+    except (KeyError, TypeError, ValueError):
+        since = today - datetime.timedelta(days=days)
+    bounds, end = [], today + datetime.timedelta(days=1)
+    while end > since:
+        start = max(since, end - datetime.timedelta(days=7))
+        bounds.append((start, end)); end = start
     out = []
-    for i, start in enumerate(starts):
-        end = starts[i + 1] if i + 1 < len(starts) else now + datetime.timedelta(days=1)
+    for start, end in reversed(bounds):
         a, b = start.isoformat(), end.isoformat()
-        calls = [c for c in usage['subagents']['calls'] if a <= c['ts'][:10] < b]
+        calls = [c for c in usage['subagents']['calls'] if a <= consumption.local_day(c['ts']) < b]
         out.append({'since': a, 'until': (end - datetime.timedelta(days=1)).isoformat(),
                     'spend': round(sum(d['cost'] for d in usage.get('daily', []) if a <= d['date'] < b), 2),
                     'calls': len(calls), 'struggled': sum(1 for c in calls if c.get('retry_of') or c.get('errors', 0) >= consumption.ERROR_HEAVY or c.get('failed')),
-                    'routed': sum(1 for r in routed if a <= r['at'][:10] < b)})
+                    'routed': sum(1 for r in routed if a <= consumption.local_day(r['at']) < b)})
     return out
 
 
@@ -753,7 +831,10 @@ def collect(fetch=False):
         bench = (decide.FAMILIES.get(fam) or {}).get('benches', [fam])[0]
         ok, why = can_run(bench)
         variant, ev = evidence_of(rf)
-        families.append({'name': fam, 'bench': bench, 'status': rf.get('status'), 'model': d.get('model'), 'effort': d.get('effort'),
+        su = rf.get('step_up') or {}
+        step_up = ({'model': su['model'], 'effort': su['effort'], 'rate': (rf.get('evidence') or {}).get(f"{su['model']} {su['effort']}"), 'cost_per_success': su.get('cost_per_success')}
+                   if su.get('model') and su.get('effort') else None)
+        families.append({'name': fam, 'bench': bench, 'status': rf.get('status'), 'model': d.get('model'), 'effort': d.get('effort'), 'step_up': step_up,
                          'requires': rf.get('requires') or [], 'variant': variant, 'rate': f"{ev['success']}/{ev['n'] - ev.get('not_model', 0)}" if ev else None,
                          'ci': ev.get('ci'), 'cost_per_success': ev.get('cost_per_success'), 'can_run': ok, 'why': why})
     models = [{'id': mid, 'verified': m.get('verified_date'), 'input': m.get('input_per_mtok'), 'output': m.get('output_per_mtok')}
@@ -765,6 +846,10 @@ def collect(fetch=False):
     timer = timer_state()
     for f in families:
         f['last_check'] = (reg or {}).get('rows', {}).get(f['name'])
+        lc = f['last_check']
+        if lc and str(lc.get('sample', '')).isdigit() and f.get('ci'):
+            # what the sample could have caught: 'ok 6/6' with a floor of 4 means 4/6 would have failed and 5/6 passed
+            lc['fails_at'] = check_floor(int(lc['sample']), f['ci'][0])
     cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=USAGE_DAYS)).strftime('%Y-%m-%dT%H:%M')
     events = [e for e in changes.read() if e.get('at', '') >= cutoff]   # a change older than the window has no before side here
     usage = consumption.collect(USAGE_DAYS, splits=[e['at'] for e in events] or None)
@@ -796,6 +881,22 @@ def collect(fetch=False):
         lc = f.get('last_check')
         if lc and lc['verdict'] not in ('ok',) and not lc['verdict'].startswith('skipped'):
             advice.append(f"{f['name']}: last check said '{lc['verdict']}' ({lc['successes']}/{lc['sample']}): read ledger/{reg['file']}")
+    if reg:
+        unchecked = [f['name'] for f in families if f.get('status') == 'decided' and f['can_run'] and not f.get('last_check')]
+        if unchecked:
+            advice.append(f"{len(unchecked)} decided famil{'y' if len(unchecked) == 1 else 'ies'} can run here and {'has' if len(unchecked) == 1 else 'have'} no regression check "
+                          f"on this Claude Code version ({', '.join(unchecked)}): /router update")
+    stale = [m for m in unmeasured_models(usage, routing) if m['cost'] >= UNMEASURED_MODEL_FLOOR]
+    if stale:
+        plans = routing.get('plan_for_unmeasured_models') or []
+        runs = []
+        for m in stale:
+            for p in plans:
+                if m['model'] == p['model'] or m['model'].startswith(p['model'] + '-'):
+                    runs += [f"{f['family']} on {m['model']} (~${f['expected_cost_usd']})" for f in p.get('families', []) if f.get('run')][:2]
+        names = ', '.join(f"{m['model']} (${m['cost']:.0f}, {m['msgs']} msgs)" for m in stale[:3])
+        advice.append(f"no family has receipts for {names}: what the pane says about them is a ratio from other models"
+                      + (f"; routing.json plans {', '.join(runs[:4])}" if runs else '') + "; python3 decide.py --dry-run lists what to run")
     age = days_since(oldest, today) if oldest else None
     if age is not None and age > ADVICE_PRICE_DAYS:
         advice.append(f"prices verified {age} days ago ({oldest}): check the sources in catalog/models.json, then decide.py")
@@ -846,6 +947,7 @@ def collect(fetch=False):
                       'previous': {'since': usage['previous']['since'], 'main_total': usage['previous']['main_total'], 'subagents_total': usage['previous']['subagents_total']}},
             'suggestions': suggestions, 'fixed': usage.get('fixed'), 'learned': learned, 'overrides': ovr, 'slots': week_slots,
             'routed_window': {'n': len(routed), 'kept': sum(1 for r in routed if r.get('decision') == 'kept')},
+            'unmeasured_models': stale,
             'changes': {'events': events[-5:], 'realized': realized['latest'] if realized else None, 'history': realized['history'] if realized else []},
             'thresholds': {'price_days': ADVICE_PRICE_DAYS, 'ledger_days': ADVICE_LEDGER_DAYS, 'regress_days': ADVICE_REGRESS_DAYS}}
 
@@ -874,8 +976,13 @@ def text(s):
         d = (f"{f['model']} {f['effort']}" + (' +' + f['variant'] if f['variant'] else '')) if f['model'] else 'none'
         lc = f.get('last_check')
         last = f"{lc['verdict']} {lc['successes']}/{lc['sample']}" if lc and lc['sample'] else (lc['verdict'] if lc else '-')
+        if lc and lc.get('fails_at') is not None:
+            last += f" (fails at <={lc['fails_at']}/{lc['sample']})"
         cost = f"{f['cost_per_success']:.4f}" if f.get('cost_per_success') is not None else '-'
         out.append(f"{f['name']:<14}{d:<22}{f['rate'] or '-':<10}{cost:<11}{'yes' if f['can_run'] else 'no':<6}{last}")
+    away = [f['name'] for f in s['families'] if f.get('model') and f['model'] != 'inherit' and not f['can_run']]
+    if away:
+        out.append(f"not checkable here: {', '.join(away)} (their last check, if any, ran on another machine)")
     a = s['agents']
     applied = sum(1 for r in a['routed'] if r['state'] == 'applied')
     out += ['', f"agents: {a['files']} files in {a['dir']}, {a['unused']} unused; routed {applied}/{len(a['routed'])} applied",

@@ -56,7 +56,11 @@ def call_claude(prompt, model, effort, max_turns, tools, timeout, cwd, chrome=Fa
            '--max-turns', str(max_turns), '--effort', effort, '--allowed-tools', tools]
     if chrome:
         cmd.insert(2, '--chrome')
-    proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, encoding='utf-8', errors='replace', capture_output=True, timeout=timeout)
+    try:
+        proc = subprocess.run(cmd, cwd=str(cwd), input=prompt, text=True, encoding='utf-8', errors='replace', capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired as e:   # an overlong run is a receipt with an operational error, as for codex, not an exception out of the arm
+        return {'harness': 'claude', 'text': (e.stdout or '')[-2000:] if isinstance(e.stdout, str) else '',
+                'usage': None, 'cost_usd': None, 'operational_error': 'timeout'}
     # The JSON starts at the first brace: a tool manager (mise) may print its own notice line before it.
     start = proc.stdout.find('{')
     try:

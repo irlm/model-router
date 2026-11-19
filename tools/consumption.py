@@ -44,6 +44,9 @@ RUNNER = ('failing test', 'test command', 'run the tests', 'run the test', 'npm 
           'make test', 'tests pass', 'test passes', 'the suite')
 # A prompt that delegates (the Agent tool, subagents) is an orchestrator: never a measured family, as in the widget.
 ORCHESTRATE = ('agent tool', 'subagent', 'sub-agent', 'launch, in parallel', 'spawn a')
+# A short question about the code in front of the model (a crash, a trace, a file) is not a fact lookup for the Web Researcher
+CODEREF = ('crash', 'stack trace', 'traceback', 'this repo', 'the repo', 'this code', 'the codebase', 'in the code', 'this function', 'the function', 'this file')
+FILE_RE = re.compile(r'\b[\w-]+\.(?:c|h|cc|cpp|py|ts|tsx|js|jsx|go|rs|java|rb|json|ya?ml|toml)\b')
 BROWSER = ('in the browser', 'chrome', 'web page', 'the page at', 'fill the form', 'fill in the form', 'click', 'sign in', 'log in',
            'navigate to', 'open http', 'checklist', 'pass/fail')   # the same list the widget's router uses
 
@@ -69,7 +72,7 @@ def classify(subagent_type, prompt):
         return 'other'
     if sum(k in p for k in BROWSER) >= 2:
         return 'browser-flow'
-    if len(p) < 900 and any(k in p for k in LOOKUP):
+    if len(p) < 900 and any(k in p for k in LOOKUP) and not any(k in p for k in CODEREF) and not FILE_RE.search(p):
         return 'fact-lookup'
     if any(k in p for k in SYNTHESIS) and not any(k in p for k in RUNNER) and not any(k in p for k in CODE):
         return 'research-synthesis'   # a test run or a code change is not a research note, as in the widget's matchFamily
@@ -135,6 +138,15 @@ def struggle_of(calls, sessions):
             p[k] = round(p[k], 2)
         p['ctx_per_msg'] = round(p['ctx_tokens'] / p['msgs']) if p['msgs'] else 0
     return {'cells': {p: dict(v) for p, v in cells.items()}, 'sessions': dict(by_proj)}
+
+
+def local_day(ts):
+    """The local calendar day of a transcript or log timestamp (UTC): the day the person worked, as the pane's bars and
+    its 'days ago' count it; the UTC day put evening work on the next bar west of Greenwich."""
+    try:
+        return datetime.datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone().date().isoformat()
+    except (AttributeError, ValueError):
+        return (ts or '')[:10]
 
 
 def collect(days=30, now=None, splits=None):
@@ -247,7 +259,7 @@ def collect(days=30, now=None, splits=None):
                                 tok[key][k] += u.get(k, 0) or 0
                             msgs[key] += 1; cost[key] += c; out_cost[key] += oc
                             if window == 'cur':
-                                daily[ts[:10]] += c
+                                daily[local_day(ts)] += c
                                 if splits:
                                     pk = (sum(1 for sp in splits if ts >= sp), 'sub' if is_sub else 'main', model, effort or '?')
                                     pmsgs[pk] += 1; pcost[pk] += c
@@ -311,7 +323,8 @@ def collect(days=30, now=None, splits=None):
     for b in by_class.values():
         b['cost'] = round(b['cost'], 2); b['types'] = dict(b['types'])
         b['models'] = {m: {'n': v['n'], 'cost': round(v['cost'], 4)} for m, v in b['models'].items()}
-    day_list = [(now - datetime.timedelta(days=i)).date().isoformat() for i in range(days - 1, -1, -1)]
+    today = datetime.datetime.now().date() if now is None or now.tzinfo is None else now.astimezone().date()
+    day_list = [(today - datetime.timedelta(days=i)).isoformat() for i in range(days - 1, -1, -1)]
     def segment(i):
         prow = [{'model': m, 'effort': e, 'msgs': n, 'cost': round(pcost[(p, w, m, e)], 2), 'tok': dict(ptok[(p, w, m, e)])}
                 for (p, w, m, e), n in sorted(pmsgs.items(), key=lambda kv: -pcost[kv[0]]) if p == i and w == 'main']

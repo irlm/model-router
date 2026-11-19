@@ -104,7 +104,8 @@ routed this session 2
   model and effort, the measured family the prompt read as, the task, requests so far, elapsed; a child
   under the agent that spawned it; a row a minute without a request turns yellow; a finished agent shows
   its cost and folds into the `done` count, failed and stopped counted apart.
-- *Limits* are the rate-limit windows as bars. *To check* are things to do, not failures. What the widget
+- *Limits* are the rate-limit windows as bars, each with the pace at which it would run out before its
+  reset, and the pressure line from which routing and effort go auto. *To check* are things to do, not failures. What the widget
   could not read (the limits, the context size, the marketplace file, the saved runs) is listed under Details
   as `not read: … (reason)` rather than left blank. *Suggestions*
   say where the same work could consume less, each with its estimate and its kind of evidence:
@@ -178,8 +179,13 @@ Nothing unmeasured is touched: a research report, a design, a review, a plan kee
 that names a test runner or asks for a code change is never read as a research note, however it is worded.
 The same keyword rule classifies the ledger, and a test keeps the two copies identical. A routed
 call that fails, or that the main model re-issues within ten minutes, escalates its family for half an
-hour: its calls run as asked, then the routing resumes. Only a call that asks for something dearer is
-routed: a call already on the decided model, or on a cheaper one, is left alone and not counted.
+hour: its calls go to the family's measured step up (find_feature: sonnet low, 144/144), then as asked
+when that fails too, then the routing resumes. Only a call that asks for something dearer is routed: a
+call already on the decided model, or on a cheaper one, is left alone and not counted. Up as well as
+down: a family whose regression check failed on this Claude Code version is not routed; a fix or a browser
+flow that names auth, payments, a migration, production or a destructive command is held by the risk
+floor; a routed fix that ends without running the tests is marked and escalates its family; from 80% of a
+rate-limit window routing and effort go auto for the rest of it.
 `/router effort advise|auto|off` extends the same rule to the main session's own
 requests: a prompt that reads as a measured family runs at that family's measured effort, back up after
 3 tool errors; advise (the default) only says what auto would have done and the estimate.

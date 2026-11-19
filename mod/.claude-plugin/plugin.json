@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.30.1",
+  "version": "0.31.0",
   "description": "Model router widget: routes each Agent call to the model and effort the benchmark measured for that kind of task (auto, ask or off), rate-limit headroom, what the last 30 days consumed, and one key to re-check the routing.",
   "author": {
     "name": "irlm"
@@ -51,6 +51,12 @@
       "title": "Context warning (tokens)",
       "description": "From this many tokens re-read per turn, a prompt that reads as a different task gets a word: what the session costs per turn against a new window, and an offer to compact down to the new task. The status line shows the context size from here too.",
       "default": 100000
+    },
+    "pressure": {
+      "type": "number",
+      "title": "Window pressure (%)",
+      "description": "From this share of the 5-hour or 7-day window, routing goes auto (no question) and main-session effort goes auto for the rest of the window; back to your modes when it comes under. 0 turns it off. The pane shows the pace at which a window would run out.",
+      "default": 80
     },
     "repo": {
       "type": "string",

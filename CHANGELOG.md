@@ -3,6 +3,47 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.31.0 — 2026-11-18
+
+The gaps the 2026-11-18 review pass left open, implemented where they pay: the router moves calls up as well as down,
+and the pane notices what it used to miss.
+
+- **Up as well as down.** An escalated family goes to its measured step up first (`step_up` in routing.json; find_feature:
+  sonnet low, 144/144, a tenth of the session model), to "as asked" when the step up fails or is re-issued too; the
+  escalation jumped straight to the session model at 30x. A family whose last regression check said REGRESSED on this
+  Claude Code version is not routed until a check passes. A fix or a browser flow whose ask names auth, passwords,
+  credentials, payments, billing, a migration, production, a deploy or a destructive command is held by the risk floor:
+  as asked, no question, `floor` in the log. Main-session effort goes back up when the turn makes an Agent call (it
+  orchestrates), not only after three tool errors.
+- **What a routed agent must have done.** A routed fix (measured with the runner in the loop, 72/72) that ends without a
+  test command of its own is marked `!` "finished without running the tests" and its family escalates as after a failure;
+  a routed code search that answers "not found" is marked, not escalated. The subagent's own Bash calls are watched for
+  a runner command.
+- **Window pressure and the burn rate.** The Limits frame and the status line say when a window would run out at this pace
+  (`5h 62% (out ~15:40)`), from the readings the session took (each refresh, each turn's end). From the pressure line
+  (`pressure` in /config, 80%, 0 off) routing goes auto without asking and main-session effort goes auto for the rest of
+  the window, back to your modes when it comes under; escalations still win. `/router check` carries the Limits lines.
+- **A model with no receipts has an alarm.** The transcripts have run on claude-fable-5-2 and claude-opus-5; the ratios
+  were keyed on 5-1 and 5-5 ids, so the 5.2 spend dropped out of the tier suggestion and nothing said the ratios were
+  another model's. Ratios are keyed by tier now; To check names each model in the window that no family's evidence
+  covers, with what routing.json plans to run for it.
+- **Your own Opus against your own Fable.** The tier suggestion shows the two tiers' rows side by side (cost per message,
+  output apart) once the window has fifty messages on each: the A/B that already ran here, a hint beside the benchmark's
+  ratio. The `other` bucket, when it is the largest subagent spend, gets its own unmeasured line with what the calls were.
+- **The check's floor and the unchecked families.** Each last regression verdict carries what the sample could have caught
+  (`ok 6/6 (fails at <=3/6)`); a decided family that can run here and has no check on this version is advice; `/router
+  check` lists the families not checkable on this machine.
+- **The ledger writes itself on any OS.** A checkout of your own whose last ledger is a month old gets one at the next
+  refresh, once a day (what the Linux systemd timer did); GAPS item 6 closed.
+- A short question about the code in front of the model ("what is the cause of this crash in parser.c?") is no longer a
+  fact lookup for the Web Researcher, in the router and the ledger alike.
+- Day buckets and weekly slots are local days ending today, the oldest clipped to the window (the first day of the window
+  was in the total and in no slot; evening work west of Greenwich landed on the next bar). `decide.py`: a task every run
+  lost to the harness no longer records `pass_k 0.0`, a family whose default is missing from the catalog no longer
+  crashes the dry run, and a candidate without wall time no longer sorts as the fastest. `tools/runs.py import` compares
+  calls by identity, not by dict equality over 2000-character prompts. The bench refuses to `git reset --hard` anything
+  that is not a linked worktree, and an overlong `claude` run is a timeout receipt, as for codex.
+
 ## 0.30.1 — 2026-11-18
 
 A review pass with three readers (the code, the features, the field: twenty-odd Claude Code routers and monitors of

@@ -6,7 +6,7 @@ const STATUS = {
   routing: { version: 1.1, decided: '2026-11-01' },
   families: [
     { name: 'find_feature', model: 'haiku', effort: 'low', variant: '', rate: '214/216', cost_per_success: 0.0046, can_run: true, why: '',
-      last_check: { sample: '6', successes: '6', verdict: 'ok' } },
+      last_check: { sample: '6', successes: '6', verdict: 'ok' }, step_up: { model: 'sonnet', effort: 'low', rate: '144/144 over 2 cold trials', cost_per_success: 0.1173 } },
     { name: 'fix_bug', model: 'haiku', effort: 'low', variant: 'kunit', rate: '16/21', cost_per_success: 0.0158, can_run: false,
       why: 'needs a kernel worktree', last_check: null },
   ],
@@ -577,11 +577,11 @@ test('a routed Agent call that fails escalates its family: the next call runs as
   const again = { ...EXPLORE, tool_use_id: 'tu-explore-2', description: 'find the schema loader' }
   await $.tool.call(again)
   await $.agent.spawn(spawnOf(again))
-  expect(spawnSeen(seen)?.model).toBeUndefined()   // as asked: the family is escalated this session
+  expect(spawnSeen(seen)?.model).toBe('sonnet')    // escalated to the measured step up (sonnet low, 144/144), not straight to the session model
   await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer', usage: USAGE })
   const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
-  expect(text).toContain('agents   2 calls · 1 routed · escalated: find_feature (a call routed to haiku low failed)')
-  expect(text).toContain('[find_feature] escalated')
+  expect(text).toContain('agents   2 calls · 1 routed · escalated: find_feature (the step up (sonnet low) failed too)')   // every Agent call fails in this test: the default, then the step up
+  expect(text).toContain('inherit -> sonnet low (step up)  [find_feature] escalated')
   await settled()   // the detached work (log writes, the change record) ends inside the test
 })
 
@@ -632,9 +632,10 @@ test('an Agent call re-issued within minutes of a routed one, with the same word
   const again = { ...EXPLORE, tool_use_id: 'tu-explore-2', description: EXPLORE.description + ' again' }
   await $.tool.call(again)
   await $.agent.spawn(spawnOf(again))
-  expect(spawnSeen(seen)?.model).toBeUndefined()
+  expect(spawnSeen(seen)?.model).toBe('sonnet')    // the re-issue goes to the step up first
   let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
   expect(text).toContain('escalated: find_feature (re-issued within 10 min of a routed call)')
+  expect(text).toContain('inherit -> sonnet low (step up)  [find_feature] escalated')
   // setting the mode clears the escalations: the same call is routed again
   ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'routing auto' }))
   expect(text).toContain('escalated families cleared')
@@ -1159,24 +1160,26 @@ test('the timeline: the day as one bar per run with the lens on the run shown, t
 })
 
 /** Mocks for a routing test with a status of one's own, a clock that can move and a status line that is kept. */
-const CUSTOM_MOCKS = (on: On, seen: Record<string, unknown>[], statusJson: unknown, clock: { now: number }, pinned: (string | undefined)[] = [], failing: string | null = null) => {
+const CUSTOM_MOCKS = (on: On, seen: Record<string, unknown>[], statusJson: unknown, clock: { now: number }, pinned: (string | undefined)[] = [], failing: string | null | ((e: { tool: string }) => boolean | Promise<boolean>) = null, argvs: string[] = []) => {
   on('command.register', () => ({ value: { command: 'router' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('clock.now', () => ({ value: clock.now }))
   on('clock.every', () => ({ value: undefined }))
   mock.env(on, { HOME: '/home/me' })
   on('fs.exists', () => ({ value: true }))
-  on('process.run', (_, e) => ({ value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(statusJson) } }))
+  on('process.run', (_, e) => { argvs.push(e.argv.join(' ')); return { value: e.argv[1] === '--version' ? { ...ok, stdout: 'Python 3.13.0' } : { ...ok, stdout: JSON.stringify(statusJson) } } })
   on('ui.status', (_, e) => { pinned.push(e.text); return { value: undefined } })
   on('ui.toast', () => ({ value: undefined }))
   on('session.model', () => ({ value: 'claude-fable-5-1' }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
-  on('tool.call', (_, e) => {
+  on('tool.call', async (_, e) => {
     seen.push(e as unknown as Record<string, unknown>)
     if (e.tool === 'AskUserQuestion') return { deny: 'no one to ask' }
-    return failing && e.tool === failing ? { result: {}, isError: true } : { result: {} }
+    const fail = typeof failing === 'function' ? await failing(e as { tool: string }) : failing !== null && e.tool === failing
+    return fail ? { result: {}, isError: true } : { result: {} }
   })
+  on('process.spawn', async function* (_, e) { argvs.push(e.argv.join(' ')); yield { stream: 'stdout', text: 'ok\n' }; return { value: { code: 0 } } })
   SPAWN_MOCKS(on, seen)
 }
 
@@ -1225,30 +1228,31 @@ test("the status line's routed count is what the router moved: a kept answer is 
   await settled()
 })
 
-test('an escalation is stamped when the routed call failed and is over half an hour later: the pane drops it and the family is routed again', { options: { routing: 'auto' } }, async ($, on) => {
+test('escalation by rungs: a failed routed call sends the family to its measured step up, a failed step up to as asked, each stamped when it failed; half an hour later the pane drops it and the family is routed again', { options: { routing: 'auto' } }, async ($, on) => {
   const seen: Record<string, unknown>[] = []
   const clock = { now: 1_762_000_000_000 }
-  CUSTOM_MOCKS(on, seen, STATUS, clock, [], 'Agent')
-  on('tool.call', { tool: 'Agent' }, async (_, e) => { clock.now += 20 * 60_000; seen.push(e as unknown as Record<string, unknown>); return { result: {}, isError: true } })   // the call runs 20 minutes, then fails
+  let fails = 2
+  // The engine spawns the agent inside the Agent call and returns when it ends: the mock does the same, and the first two calls run 20 minutes, then fail
+  CUSTOM_MOCKS(on, seen, STATUS, clock, [], async e => { if (e.tool !== 'Agent') return false; await $.agent.spawn(spawnOf(e as unknown as typeof EXPLORE)); if (fails-- > 0) { clock.now += 20 * 60_000; return true } return false })
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   await $.turn.start({ text: 'find where the config loader is', turnId: 't1' })
   await $.tool.call(EXPLORE)
-  await $.agent.spawn(spawnOf(EXPLORE))
   expect(spawnSeen(seen)?.model).toBe('haiku')
-  clock.now += 25 * 60_000                                     // 25 minutes after the failure (45 after the call began): still escalated
+  clock.now += 25 * 60_000                                     // 25 minutes after the failure (45 after the call began): still escalated, rung 1
   const again = { ...EXPLORE, tool_use_id: 'tu-explore-2', description: 'find the schema loader' } as const
-  await $.tool.call(again)
-  await $.agent.spawn(spawnOf(again))
-  expect(spawnSeen(seen)?.model).toBeUndefined()
+  await $.tool.call(again)                                     // the step up, and it fails too (20 more minutes)
+  expect(spawnSeen(seen)?.model).toBe('sonnet')
   let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
-  expect(text).toContain('escalated: find_feature (a call routed to haiku low failed)')
-  clock.now += 10 * 60_000                                     // past the half hour: over
+  expect(text).toContain('escalated: find_feature (the step up (sonnet low) failed too)')
+  const third = { ...EXPLORE, tool_use_id: 'tu-explore-3', description: 'find the route table' } as const
+  await $.tool.call(third)                                     // rung 2: as asked
+  expect(spawnSeen(seen)?.model).toBeUndefined()
+  clock.now += 31 * 60_000                                     // past the half hour since the step up failed: over
   ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
   expect(text).not.toContain('escalated: find_feature')
-  const later = { ...EXPLORE, tool_use_id: 'tu-explore-3', description: 'find the route table' } as const
+  const later = { ...EXPLORE, tool_use_id: 'tu-explore-4', description: 'find the cache' } as const
   await $.tool.call(later)
-  await $.agent.spawn(spawnOf(later))
   expect(spawnSeen(seen)?.model).toBe('haiku')
   await settled()
 })
@@ -1268,6 +1272,7 @@ test('the ledger and the router classify alike: the type first (a reviewer is ne
     ['general-purpose', 'in the browser, click through the checkout; use the Agent tool for the rest', undefined],
     ['general-purpose', 'open the web page and click sign in', 'haiku'],
     ['general-purpose', 'what is the default value of X?', 'haiku'],
+    ['general-purpose', 'what is the cause of this crash in parser.c?', undefined],   // a question about the code in front of the model, not a lookup
   ]
   for (const [i, [type, prompt, model]] of cases.entries()) {
     const call = { tool: 'Agent', tool_use_id: `tu-c${i}`, description: `case ${i}`, prompt, subagent_type: type } as const
@@ -1307,4 +1312,144 @@ test("a secret in a subagent's Bash line or answer is redacted before the monito
   expect(saved![1]).toContain('23k tokens: fine')
   expect(saved![1]).not.toContain('hunter2')
   expect(saved![1]).not.toContain('ghp_ZZZZ')
+})
+
+const FIXES = { name: 'repo_fix', model: 'haiku', effort: 'low', variant: 'vitest', rate: '72/72', cost_per_success: 0.0071, can_run: true, why: '', last_check: null }
+
+test('a family that failed its last regression check is not routed until a check passes', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const regressed = { ...STATUS, families: STATUS.families.map(f => (f.name === 'find_feature' ? { ...f, last_check: { sample: '6', successes: '3', verdict: 'REGRESSED' } } : f)) }
+  CUSTOM_MOCKS(on, seen, regressed, { now: 1_762_000_000_000 })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).not.toContain('routed this session')
+  expect(text).toContain('last check not ok: find_feature')
+  await settled()
+})
+
+test('the risk floor: a fix that touches payments, auth or a migration runs as asked and the log says so; a plain fix is routed with the runner note', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  CUSTOM_MOCKS(on, seen, { ...STATUS, families: [...STATUS.families, FIXES] }, { now: 1_762_000_000_000 })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  const risky = { tool: 'Agent', tool_use_id: 'tu-r', description: 'fix the payments test', prompt: 'Fix the failing test in the payments module; run npm test until it passes.', subagent_type: 'general-purpose' } as const
+  await $.tool.call(risky)
+  await $.agent.spawn(spawnOf(risky))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
+  const plain = { tool: 'Agent', tool_use_id: 'tu-p', description: 'fix the parser test', prompt: 'Fix the failing test in the parser; run npm test until it passes.', subagent_type: 'general-purpose' } as const
+  await $.tool.call(plain)
+  await $.agent.spawn(spawnOf(plain))
+  const sp = spawnSeen(seen) as { model?: string; prompt?: string } | undefined
+  expect(sp?.model).toBe('haiku')
+  expect(sp?.prompt).toContain('Run the test command before you finish')
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('routed this session: 1 routed, 0 kept, 1 held by the risk floor')
+  expect(text).toContain('[repo_fix] floor  fix the payments test')
+  await settled()
+})
+
+test('a routed fix that ends without running the tests is marked and escalates its family; a routed search that answers "not found" is marked', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  CUSTOM_MOCKS(on, seen, { ...STATUS, families: [...STATUS.families, FIXES] }, { now: 1_762_000_000_000 })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'fix the parser', turnId: 't1' })
+  const fix = { tool: 'Agent', tool_use_id: 'tu-f1', description: 'fix the parser test', prompt: 'Fix the failing test in the parser; run npm test until it passes.', subagent_type: 'general-purpose' } as const
+  await $.tool.call(fix)
+  const v1 = await $.agent.spawn(spawnOf(fix))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  await $.tool.call({ tool: 'Edit', file_path: 'parser.ts', agentId: v1.agentId })    // edits, no test command
+  await $.turn.complete({ answer: 'fixed the off-by-one', durationMs: 1000, isAborted: false, turnId: 'tv1', reason: 'answer', agentId: v1.agentId, usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toMatch(/! general-purpose .* finished without running the tests/)
+  expect(text).toContain('escalated: repo_fix (a routed fix finished without running the tests)')
+  const fix2 = { ...fix, tool_use_id: 'tu-f2', description: 'fix the lexer test' }
+  await $.tool.call(fix2)
+  await $.agent.spawn(spawnOf(fix2))
+  expect(spawnSeen(seen)?.model).toBeUndefined()                                       // repo_fix has no step up: as asked
+  // a fix that runs its tests is a plain success
+  await $.command.run({ ...RUN, command: 'router', args: 'routing auto' })             // clears the escalation
+  const fix3 = { ...fix, tool_use_id: 'tu-f3', description: 'fix the printer test' }
+  await $.tool.call(fix3)
+  const v3 = await $.agent.spawn(spawnOf(fix3))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  await $.tool.call({ tool: 'Bash', command: 'npm test -- printer', agentId: v3.agentId })
+  await $.turn.complete({ answer: 'green', durationMs: 1000, isAborted: false, turnId: 'tv3', reason: 'answer', agentId: v3.agentId, usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } })
+  // a routed search that found nothing
+  await $.tool.call(EXPLORE)
+  const v4 = await $.agent.spawn(spawnOf(EXPLORE))
+  await $.turn.complete({ answer: 'The config parser could not be found anywhere in the tree.', durationMs: 1000, isAborted: false, turnId: 'tv4', reason: 'answer', agentId: v4.agentId, usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } })
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).toMatch(/! Explore .* answered "not found"/)
+  expect(text).not.toContain('escalated: find_feature')
+  expect(text).toMatch(/✓ general-purpose .* fix the printer test/)
+  await settled()
+})
+
+test('window pressure: above the line, ask mode routes without asking and the pane says so; the burn rate names when the window runs out at this pace', { options: { routing: 'ask', mainEffort: 'advise' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const clock = { now: 1_762_000_000_000 }
+  let pct = 40
+  const resetsAt = new Date(clock.now + 4 * 3600_000).toISOString()
+  CUSTOM_MOCKS(on, seen, { ...STATUS, families: [...STATUS.families, { name: 'web_research', model: 'haiku', effort: 'low', variant: '', rate: '76/78', cost_per_success: 0.0197, can_run: true, why: '', last_check: null }] }, clock)
+  const lastStep = () => (seen.filter(x => x.tool === '$step').at(-1) as { effort?: string } | undefined)?.effort
+  on('session.usage', () => ({ value: { startedAt: 0, context: { tokens: 50000, window: 1000000 }, rateLimits: [{ kind: 'five_hour', percentUsed: pct, resetsAt }] } }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('5h  ████████░░░░░░░░░░░░  40% used')
+  expect(text).not.toContain('at this pace')
+  clock.now += 30 * 60_000; pct = 55                                                  // 15 points in 30 minutes: 45 more points is 90 minutes
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).toMatch(/55% used, resets \d\d:\d\d · at this pace out ~\d\d:\d\d/)
+  expect(text).toContain('from 80% of a window, routing and effort go auto')
+  await $.tool.call(EXPLORE)                                                           // under the line: ask mode, no one to answer, kept
+  expect(seen.some(x => x.tool === 'AskUserQuestion')).toBe(true)
+  pct = 85
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).toContain('above 80%: routing auto and effort auto')
+  const again = { ...EXPLORE, tool_use_id: 'tu-explore-2', description: 'find the schema loader' } as const
+  await $.tool.call(again)                                                            // no question: the measured route
+  await $.agent.spawn(spawnOf(again))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  await $.turn.start({ text: 'What is the default value of shared_buffers in PostgreSQL 17?', turnId: 'tp' })
+  await drain($.turn.step({ turnId: 'tp', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1 }))
+  expect(lastStep()).toBe('low')                                                      // advise acts under pressure
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'check' }))
+  expect(text).toContain('(mode ask, auto under window pressure;')
+  await settled()
+})
+
+test('main-session effort auto: a turn that delegates goes back to the session effort', { options: { mainEffort: 'auto', routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const steps: unknown[] = []
+  LIVE_MOCKS(on, seen, steps, null)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.turn.start({ text: 'What is the default value of shared_buffers in PostgreSQL 17?', turnId: 't1' })
+  await drain($.turn.step({ turnId: 't1', index: 0, model: 'claude-fable-5-1', effort: 'high', messageCount: 1 }))
+  expect(steps.at(-1)).toBe('low')
+  await $.tool.call(EXPLORE)                                                           // the turn orchestrates: not the measured work
+  await drain($.turn.step({ turnId: 't1', index: 1, model: 'claude-fable-5-1', effort: 'high', messageCount: 3 }))
+  expect(steps.at(-1)).toBe('high')
+  await settled()
+})
+
+test('the ledger writes itself when the last one is a month old on a checkout of your own, once a day', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const argvs: string[] = []
+  const stale = { ...STATUS, ledger: { ...STATUS.ledger, usage_last: '2025-09-20' }, thresholds: { price_days: 30, ledger_days: 35, regress_days: 60 } }   // the clock reads 2025-11-01
+  CUSTOM_MOCKS(on, seen, stale, { now: 1_762_000_000_000 }, [], null, argvs)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await settled()
+  expect(argvs.filter(a => a.includes('tools/ledger.py --commit')).length).toBe(1)
+  await settled()
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await settled()
+  expect(argvs.filter(a => a.includes('tools/ledger.py')).length).toBe(1)             // once a day
+  await settled()
 })

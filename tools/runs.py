@@ -158,9 +158,10 @@ def group(calls, gap_min=GAP_MIN):
     the way the live graph hangs a child under its spawner; one whose spawner is not in the window stands alone."""
     by_agent = {c['agent']: c for c in calls if c.get('agent')}
     nested = [c for c in calls if parent_agent(c) in by_agent]
+    nested_ids = {id(c) for c in nested}   # by identity: `c not in nested` compared dicts holding 2000-character prompts, quadratic over a month
     runs = []
     by_session = {}
-    for c in sorted((c for c in calls if c not in nested), key=lambda c: (c.get('session', ''), c.get('ts', ''))):
+    for c in sorted((c for c in calls if id(c) not in nested_ids), key=lambda c: (c.get('session', ''), c.get('ts', ''))):
         s = c.get('session', '')
         try:
             t = datetime.datetime.strptime(c['ts'][:16], '%Y-%m-%dT%H:%M').replace(tzinfo=datetime.timezone.utc)
@@ -179,11 +180,12 @@ def group(calls, gap_min=GAP_MIN):
         sess = Path(r['session']).stem[:8]
         # the calls a run's agents made themselves, under the agent that made them, after the top-level ones
         top = [c for _, c in r['calls']]
-        kids = []
+        kids, kid_ids = [], set()
         frontier = list(top)
         while frontier:
-            found = [c for c in nested if parent_agent(c) in {x.get('agent') for x in frontier} and c not in kids]
-            kids.extend(found)
+            parents = {x.get('agent') for x in frontier}
+            found = [c for c in nested if parent_agent(c) in parents and id(c) not in kid_ids]
+            kids.extend(found); kid_ids.update(id(c) for c in found)
             frontier = found
         agents = []
         for i, c in enumerate(top + sorted(kids, key=lambda c: c.get('ts', '')), 1):

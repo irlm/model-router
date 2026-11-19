@@ -7,7 +7,10 @@ export type Family = {
   cost_per_success: number | null
   can_run: boolean
   why: string
-  last_check: { sample: string; successes: string; verdict: string } | null
+  /** fails_at: the most successes out of `sample` the check would still have called REGRESSED (what a small sample could catch) */
+  last_check: { sample: string; successes: string; verdict: string; fails_at?: number | null } | null
+  /** the measured step up (routing.json): where an escalated family goes first, before "as asked" */
+  step_up?: { model: string; effort: string; rate: string | null; cost_per_success: number | null } | null
 }
 
 export type RoutedAgent = { file: string; name?: string; want: string; have: string | null; state: 'applied' | 'drifted' | 'missing' | 'absent' }
@@ -35,6 +38,9 @@ export type StatusJson = {
   /** what the router rewrote in the window, from its own log */
   routed_window?: { n: number; kept: number }
   overrides?: Record<string, Record<string, Override>>
+  thresholds?: { price_days: number; ledger_days: number; regress_days: number }
+  /** models in the window's rows that no family has receipts for */
+  unmeasured_models?: { model: string; msgs: number; cost: number }[]
 }
 
 /** The last 30 days of interactive work, catalog-priced: headroom on a subscription. */
@@ -124,8 +130,11 @@ export type Routed = {
   family: string
   from: string
   to: string
-  /** auto: rewritten without asking; routed: the person chose it; kept: the person kept what was asked, or no one could be asked */
-  decision: 'auto' | 'routed' | 'kept' | 'escalated'
+  /** auto: rewritten without asking; routed: the person chose it; kept: the person kept what was asked, or no one could be asked;
+   * escalated: the family was struggling, so the call ran on its step up or as asked; floor: the risk floor kept it as asked */
+  decision: 'auto' | 'routed' | 'kept' | 'escalated' | 'floor'
+  /** an escalated call sent to the family's measured step up (not as asked) */
+  step?: boolean
   description: string
   /** the Agent call's tool_use_id, so the spawn finds its own decision and not an earlier call's with the same words */
   callId?: string
@@ -198,8 +207,12 @@ export type RunningAgent = {
   asked: string
   askedModel: string
   askedEffort: string
-  /** the router's decision on the call; null when nothing measured covered it */
-  decision: 'auto' | 'routed' | 'kept' | 'escalated' | null
+  /** the router's decision on the call; floor: the risk floor kept it as asked; null when nothing measured covered it */
+  decision: 'auto' | 'routed' | 'kept' | 'escalated' | 'floor' | null
+  /** a Bash call of its own ran a test command (the runner-in-the-loop condition of a routed fix) */
+  ranTests?: boolean
+  /** a routed agent that ended without the condition its family was measured under, or with an empty result */
+  unverified?: string | null
   /** its tokens when the run ended, so the as-asked cost can be estimated at catalog prices */
   usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number } | null
   /** its final answer, the first 2000 characters, kept for the run's report */
@@ -230,7 +243,7 @@ export type RunEvent = { at: number; text: string; color?: string; runId: string
 /** The main session itself, for the monitor's root box and its panel: at work since a turn began, its last tool calls. */
 export type MainLive = { busy: boolean; since: number; lastAt: number; recent: Recent[] }
 /** The session as it runs: the turns so far, the families escalated (the reason), the agents running and the last that finished. */
-export type Live = { turns: Turn[]; escalated: Record<string, string>; /** when each family was escalated; one expires after ESCALATE_MS */ escalatedAt: Record<string, number>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; stoppedN: number; events: RunEvent[]; nextN: number; runs: RunMeta[]; task: string | null; main: MainLive }
+export type Live = { turns: Turn[]; escalated: Record<string, string>; /** when each family was escalated; one expires after ESCALATE_MS */ escalatedAt: Record<string, number>; /** 1: its calls go to the measured step up; 2: as asked */ escalatedRung?: Record<string, number>; agents: Record<string, RunningAgent>; finished: RunningAgent[]; doneN: number; doneCost: number; failedN: number; stoppedN: number; events: RunEvent[]; nextN: number; runs: RunMeta[]; task: string | null; main: MainLive }
 
 /** A prompt that read as a different task in a session already re-reading a lot per turn, and what was done. */
 export type Switch = { at: number; ctx: number; why: string; action: 'compacted' | 'kept' | 'asked' }

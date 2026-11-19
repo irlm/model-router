@@ -23,7 +23,9 @@ What you see:
   change and against the baseline before the first change; the suggestions, numbered, each with
   its estimate and what the transcripts show since the change (not applied, too early, holding,
   below estimate, wrong so far); one line on the families; the things to check. Details adds the
-  families table, the weekly slots (spend, calls, struggled, routed), the consumption, each
+  families table (each last check with its floor, `ok 6/6 (fails at <=3/6)`: the most successes the sample
+  would still have called a regression, so a small sample says what it could catch), the weekly slots
+  (spend, calls, struggled, routed), the consumption, each
   suggestion's basis and action, the earlier changes, what was learned on this machine, and the
   calls routed this session. Lines are cut to the pane's width; `/router check` prints the full text. While a job runs (Re-check, Ledger, Apply, Pull)
   the pane shows only that job's output, and the summary returns when it ends. `Details` (`d`) adds the long sections: the
@@ -42,7 +44,16 @@ carries its evidence and a kind:
   fixes, on tasks every effort solved).
 - `unmeasured`: the stake is known, no cheaper model is (research reports on general-purpose
   agents; Fable in main sessions, where the measured families saw Opus equal at 37 to 40 percent
-  of the cost). These say what to measure next, or what to try and compare in the next ledger.
+  of the cost; the largest subagent bucket when it is work no family covers, with what those calls
+  were). These say what to measure next, or what to try and compare in the next ledger. The Fable
+  line also shows your own Opus and Fable rows side by side (cost per message, output apart) once the
+  window holds fifty messages on each: the A/B that already ran on this machine, a hint beside the
+  benchmark's ratio, not a measurement, since the work was not the same.
+
+The ratios are keyed by tier (Opus, Fable), not by one version's model id, so a session on a newer
+version counts; a model in your transcripts that no family has receipts for is named under To check,
+with what `routing.json` plans to run for it (`python3 decide.py --dry-run` lists the rest), since
+what the pane says about it is a ratio measured on another model.
 
 The numbers come from `tools/consumption.py` (the local transcripts, last 30 days, with the
 effort of each request) and the rules in `tools/status.py`, where every ratio is a named
@@ -243,8 +254,9 @@ stays, since changing the model would re-write the cache. The rule: when the pro
 measured family (the same matcher as for Agent calls: a short fact lookup, a browser flow, a fix with
 the test runner in the loop), the turn's requests run at that family's measured effort, `low` for every
 family measured so far. Up: once the turn has hit 3 tool errors, the requests go back to the session's
-own effort, the signal the transcripts' struggle measure is built on. Anything the matcher does not
-recognise runs as the session has it. Advise mode changes nothing and says, per turn, what auto would
+own effort, the signal the transcripts' struggle measure is built on; also once the turn makes an
+Agent call, since a turn that delegates is orchestrating, and a family's effort was measured on the
+work itself, not on handing it out. Anything the matcher does not recognise runs as the session has it. Advise mode changes nothing and says, per turn, what auto would
 have done and the estimate: the cell8 effort ratios (high 1.06-1.16x of low, xhigh 1.30-1.52x) on the
 turn's output cost, which is the part effort moves. Main sessions were not measured in the benchmark;
 that is why the default is advise and the figure says `est`.
@@ -255,6 +267,34 @@ from the failure: the next calls run as the main model asked, the routed log rec
 reason, the pane shows it on the `agents` line until it is over, then the family is routed again
 (`/router routing ask|auto|off` clears the escalations at once). No call is re-run on its own: a second run doubles the
 cost and may repeat an edit; the main model's own re-issue is the signal, and it is then left alone.
+
+**Up as well as down.** The router moves calls down only on evidence, and four rules move them back up:
+
+- *The step up.* An escalated family does not jump to the session model: its calls go first to the
+  family's measured step up (`step_up` in `routing.json`; find_feature: sonnet low, 144/144, a tenth
+  of the session model), the routed log says `sonnet low (step up)`, and "as asked" comes when the
+  step up fails or is re-issued too, or when the family has none (every tier at the ceiling, as for
+  the fixes with the runner).
+- *A regressed family is not routed.* When the last regression check on this Claude Code version said
+  REGRESSED for a family, its calls run as asked until a check passes (`/router update`).
+- *The risk floor.* A fix or a browser flow whose ask names auth, passwords, credentials, payments,
+  billing, a migration, production, a deploy, or a destructive command (`rm -rf`, `drop table`, a
+  force push) is never moved down, whatever family it reads as: it runs as asked without a question,
+  the routed log records `floor`, the Routing frame says why. A measured 72/72 on a test suite says
+  nothing about a payments migration.
+- *What a routed agent must have done.* A routed fix was measured with the runner in the loop; one
+  that ends without a test command of its own is marked `!` in the agents block with "finished without
+  running the tests" and its family escalates as after a failure. A routed code search whose answer says
+  "not found" is marked "answered not found", not escalated: what it looked for may not exist. A short
+  question about the code in front of the model (a crash, a trace, a file name) is not a fact lookup
+  for the Web Researcher either.
+
+**Window pressure.** The Limits frame shows each window with its pace: from two readings ten minutes
+apart (a refresh, a turn's end), when the window would run out at this pace if before its reset, and
+the status line says `5h 62% (out ~15:40)`. From the pressure line (`pressure` in `/config`, 80% by
+default, 0 turns it off) routing goes `auto` without asking and main-session effort goes `auto` for the
+rest of the window, a toast says so, and your own modes return when the window comes back under. An
+escalation still wins over the pressure: a struggling family is not sent down because the window is full.
 
 ### Requirements and what it reads
 
@@ -575,8 +615,11 @@ What differs on Windows. `python3` and `python` may be the Microsoft Store place
 print "Python was not found" and fail; the mod skips a name that does not answer `Python 3` and
 tries the next, down to `py`, the launcher the python.org installer adds. When none answers, the
 status line says `no Python 3 on PATH`, and the "Python command" option names the one to use.
-The ledger timer is a Linux systemd unit; on Windows the ledger runs when you press `l` in the
-pane (or `/router ledger`), and the pane says so instead of advising the timer. Re-check can run
+The widget writes the monthly ledger itself on any OS: on a checkout of your own whose last ledger is a
+month old, a refresh runs `tools/ledger.py --commit` once that day (what the Linux systemd timer,
+`tools/install_ledger_timer.sh`, did; it still works and is no longer needed). A checkout that never
+wrote one is left to `l` in the pane or `/router ledger`; the install's clone prints the ledger instead
+of committing it. Re-check can run
 web_research, which needs only the `claude` CLI; the kernel families need Linux, and repo_fix
 needs its clone and worktrees set up by hand. The scripts read and write UTF-8 on every platform:
 the mod runs them with `PYTHONUTF8=1`, and each file read, write and git call names the encoding

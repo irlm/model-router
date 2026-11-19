@@ -19,66 +19,36 @@ what is not done. The history of the earlier plan, written on 2026-10-31, is bel
    are unmeasured; `bench/browser_flow` measures a scripted checklist.
 5. **The Codex runner arm** cannot run inside Codex's sandbox (ptrace); only with `--codex-full-access`,
    which lets the model act as the user on the whole machine, so it runs only on the user's say.
-6. **The monthly ledger runs itself on Linux only.** `tools/install_ledger_timer.sh` is a systemd user
-   timer. On macOS and Windows nothing schedules it: the pane says "no usage ledger since …" after 35
-   days (`ADVICE_LEDGER_DAYS` in `tools/status.py`) and `/router ledger` writes one. A launchd agent and
-   a Scheduled Task would close this.
+6. ~~The monthly ledger runs itself on Linux only.~~ Closed in widget 0.31.0: the widget writes the ledger on any OS
+   when the last one is a month old (a checkout that never wrote one is left to `/router ledger`).
 7. **Main-session effort is measured by extrapolation.** `/router effort auto` applies the measured
    families' effort to main-session turns that read as one of them; the cell 8 effort ratios come from
    subagent fixes, not from main sessions on the user's own repositories.
 8. **The widget's tests run on Linux in CI**, the author's machines are macOS and Windows; the path
    handling (home directory, project key, Python on PATH) is exercised there by use, not by CI.
 
-### From the 2026-11-18 review pass (what the widget would not notice)
+### From the 2026-11-18 review pass
 
 Three readers went over the code, the features and the field. The nine defects they found are fixed in widget
-0.30.1 (`CHANGELOG.md`). What they left open, in the order it is worth doing:
+0.30.1, and widget 0.31.0 implemented what they left open where it pays (`CHANGELOG.md`): the step up before "as
+asked", the regressed-family suspension, the risk floor, the runner check on routed fixes, the burn rate and the
+pressure line, the stale-model alarm, the on-machine Opus-against-Fable rows, the `other` bucket line, the check's
+floor, the self-writing ledger, the lookup guard, and the lower-severity code findings. Still open:
 
-9. **A model in the transcripts with no receipts in any family has no alarm.** The sessions have run on
-   `claude-fable-5-2` since 2026-11-10 and on `claude-opus-5` (effort unknown), but `EFFORT_RATIO` and
-   `OPUS_OVER_FABLE` in `tools/status.py` are 5.1-and-5.5 ratios, the tier suggestion filters on `fable-5-1` so the
-   5.2 spend drops out of it, and `decide.ALIAS` maps `fable` to 5-1 while the engine resolves it to 5.2. The only
-   advice is "prices verified N days ago". The check: a model in the window's rows that no family's evidence
-   names, with `decide.py --dry-run`'s list of what to run (`plan_for_unmeasured_models` in routing.json exists
-   and is never surfaced).
-10. **A routed fix agent that never ran the tests is invisible.** `repo_fix` was measured with the runner in the loop
-   (72/72); the widget appends `RUNNER_NOTE` and hopes. It keeps each agent's last eight tool calls and its answer:
-   a `repo_fix`-routed agent whose tail has no runner command, or a `find_feature` answer that says "not found",
-   is the free part of item 3 (the price of a wrong answer), and should mark the row and count as a failure for
-   the escalation.
-11. **Five of seven families are never re-checked on a machine without their worktrees** (`can_run` says no for
-   find_feature, fix_bug, write_tests, browser_flow, repo_fix here), and the regression advice is satisfied by any
-   regress file matching the Claude Code version. The pane should say "N families have no check on this
-   machine", and `ok 5/6` should carry its power (at n=6 the binomial catches a drop below about 65% only).
-12. **The rate-limit windows are read and drive nothing.** Every monitor in the field (claude-dashboard,
-   Claude-Code-Usage-Monitor, ccstatusline) shows a burn rate and a time to the limit; two routers (jev-router,
-   frugal) tighten their policy at 80 and 95% of the window. The widget has the windows from the API responses;
-   a slope over the session gives the time, and a threshold that turns `ask` into `auto` and `advise` into
-   `auto` for the rest of the window is where routing pays on a subscription.
-13. **The prompt classifier has no guard against a false positive.** Any general-purpose prompt under 900
-   characters with "what is the" is a fact lookup routed to Haiku low ("what is the cause of this crash in
-   parser.c?" included). A risk floor (AutoMode's idea: auth, migrations, payments, destructive operations
-   never go below a tier) and a fail-closed fallback for the words the rule misses are the two halves.
-14. **The biggest subagent bucket is `other`** (half of subagent spend on this machine, general-purpose calls),
-   and the pane says nothing about it. A delegation break-even (the 23k prefix as a share of each agent's cost:
-   "this Explore paid 78% of its cost on the prefix") is what frugal and the Systima "subagent tax" write-up
-   report and this repo measured but never shows.
-15. **The suggestions ignore the widget's own levers.** The effort suggestion's action is `claude --effort low`
-   while `/router effort auto` exists and is off by default (advise); the tier suggestion says "try opus" while
-   the window already holds Opus messages that are never compared with the Fable ones. Comparing the user's
-   own Opus and Fable messages (cost per message, tool-error and re-issue rates) would turn "unmeasured" into
-   measured on this machine.
-16. **Shadow mode and replay.** A candidate routing.json cannot be priced on the last 30 days before `apply`;
+9. **The prefix share per agent, and a delegation break-even.** The repo measured the 23k-token prefix but never
+   tells the user "this Explore paid 78% of its cost on the prefix; inline would have been cheaper". frugal's
+   delegation floor and the Systima "subagent tax" write-up report it; the data is the spawn's prompt size against
+   the agent's first request. The `other` bucket now has a line; the per-agent share does not.
+10. **Shadow mode and replay.** A candidate routing.json cannot be priced on the last 30 days before `apply`;
    `tools/consumption.py` has every call with its tokens and class, so a replay under another policy is a
    function away (jev-router's `--shadow` and `replay`).
-17. **The command names overlap**: `/router update` is the regression check, `/router upgrade` updates the
+11. **The step up is measured for find_feature only.** The other families sit at the ceiling on every tier, so their
+   escalation goes straight to "as asked"; a measured middle rung for repo_fix and web_research (sonnet) would
+   cost a run of each family's tasks on sonnet.
+12. **The pressure line tightens only.** Above it routing and effort go auto; nothing yet says, at 95%, which
+   unmeasured spawns to refuse or warn about (frugal's thermostat denies reasoning-tier spawns at 100%).
+13. **The command names overlap**: `/router update` is the regression check, `/router upgrade` updates the
    install, and `pull`, `fetch`, `check` exist beside them. A reader of "update" expects the plugin update.
-
-Lower on the list, from the code review and not yet fixed: `decide.py` records `pass_k: 0.0` for a cell with a
-task of zero judged runs and crashes when a family's default model is not in the catalog; the weekly slots are
-UTC days while the "days since" are local; `tools/runs.py import` compares calls by dict equality (quadratic);
-`bench/common/worktree.py reset()` runs `git reset --hard` on any path it is given; `call_claude` in the harness
-does not catch a timeout the way `call_codex` does.
 
 ## Done, from the 2026-10-31 plan
 

@@ -55,12 +55,11 @@ REQUIRES = {'kunit': 'the test runner in the loop (KUnit)', 'vitest': 'the test 
 
 def pass_k(per_task):
     """per_task: {id: (judged, successes)}. Returns (k, estimate) with k = fewest judged runs of any task."""
-    if not per_task:
+    judged = {t: v for t, v in per_task.items() if v[0] > 0}   # a task every run lost to the harness has nothing to say about the model
+    if not judged:
         return 1, 0.0
-    k = min(n for n, _ in per_task.values())
-    if k == 0:
-        return 1, 0.0
-    est = statistics.mean(math.comb(c, k) / math.comb(n, k) for n, c in per_task.values())
+    k = min(n for n, _ in judged.values())
+    est = statistics.mean(math.comb(c, k) / math.comb(n, k) for n, c in judged.values())
     return k, est
 
 
@@ -119,7 +118,7 @@ def decide_family(cands, margin, min_trials, rule='lower'):
         return None, None, None
     bar = max(score(v, rule) for v in ok.values()) - margin
     above = sorted((k for k, v in ok.items() if score(v, rule) >= bar),
-                   key=lambda k: (ok[k]['cost_per_success'], ok[k]['wall_mean'] or 0))
+                   key=lambda k: (ok[k]['cost_per_success'], ok[k]['wall_mean'] if ok[k]['wall_mean'] is not None else math.inf))   # no wall time is not the fastest
     best = above[0]
     # step-up: the cheapest candidate above the bar that is more reliable than the default
     better = [k for k in above[1:] if ok[k]['rate'] > ok[best]['rate']]
@@ -162,7 +161,7 @@ def plan_new_models(cat, fams_decided, cells):
             r = report.price.rates(entry)
             est = d['n_tasks'] * (tok['input'] * r['in'] + tok['output'] * r['out'] + tok['cache_read'] * r['cache_read'] + tok['cache_write'] * r['write_1h'])
             rows.append({'family': name, 'run': cheaper, 'n_tasks': d['n_tasks'], 'expected_cost_usd': round(est, 2),
-                         'why': ('not dearer than the current default, so it could win on cost' if list_price(entry) <= list_price(cur) else
+                         'why': ('not dearer than the current default, so it could win on cost' if cur is None or list_price(entry) <= list_price(cur) else
                                  'dearer, but the default is below the bar ceiling, so a perfect run could raise the bar') if cheaper
                          else 'dearer than the current default and the default is at the ceiling; it cannot change the decision'})
         rows.sort(key=lambda x: (not x['run'], x.get('expected_cost_usd', 0)))

@@ -16,6 +16,11 @@ def git(wt, *args, check=True):
 
 
 def reset(wt, base=BASE):
+    """Back to the pinned base, every change gone. Only on a linked worktree (its .git is a file pointing into the main
+    repository): pointed at a checkout of one's own, this would wipe uncommitted work."""
+    dotgit = Path(wt) / '.git'
+    if not dotgit.is_file():
+        raise RuntimeError(f'refusing to reset {wt}: not a linked git worktree (.git is not a file); the bench runs on worktrees it made')
     git(wt, 'reset', '-q', '--hard', base)
     git(wt, 'clean', '-qfd')
 

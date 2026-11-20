@@ -1,0 +1,26 @@
+{
+ "claude-sonnet-5-5 / low / 1 / rs-01": {
+  "detail": "402 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-02": {
+  "detail": "313 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-03": {
+  "detail": "338 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-04": {
+  "detail": "353 words, 3/3 sourced",
+  "outcome": "correct"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-05": {
+  "detail": "2/3 right; 1: wrong ('1,800 seconds (30 minutes)')",
+  "outcome": "partial"
+ },
+ "claude-sonnet-5-5 / low / 1 / rs-06": {
+  "detail": "291 words, 3/3 sourced",
+  "outcome": "correct"
+ }
+}

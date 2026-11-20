@@ -29,26 +29,19 @@ what is not done. The history of the earlier plan, written on 2026-10-31, is bel
 
 ### From the 2026-11-18 review pass
 
-Three readers went over the code, the features and the field. The nine defects they found are fixed in widget
-0.30.1, and widget 0.31.0 implemented what they left open where it pays (`CHANGELOG.md`): the step up before "as
-asked", the regressed-family suspension, the risk floor, the runner check on routed fixes, the burn rate and the
-pressure line, the stale-model alarm, the on-machine Opus-against-Fable rows, the `other` bucket line, the check's
-floor, the self-writing ledger, the lookup guard, and the lower-severity code findings. Still open:
+Three readers went over the code, the features and the field. The nine defects they found are fixed in widget 0.30.1,
+widget 0.31.0 implemented what paid (the step up before "as asked", the regressed-family suspension, the risk floor, the
+runner check on routed fixes, the burn rate and the pressure line, the stale-model alarm, the on-machine Opus-against-Fable
+rows, the `other` bucket line, the check's floor, the self-writing ledger, the lookup guard), and widget 0.32.0 closed the
+rest (the prefix share and the delegation break-even, shadow mode and `replay`, the escalation rung for every family with
+one measured, the hard pressure line, the command names). What the pass leaves open is measurement, not code:
 
-9. **The prefix share per agent, and a delegation break-even.** The repo measured the 23k-token prefix but never
-   tells the user "this Explore paid 78% of its cost on the prefix; inline would have been cheaper". frugal's
-   delegation floor and the Systima "subagent tax" write-up report it; the data is the spawn's prompt size against
-   the agent's first request. The `other` bucket now has a line; the per-agent share does not.
-10. **Shadow mode and replay.** A candidate routing.json cannot be priced on the last 30 days before `apply`;
-   `tools/consumption.py` has every call with its tokens and class, so a replay under another policy is a
-   function away (jev-router's `--shadow` and `replay`).
-11. **The step up is measured for find_feature only.** The other families sit at the ceiling on every tier, so their
-   escalation goes straight to "as asked"; a measured middle rung for repo_fix and web_research (sonnet) would
-   cost a run of each family's tasks on sonnet.
-12. **The pressure line tightens only.** Above it routing and effort go auto; nothing yet says, at 95%, which
-   unmeasured spawns to refuse or warn about (frugal's thermostat denies reasoning-tier spawns at 100%).
-13. **The command names overlap**: `/router update` is the regression check, `/router upgrade` updates the
-   install, and `pull`, `fetch`, `check` exist beside them. A reader of "update" expects the plugin update.
+9. **A rung for browser_flow and research_synthesis.** Sonnet drove 37/42 browser flows, under haiku's rate; opus wrote
+   12/12 research notes, under the twenty trials a rung needs. Their escalation goes straight to "as asked" until a run
+   of each family's tasks on another model (`decide.py --dry-run` prices it).
+10. **The prefix share is an estimate.** It prices 23k tokens (`results/prefix`) at the agent's model rates from the request
+   count; the subagent's own prefix was not measured apart from the main session's. `tools/fixed_text.py` on subagent
+   transcripts would give the number.
 
 ## Done, from the 2026-10-31 plan
 
@@ -64,7 +57,7 @@ The plan listed twelve gaps; what closed each one:
   xhigh) and the research-notes family graded on facts and sources (cell 9, Sonnet low).
 - Wilson intervals and pass^k in `report.py` and `decide.py`, `--rule lower` the default.
 - The saturated cells are the regression suite (`regress.py`, run on every Claude Code update, with the
-  version and the prefix recorded; `/router update`).
+  version and the prefix recorded; `/router recheck`).
 - One paraphrase per family (no effect); the find-feature families on a private tree (no contamination
   effect).
 - Routing applied automatically: the widget routes each Agent call (ask, auto, off), applies the decision

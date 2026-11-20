@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "description": "Model router widget: routes each Agent call to the model and effort the benchmark measured for that kind of task (auto, ask or off), rate-limit headroom, what the last 30 days consumed, and one key to re-check the routing.",
   "author": {
     "name": "irlm"
@@ -10,11 +10,12 @@
     "routing": {
       "type": "string",
       "title": "Route Agent calls",
-      "description": "When the main model starts a task a measured family covers: ask you (ask), rewrite to the measured model and effort without asking (auto), or leave calls alone (off).",
+      "description": "When the main model starts a task a measured family covers: ask you (ask), rewrite to the measured model and effort without asking (auto), log what auto would have done without moving anything (shadow), or leave calls alone (off).",
       "default": "ask",
       "options": [
         "ask",
         "auto",
+        "shadow",
         "off"
       ]
     },
@@ -57,6 +58,12 @@
       "title": "Window pressure (%)",
       "description": "From this share of the 5-hour or 7-day window, routing goes auto (no question) and main-session effort goes auto for the rest of the window; back to your modes when it comes under. 0 turns it off. The pane shows the pace at which a window would run out.",
       "default": 80
+    },
+    "pressureHard": {
+      "type": "number",
+      "title": "Hard pressure line (%)",
+      "description": "From this share of a window, an Agent call that no measured family covers is asked about before it runs on the session model (ask mode: run it or skip it; auto: said once). 0 turns it off.",
+      "default": 95
     },
     "repo": {
       "type": "string",

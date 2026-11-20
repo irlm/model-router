@@ -206,7 +206,8 @@ requests: a prompt that reads as a measured family runs at that family's measure
 | `dismiss <n or id>`, `undismiss <id>` | hide a suggestion you judge wrong, and bring it back |
 | `agents pin\|check\|update\|list` | agent files from outside this repository, pinned to their source commit; a change there shown as a diff before it lands |
 | `prune` | move the agent files no transcript ever called out of the prefix (reversible) |
-| Re-check routing (u) | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry |
+| Re-check routing (u), `recheck` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`update` still works) |
+| `replay [candidate.json]` | the last 30 days priced under the current routing or a candidate file, per class: shadow before `apply` (`routing shadow` does it live, logging what auto would do) |
 | Ledger now (l) | `tools/ledger.py --commit` (into the pane in the marketplace clone) |
 | Apply agents (a) | `apply_agents.py`: routing.json's model and effort into the agent files you have |
 | `upgrade` | `tools/upgrade.py`: the install brought up to date by itself, marketplace then plugin, on any machine; the pane says when GitHub has a newer version |

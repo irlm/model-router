@@ -1160,7 +1160,7 @@ test('the timeline: the day as one bar per run with the lens on the run shown, t
 })
 
 /** Mocks for a routing test with a status of one's own, a clock that can move and a status line that is kept. */
-const CUSTOM_MOCKS = (on: On, seen: Record<string, unknown>[], statusJson: unknown, clock: { now: number }, pinned: (string | undefined)[] = [], failing: string | null | ((e: { tool: string }) => boolean | Promise<boolean>) = null, argvs: string[] = []) => {
+const CUSTOM_MOCKS = (on: On, seen: Record<string, unknown>[], statusJson: unknown, clock: { now: number }, pinned: (string | undefined)[] = [], failing: string | null | ((e: { tool: string }) => boolean | Promise<boolean>) = null, argvs: string[] = [], answer: string | null = null) => {
   on('command.register', () => ({ value: { command: 'router' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('clock.now', () => ({ value: clock.now }))
@@ -1175,7 +1175,7 @@ const CUSTOM_MOCKS = (on: On, seen: Record<string, unknown>[], statusJson: unkno
   on('turn.complete', (_, e) => ({ text: e.answer }))
   on('tool.call', async (_, e) => {
     seen.push(e as unknown as Record<string, unknown>)
-    if (e.tool === 'AskUserQuestion') return { deny: 'no one to ask' }
+    if (e.tool === 'AskUserQuestion') return answer === null ? { deny: 'no one to ask' } : { result: { questions: e.questions, answers: { [e.questions[0]?.question ?? '']: answer, [e.questions[0]?.header ?? '']: answer } } }
     const fail = typeof failing === 'function' ? await failing(e as { tool: string }) : failing !== null && e.tool === failing
     return fail ? { result: {}, isError: true } : { result: {} }
   })
@@ -1451,5 +1451,80 @@ test('the ledger writes itself when the last one is a month old on a checkout of
   await $.command.run({ ...RUN, command: 'router', args: 'check' })
   await settled()
   expect(argvs.filter(a => a.includes('tools/ledger.py')).length).toBe(1)             // once a day
+  await settled()
+})
+
+test('shadow mode: what auto would have done is logged and shown, nothing is moved', { options: { routing: 'shadow' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  CUSTOM_MOCKS(on, seen, STATUS, { now: 1_762_000_000_000 })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  await $.tool.call(EXPLORE)
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBeUndefined()
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('routed this session: 0 routed, 0 kept, 1 would have been routed (shadow) (mode shadow;')
+  expect(text).toContain('Explore: inherit -> haiku low  [find_feature] shadow  find the parser')
+  await settled()
+})
+
+test('/router replay prices the window under the current routing or a candidate file; /router recheck is the regression check and update still works', { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const argvs: string[] = []
+  CUSTOM_MOCKS(on, seen, STATUS, { now: 1_762_000_000_000 }, [], null, argvs)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  let { text } = await $.command.run({ ...RUN, command: 'router', args: 'replay' })
+  expect(text).toContain('replay started; the pane prices the last 30 days under the current routing.json')
+  await settled()
+  expect(argvs.some(a => a.endsWith('tools/replay.py'))).toBe(true)
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'replay /tmp/candidate.json' }))
+  expect(text).toContain('under /tmp/candidate.json')
+  await settled()
+  expect(argvs.some(a => a.endsWith('tools/replay.py /tmp/candidate.json'))).toBe(true)
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'recheck' }))
+  expect(text).toContain('regression check started')
+  await settled()
+  expect(argvs.filter(a => a.includes('tools/update.py --sample 6')).length).toBe(1)
+  ;({ text } = await $.command.run({ ...RUN, command: 'router', args: 'update' }))
+  expect(text).toContain('update is now recheck')
+  await settled()
+  expect(argvs.filter(a => a.includes('tools/update.py --sample 6')).length).toBe(2)
+})
+
+test('the hard pressure line: an unmeasured Agent call is asked about and can be skipped; a measured one is still routed', { options: { routing: 'ask' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  const clock = { now: 1_762_000_000_000 }
+  CUSTOM_MOCKS(on, seen, STATUS, clock, [], null, [], 'Skip it: answer with what you have')
+  on('session.usage', () => ({ value: { startedAt: 0, context: { tokens: 50000, window: 1000000 }, rateLimits: [{ kind: 'five_hour', percentUsed: 96, resetsAt: new Date(clock.now + 3600_000).toISOString() }] } }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  const notes = { tool: 'Agent', tool_use_id: 'tu-n', description: 'draft the release notes', prompt: 'Draft the release notes for 2.4 from the changelog.', subagent_type: 'general-purpose' } as const
+  await $.tool.call(notes).catch(() => undefined)                                      // skipped: the engine's own handler is never reached
+  expect(seen.some(x => x.tool === 'Agent' && x.description === 'draft the release notes')).toBe(false)
+  expect(seen.some(x => x.tool === 'AskUserQuestion')).toBe(true)
+  await $.tool.call(EXPLORE)                                                           // measured, and above the pressure line: routed without a question
+  await $.agent.spawn(spawnOf(EXPLORE))
+  expect(spawnSeen(seen)?.model).toBe('haiku')
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  expect(text).toContain('1 skipped at the hard line')
+  expect(text).toContain('general-purpose: inherit -> skipped  [unmeasured] skipped  draft the release notes')
+  expect(text).toContain('from 95% an unmeasured Agent call is asked about')
+  await settled()
+})
+
+test("the Routing frame says when an agent paid mostly for the prefix: the smallest asks are cheaper inline", { options: { routing: 'auto' } }, async ($, on) => {
+  const seen: Record<string, unknown>[] = []
+  CUSTOM_MOCKS(on, seen, STATUS, { now: 1_762_000_000_000 })
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.close', () => ({ value: undefined }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...RUN, command: 'router', args: 'check' })
+  const sp = await $.agent.spawn({ tool_use_id: 'tp1', prompt: 'What is the RFC number of TLS 1.3?', description: 'look up the RFC', subagentType: 'general-purpose', provider: { kind: 'model' }, parentModel: 'claude-opus-5-5', model: 'claude-opus-5-5' })
+  await drain($.turn.step({ turnId: 'tp1', index: 0, model: 'claude-opus-5-5', effort: 'low', messageCount: 1, agentId: sp.agentId }))
+  await $.turn.complete({ answer: 'RFC 8446', durationMs: 1000, isAborted: false, turnId: 'tp1', reason: 'answer', agentId: sp.agentId, usage: { model: 'claude-opus-5-5', input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 23000, cache_creation_input_tokens: 0 } })
+  const { text } = await $.command.run({ ...RUN, command: 'router', args: 'monitor' })
+  expect(text).toMatch(/01 general-purpose .* prefix 88% of its cost/)   // (23000 * 0.2) / (100 * 4 + 10 * 20 + 23000 * 0.2) per Mtok
+  expect(text).toContain('1 of 1 agents paid mostly for the 23k prefix')
   await settled()
 })

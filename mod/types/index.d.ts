@@ -131,8 +131,9 @@ export type Routed = {
   from: string
   to: string
   /** auto: rewritten without asking; routed: the person chose it; kept: the person kept what was asked, or no one could be asked;
-   * escalated: the family was struggling, so the call ran on its step up or as asked; floor: the risk floor kept it as asked */
-  decision: 'auto' | 'routed' | 'kept' | 'escalated' | 'floor'
+   * escalated: the family was struggling, so the call ran on its step up or as asked; floor: the risk floor kept it as asked;
+   * shadow: shadow mode logged what auto would have done; skipped: at the hard pressure line the person skipped an unmeasured call */
+  decision: 'auto' | 'routed' | 'kept' | 'escalated' | 'floor' | 'shadow' | 'skipped'
   /** an escalated call sent to the family's measured step up (not as asked) */
   step?: boolean
   description: string
@@ -208,7 +209,7 @@ export type RunningAgent = {
   askedModel: string
   askedEffort: string
   /** the router's decision on the call; floor: the risk floor kept it as asked; null when nothing measured covered it */
-  decision: 'auto' | 'routed' | 'kept' | 'escalated' | 'floor' | null
+  decision: 'auto' | 'routed' | 'kept' | 'escalated' | 'floor' | 'shadow' | 'skipped' | null
   /** a Bash call of its own ran a test command (the runner-in-the-loop condition of a routed fix) */
   ranTests?: boolean
   /** a routed agent that ended without the condition its family was measured under, or with an empty result */

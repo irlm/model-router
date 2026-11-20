@@ -25,6 +25,7 @@ import prune_agents  # noqa: E402
 import release  # noqa: E402
 import status  # noqa: E402
 import price  # noqa: E402   (catalog/, on the path once status is imported)
+import replay  # noqa: E402
 import upgrade  # noqa: E402
 
 
@@ -135,6 +136,37 @@ class Suggest(unittest.TestCase):
         self.assertIn('"review the plan"; "draft the email"', out['other']['basis'])
         bc['fact-lookup']['cost'] = 20.0                                                   # not the largest bucket: no line
         self.assertNotIn('other', {g['id'] for g in status.suggest(usage(bc), {})})
+
+    def test_spawns_that_paid_for_their_prefix(self):
+        # the prefix is re-read from the session's cache (a spawn writes nothing again): 23k at the cache-read rate per request
+        r = price.rates(price.model_entry('claude-opus-5-5'))
+        small = {'window': 'cur', 'class': 'code-explore', 'model': 'claude-opus-5-5', 'msgs': 40, 'cost': round(status.PREFIX_TOKENS * 40 * r['cache_read'] * 1.1, 6),
+                 'tok': {'cache_read_input_tokens': status.PREFIX_TOKENS * 60}}
+        big = {**small, 'cost': 20.0}
+        self.assertAlmostEqual(status.prefix_cost_share(small), 1 / 1.1, 3)
+        self.assertLess(status.prefix_cost_share(big), 0.1)
+        self.assertIsNone(status.prefix_cost_share({**small, 'msgs': 0}))
+        self.assertAlmostEqual(status.prefix_cost_share({**small, 'tok': {'cache_read_input_tokens': 1000}}), 1000 * r['cache_read'] / small['cost'], 6)   # never more than it read
+        u = usage({'code-explore': {'n': 5, 'cost': 2.5, 'types': {'Explore': 5}, 'models': {}, 'last': '2026-11-02T10:00'}})
+        u['subagents']['calls'] = [dict(small) for _ in range(3)] + [dict(big)]
+        out = {g['id']: g for g in status.suggest(u, {})}
+        self.assertIn('prefix:code-explore', out)
+        self.assertIn('3 of 4 code searches paid 91% of their cost for the 23k prefix', out['prefix:code-explore']['title'])
+        u['subagents']['calls'] = [dict(big)] * 4
+        self.assertNotIn('prefix:code-explore', {g['id'] for g in status.suggest(u, {})})
+
+    def test_the_escalation_rung_from_the_evidence(self):
+        routing = json.loads((Path(__file__).resolve().parents[1] / 'routing.json').read_text(encoding='utf-8'))
+        f = routing['families']
+        self.assertEqual(status.escalation_rung(f['find_feature'])['model'], 'sonnet')                  # routing.json's step_up
+        self.assertEqual(status.escalation_rung(f['find_feature'])['why'], 'step_up in routing.json')
+        wr = status.escalation_rung(f['web_research'])                                                  # sonnet low 26/26 clears the bar at $0.062: the rung
+        self.assertEqual((wr['model'], wr['effort'], wr['rate']), ('sonnet', 'low', '26/26'))
+        rf = status.escalation_rung(f['repo_fix'])                                                      # the same variant (+vitest): sonnet low 24/24
+        self.assertEqual((rf['model'], rf['effort']), ('sonnet', 'low'))
+        self.assertIsNone(status.escalation_rung(f['research_synthesis']))                              # opus 12/12 would be the rung, but 12 trials are under the 20 a rung needs
+        self.assertIsNone(status.escalation_rung(f['browser_flow']))                                    # sonnet 37/42 is under the default's rate: no rung
+        self.assertIsNone(status.escalation_rung(f['unmeasured']))
 
     def test_models_without_receipts_and_the_check_floor(self):
         routing = {'families': {'f': {'decided': {'evidence': {'claude-haiku-5-5 low': {}, 'claude-fable-5-1 low': {}}}}}}
@@ -927,3 +959,20 @@ class Upgrade(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
+
+
+class Replay(unittest.TestCase):
+    def test_the_window_under_another_routing(self):
+        tok = {'input_tokens': 20000, 'output_tokens': 1000, 'cache_read_input_tokens': 100000, 'cache_creation_input_tokens': 0}
+        calls = [{'window': 'cur', 'class': 'code-explore', 'model': 'claude-opus-5-5', 'cost': 1.0, 'tok': tok},
+                 {'window': 'cur', 'class': 'code-explore', 'model': 'claude-haiku-5-5', 'cost': 0.01, 'tok': tok},
+                 {'window': 'prev', 'class': 'code-explore', 'model': 'claude-opus-5-5', 'cost': 1.0, 'tok': tok},
+                 {'window': 'cur', 'class': 'other', 'model': 'claude-opus-5-5', 'cost': 1.0, 'tok': tok}]
+        routing = {'families': {'find_feature': {'default': {'model': 'haiku', 'effort': 'low'}}}}
+        r = replay.replay({'days': 30, 'since': '2026-10-02', 'subagents': {'calls': calls}}, routing)
+        self.assertEqual([(x['class'], x['calls'], x['moved']) for x in r['rows']], [('code-explore', 2, 1)])
+        under = 2 * status.price_tokens(tok, 'claude-haiku-5-5')
+        self.assertAlmostEqual(r['under'], round(under, 2), 2)
+        self.assertAlmostEqual(r['saved'], round(1.01 - under, 2), 2)
+        self.assertIn('code-explore         claude-haiku-5-5 low', replay.text(r, 'x'))
+        self.assertEqual(replay.decisions({'families': {'f': {'default': {'model': 'inherit'}}, 'g': {'default': {'model': 'sonnet', 'effort': 'low'}}}}), {'g': ('claude-sonnet-5-5', 'low')})

@@ -161,6 +161,7 @@ def collect(days=30, now=None, splits=None):
     calls = {}                                               # tool_use_id -> Agent call
     agent_of = {}                                            # tool_use_id -> agentId
     agent_cost = collections.Counter(); agent_model = {}
+    agent_msgs = collections.Counter()                       # agentId -> its requests: each one re-reads the prefix
     agent_errors = collections.Counter()                     # agentId -> tool errors inside its transcript
     agent_tok = collections.defaultdict(collections.Counter)  # agentId -> tokens by kind: the size of its work
     ptok = collections.defaultdict(collections.Counter)       # (segment, where, model, effort) -> tokens by kind
@@ -267,7 +268,7 @@ def collect(days=30, now=None, splits=None):
                                         ptok[pk][k] += u.get(k, 0) or 0
                                     ptok[pk]['cache_write_5m'] += w5; ptok[pk]['cache_write_1h'] += w1
                         if is_sub and r.get('agentId'):
-                            agent_cost[r['agentId']] += c; agent_model[r['agentId']] = model
+                            agent_cost[r['agentId']] += c; agent_model[r['agentId']] = model; agent_msgs[r['agentId']] += 1
                             for k in TOKENS:
                                 agent_tok[r['agentId']][k] += u.get(k, 0) or 0
                             agent_tok[r['agentId']]['cache_write_5m'] += w5; agent_tok[r['agentId']]['cache_write_1h'] += w1
@@ -297,6 +298,7 @@ def collect(days=30, now=None, splits=None):
         c['agent'] = aid; c['cost'] = round(agent_cost.get(aid, 0.0), 4) if aid else None; c['model'] = agent_model.get(aid)
         c['errors'] = agent_errors.get(aid, 0) if aid else 0
         c['tok'] = dict(agent_tok[aid]) if aid else None
+        c['msgs'] = agent_msgs.get(aid, 0) if aid else 0
         c.setdefault('failed', False)
     mark_retries(calls)
     struggle = struggle_of(calls, sessions)

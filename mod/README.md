@@ -72,6 +72,11 @@ counted:
   or always route for this session. A dismissed question keeps the call; so does a run with no
   one to ask.
 - `auto`: the subagent runs on the decided model and effort and a toast says so.
+- `shadow`: nothing is moved; what auto would have done is logged (`shadow` in the routed log) and
+  counted in the pane ("1 would have been routed (shadow)"), so the routing's effect on this machine
+  shows before it is applied. `/router replay [candidate.json]` is the same look back over the last 30
+  days: every call of a covered class priced, token for token, at the rates of the model the routing
+  (the current one, or a candidate file) decides for its family, per class and in total.
 
 The decision is applied on the subagent itself, never on the Agent tool's input: the spawn the call
 makes gets the model (`agent.spawn`) and each of the subagent's requests gets the effort (`turn.step`).
@@ -102,7 +107,7 @@ Buttons (at the bottom of the pane) and verbs (`/router <verb>`):
 | | `dismiss <n or id>`, `undismiss <id>` | hides a suggestion you judge wrong (by its number in the pane); Details lists the dismissed ones |
 | | `check` | `tools/status.py` (also prints the table as text); the pane refreshes by itself after every job and every 30 minutes |
 | | `fetch` | the same after `git fetch`, so behind/ahead are current |
-| Re-check routing | `update` | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
+| Re-check routing | `recheck` (`update` still works) | `tools/update.py`: `regress.py` on every family that can run here, then commit and push the entry (`--no-commit` in the marketplace clone) |
 | Ledger now | `ledger` | `tools/ledger.py --commit` (`--stdout` in the marketplace clone: the entry goes to the pane) |
 | Apply agents | `apply` | `apply_agents.py`: write routing.json's model and effort into the agent files you have in `~/.claude/agents`; installs `agents/web-researcher.md` from the repository when missing; agent files you do not have are absent and skipped |
 | | `upgrade` | `tools/upgrade.py`: the install brought up to date by itself: the marketplace (the GitHub clone, or a checkout of your own when it is clean), then the plugin's cached copy; what remains is `/reload-plugins` in the sessions that are open. The pane's advice says when GitHub has a newer version (checked once a session, kept a day) |
@@ -276,7 +281,7 @@ cost and may repeat an edit; the main model's own re-issue is the signal, and it
   step up fails or is re-issued too, or when the family has none (every tier at the ceiling, as for
   the fixes with the runner).
 - *A regressed family is not routed.* When the last regression check on this Claude Code version said
-  REGRESSED for a family, its calls run as asked until a check passes (`/router update`).
+  REGRESSED for a family, its calls run as asked until a check passes (`/router recheck`).
 - *The risk floor.* A fix or a browser flow whose ask names auth, passwords, credentials, payments,
   billing, a migration, production, a deploy, or a destructive command (`rm -rf`, `drop table`, a
   force push) is never moved down, whatever family it reads as: it runs as asked without a question,
@@ -295,6 +300,18 @@ the status line says `5h 62% (out ~15:40)`. From the pressure line (`pressure` i
 default, 0 turns it off) routing goes `auto` without asking and main-session effort goes `auto` for the
 rest of the window, a toast says so, and your own modes return when the window comes back under. An
 escalation still wins over the pressure: a struggling family is not sent down because the window is full.
+From the hard line (`pressureHard`, 95% by default) an Agent call that no measured family covers is asked
+about before it runs on the session model: run it, or skip it (the main model is told the router skipped
+it and to go on with what it has); in auto mode the pane says so once. Nothing unmeasured is ever moved
+down, at any pressure.
+
+**The prefix share.** A spawn re-reads the fixed prefix (23k tokens here, `results/prefix`) from the
+session's cache on each of its requests before it does anything: cents on any model, and a call whose
+whole cost is that did nothing but arrive. The Routing frame says, per ended agent, "prefix 88% of its
+cost" when that share is above 60% (never more than the agent's own cache-read tokens), with a closing
+line counting them; the suggestions carry the same from the transcripts, per class ("3 of 4 code searches
+paid 91% of their cost for the 23k prefix"), with the prefix part as the upper bound of what inline would
+have saved.
 
 ### Requirements and what it reads
 

@@ -4,7 +4,7 @@ import type { Hook, Register } from 'claude-code'
 import type { Job, Live, MainLive, RateLimit, Realized, RealizedMainSide, RealizedSide, Routed, RunningAgent, Status, StatusJson, Switch, Turn, Recent, RunEvent, RunMeta, SavedRun } from '../types'
 
 type Dollar = Parameters<Hook<'session.start'>>[0]
-type RoutingMode = 'ask' | 'auto' | 'off'
+type RoutingMode = 'ask' | 'auto' | 'shadow' | 'off'
 
 const PANE = 'model-router'
 const MONITOR = 'model-router-monitor'
@@ -37,8 +37,12 @@ const savedRuns = atom({ plugin: 'model-router', key: 'savedRuns' } as const, []
 
 // What the buttons and /router <verb> run, from the checkout's root. In the clone the plugin install
 // made (`clone`), nothing is committed: the ledger prints its entry, the re-check keeps its results local.
+const RECHECK = { title: 'regression check', argv: (py: string, clone: boolean) => [py, 'tools/update.py', '--sample', '6', ...(clone ? ['--no-commit'] : [])] }
 const JOBS: Record<string, { title: string; argv: (python: string, clone: boolean) => string[] }> = {
-  update: { title: 'regression check', argv: (py, clone) => [py, 'tools/update.py', '--sample', '6', ...(clone ? ['--no-commit'] : [])] },
+  // The regression check is `recheck`; `update` was its name until 0.32 and still works (`upgrade` updates the install).
+  recheck: RECHECK, update: RECHECK,
+  // The last 30 days priced under a routing (the current one, or a candidate file after the verb): shadow before the fact.
+  replay: { title: 'replay the window under a routing', argv: py => [py, 'tools/replay.py'] },
   ledger: { title: 'usage ledger', argv: (py, clone) => [py, 'tools/ledger.py', clone ? '--stdout' : '--commit'] },
   apply: { title: 'apply agents', argv: py => [py, 'apply_agents.py'] },
   pull: { title: 'git pull', argv: () => ['git', 'pull', '--ff-only'] },
@@ -101,7 +105,12 @@ const HIST_MS = 3 * 3600000
 const PACE_MIN_MS = 10 * 60000   // readings closer than this say nothing about the pace
 let pressure = 80                // percent of a window from which routing and effort go auto for the rest of it (0: off); /config
 let pressureOn = false
+let pressureHard = 95            // percent of a window from which an unmeasured Agent call is asked about (ask mode) or said once (auto); 0: off
+let worstNow = 0                 // the fullest window's percent at the last reading
+let hardToasted = false
 const noteLimits = (limits: RateLimit[], now: number) => {
+  worstNow = Math.max(0, ...limits.map(l => l.percentUsed))
+  if (pressureHard <= 0 || worstNow < pressureHard) hardToasted = false
   for (const l of limits) {
     const h = (limitHist[l.kind] ??= [])
     const last = h[h.length - 1]
@@ -174,7 +183,7 @@ type Line = { text: string; color?: string; bold?: boolean; dim?: boolean; wrap?
 const line = (text: string, style: Omit<Line, 'text'> = {}): Line => ({ text, ...style })
 const BLANK = line('')
 /** The version of this module as loaded (tools/release.py holds it to plugin.json); the checkout's version comes with the status. */
-const WIDGET_VERSION = '0.31.0'
+const WIDGET_VERSION = '0.32.0'
 /** Which widget runs: the loaded version, and a warning when the checkout already has another (a reload loads it). */
 const versionLines = (s: StatusJson | null, full: boolean): Line[] => {
   const have = s?.widget?.version ?? null
@@ -230,7 +239,8 @@ const limitLines = (limits: RateLimit[], now: number | null = null): Line[] => {
     return line(`${windowName(l.kind).padEnd(4)}${bar(l.percentUsed / 100, 20)} ${String(Math.round(l.percentUsed)).padStart(3)}% used${l.resetsAt ? ', resets ' + clock(reset) : ''}${pace}`,
       { color: l.percentUsed >= 80 ? 'red' : l.percentUsed >= 50 ? 'yellow' : 'green', bold: true })
   })
-  if (limits.length && pressure > 0) out.push(line(pressureOn ? `above ${pressure}%: routing auto and effort auto until the window comes back under (the pressure line, /config)` : `from ${pressure}% of a window, routing and effort go auto for the rest of it (the pressure line, /config)`, { dim: !pressureOn, color: pressureOn ? 'yellow' : undefined }))
+  const hard = pressureHard > 0 ? `; from ${pressureHard}% an unmeasured Agent call is asked about before it runs on the session model` : ''
+  if (limits.length && pressure > 0) out.push(line(pressureOn ? `above ${pressure}%: routing auto and effort auto until the window comes back under (the pressure line, /config)${hard}` : `from ${pressure}% of a window, routing and effort go auto for the rest of it (the pressure line, /config)${hard}`, { dim: !pressureOn, color: pressureOn ? 'yellow' : undefined }))
   return out
 }
 
@@ -404,9 +414,10 @@ const summaryLines = (s: StatusJson, at: number, seen: Routed[] = [], where = ''
     if (full) for (const x of sw.slice(-5)) lines.push(line(`  ${clock(x.at)}  ${kilo(x.ctx)} tokens: ${x.why} -> ${x.action}`, { dim: true }))
   }
   if (seen.length > 0) {
-    const kept = seen.filter(x => x.decision === 'kept').length, floored = seen.filter(x => x.decision === 'floor').length
-    lines.push(BLANK, line(`routed this session: ${seen.length - kept - floored} routed, ${kept} kept${floored ? `, ${floored} held by the risk floor` : ''} (mode ${routingMode}${pressureOn ? ', auto under window pressure' : ''}; /router routing ask|auto|off${full ? '' : '; Details lists them'})`, { bold: true }))
-    if (full) for (const x of seen.slice(-8)) lines.push(line(`  ${clock(x.at)}  ${x.agent}: ${x.from} -> ${x.to}  [${x.family}] ${x.decision}  ${x.description}`, { dim: x.decision === 'kept' || x.decision === 'floor' }))
+    const count = (d: Routed['decision']) => seen.filter(x => x.decision === d).length
+    const kept = count('kept'), floored = count('floor'), shadow = count('shadow'), skipped = count('skipped')
+    lines.push(BLANK, line(`routed this session: ${seen.length - kept - floored - shadow - skipped} routed, ${kept} kept${floored ? `, ${floored} held by the risk floor` : ''}${shadow ? `, ${shadow} would have been routed (shadow)` : ''}${skipped ? `, ${skipped} skipped at the hard line` : ''} (mode ${routingMode}${pressureOn ? ', auto under window pressure' : ''}; /router routing ask|auto|shadow|off${full ? '' : '; Details lists them'})`, { bold: true }))
+    if (full) for (const x of seen.slice(-8)) lines.push(line(`  ${clock(x.at)}  ${x.agent}: ${x.from} -> ${x.to}  [${x.family}] ${x.decision}  ${x.description}`, { dim: x.decision !== 'auto' && x.decision !== 'routed' }))
   }
   return lines
 }
@@ -828,6 +839,14 @@ const runLine = (lv: Live, id: string | null): string => {
 let familiesNow: StatusJson['families'] = []
 /** What the agent's tokens would have cost on the model and effort the call asked for, at catalog prices: the same tokens
  * re-priced (effort moves the output part by the cell8 ratio). An estimate, since the as-asked run never happened. */
+const PREFIX_HOT = 0.6   // a spawn that paid this share of its cost for the prefix bought little work (tools/status.py PREFIX_SHARE_HOT)
+/** The share of an ended agent's cost that was its fixed prefix: re-read on each request from the cache the session already wrote,
+ * at its model's cache-read rate, never more than its own cache-read tokens (the same estimate as tools/status.py prefix_cost_share). */
+const prefixShareOf = (a: RunningAgent): number | null => {
+  if (a.cost === null || a.cost <= 0 || a.steps < 1) return null
+  const read = Math.min(PREFIX_TOKENS * a.steps, a.usage?.cache_read_input_tokens ?? PREFIX_TOKENS * a.steps)
+  return Math.min(1, (read * priceOf(a.model).read) / 1e6 / a.cost)
+}
 const costAsAsked = (a: RunningAgent): number | null => {
   if (!a.usage || !a.askedModel) return null
   const base = turnCost({ ...a.usage, model: a.askedModel })
@@ -850,7 +869,7 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
     out.push(line('  no Agent call in this run yet: each one shows here as asked → ran on, with the decision and its evidence', { dim: true }))
     return out
   }
-  let actual = 0, asked = 0, estimable = true, moved = 0
+  let actual = 0, asked = 0, estimable = true, moved = 0, prefixHeavy = 0
   // Each agent's line with its weight: an escalation first, then the routed calls by what the routing moved, then the rest.
   const rows: { l: Line; cls: number; delta: number; n: number }[] = []
   for (const a of all) {
@@ -858,6 +877,7 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
     const routed = a.decision === 'auto' || a.decision === 'routed'
     const fam = familiesNow.find(f => f.name === a.family)
     const why0 = a.decision === 'floor' ? 'risk floor: auth, payments, a migration or destructive words in the ask; runs as asked'
+      : a.decision === 'shadow' ? `shadow mode: would have gone to ${fam ? `${fam.model} ${fam.effort}` : 'the measured model'}; ran as asked`
       : a.decision === 'escalated' ? (lvAll.escalated[a.family ?? ''] ?? 'a routed call failed or was re-issued') + (a.asked !== `${shortModel(a.model)} ${a.effort}`.trim() && fam?.step_up && shortModel(a.model) === fam.step_up.model ? ': on the measured step up for half an hour' : ': runs as asked for half an hour')
       : routed ? (fam ? `measured ${fam.rate}, $${(fam.cost_per_success ?? 0).toFixed(4)}/success` : 'measured')
       : a.decision === 'kept' ? 'kept as asked'
@@ -866,7 +886,9 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
       : !fam ? 'family not decided yet: runs as asked'
       : fam.last_check?.verdict === 'REGRESSED' ? 'family regressed on this Claude Code version: runs as asked until a check passes'
       : shortModel(a.model) === fam.model ? 'already on the routed model' : 'no Agent call seen for it: not routed'
-    const why = a.unverified ? `${why0} · ${a.unverified}` : why0
+    const ps = prefixShareOf(a)
+    if (ps !== null && ps >= PREFIX_HOT) prefixHeavy++
+    const why = (a.unverified ? `${why0} · ${a.unverified}` : why0) + (ps !== null && ps >= PREFIX_HOT ? ` · prefix ${Math.round(ps * 100)}% of its cost` : '')
     const arrow = routed ? `${a.asked} → ${ran}` : a.asked === 'inherit' ? `inherit (${ran})` : a.asked
     const est = a.cost !== null ? (routed ? costAsAsked(a) : a.cost) : null
     rows.push({ l: line(`  ${String(a.n).padStart(2, '0')} ${`${a.type}${a.run > 1 ? ` · ${a.run} runs` : ''}`.padEnd(26).slice(0, 26)} ${arrow.padEnd(28)} ${(a.family ?? 'unmeasured').padEnd(19)} ${(a.decision ?? 'kept').padEnd(10)} ${why}`, { color: routed ? 'cyan' : a.decision === 'escalated' ? 'yellow' : undefined, dim: !routed && a.decision !== 'escalated' }),
@@ -891,6 +913,7 @@ const routingLines = (lvAll: Live, runId: string | null, now: number, full = tru
     const sofar = ended < all.length ? ` so far (${ended} of ${all.length} agents ended)` : ''
     out.push(line(`  run on the decisions: ${money(actual)}${sofar} · as asked, est: ${estimable ? money(asked) : 'unknown'} (the same tokens at catalog prices; the as-asked run never happened)`, { dim: true }))
   }
+  if (prefixHeavy > 0) out.push(line(`  ${prefixHeavy} of ${ended} agents paid mostly for the ${kilo(PREFIX_TOKENS)} prefix (est, from their own tokens at catalog prices): the smallest asks are cheaper inline, in the main session`, { dim: true }))
   return out
 }
 /** The run as a markdown report: what was asked, the agents with what they ran on and what they cost, their answers, the events. */
@@ -1493,7 +1516,7 @@ export const register: Register = (on, options) => {
   pythonOption = String(options.python || '')
   refreshMinutes = Number(options.refreshMinutes ?? 30)
   const mode = String(options.routing ?? 'ask')
-  routingMode = mode === 'auto' || mode === 'off' ? mode : 'ask'
+  routingMode = mode === 'auto' || mode === 'off' || mode === 'shadow' ? mode : 'ask'
   const sm = String(options.statusLine ?? 'full')
   const me = String(options.mainEffort ?? 'advise')
   mainEffortMode = me === 'off' || me === 'auto' ? me : 'advise'
@@ -1503,6 +1526,9 @@ export const register: Register = (on, options) => {
   contextWarn = Math.max(20000, Number(options.contextWarn ?? 100000) || 100000)
   pressure = Math.max(0, Math.min(100, Number(options.pressure ?? 80)))
   if (Number.isNaN(pressure)) pressure = 80
+  pressureHard = Math.max(0, Math.min(100, Number(options.pressureHard ?? 95)))
+  if (Number.isNaN(pressureHard)) pressureHard = 95
+  hardToasted = false
   vocab.clear(); ticketsSeen.clear(); vocabSeeded = false; lastSwitchTurn = -100; driftOff = false
   repo = repoOption
   python = ''
@@ -1515,7 +1541,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'router',
       description: 'Model router: the session live, where the routing stands, first-run setup, installation check, re-check it, ledger, apply, prune, pinned agent sources, pull, upgrade the install',
-      argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import [--days N] [--rebuild]|show <id>] | setup | doctor | check | fetch | update | upgrade | ledger | apply | pull | prune [skills|all] [move|revert] | agents pin <url>|check|update [file]|list | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class> | dismiss <n|id> | undismiss <id>',
+      argumentHint: 'open | monitor [save [id]] | task start <name>|end | runs [import [--days N] [--rebuild]|show <id>] | setup | doctor | check | fetch | recheck | replay [candidate.json] | upgrade | ledger | apply | pull | prune [skills|all] [move|revert] | agents pin <url>|check|update [file]|list | routing ask|auto|shadow|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | prefer clear <class> | dismiss <n|id> | undismiss <id>',
     })
     void refresh($)
     ensureTick($)
@@ -1750,13 +1776,13 @@ export const register: Register = (on, options) => {
       return { text: `main-session effort ${mainEffortMode} for this session${arg ? '' : ' (effort advise|auto|off sets it)'}: a prompt that reads as a measured family runs at its measured effort (auto), or the pane says what it would have done (advise); /config makes it permanent.` }
     }
     if (verb === 'routing') {
-      if (arg === 'ask' || arg === 'auto' || arg === 'off') {
+      if (arg === 'ask' || arg === 'auto' || arg === 'off' || arg === 'shadow') {
         const was = routingMode
         routingMode = arg
         await update($, live, v => ({ ...v, escalated: {}, escalatedAt: {}, escalatedRung: {} }))   // a fresh start for the families escalated this session
         if (arg === 'auto' && was !== 'auto') void recordChange($, 'routing', 'auto for this session', measuredProjected((await read($, status))?.json))
       }
-      return { text: `routing ${routingMode} for this session${arg ? '; escalated families cleared' : ' (routing ask|auto|off sets it)'}; /config makes it permanent.` }
+      return { text: `routing ${routingMode} for this session${arg ? '; escalated families cleared' : ' (routing ask|auto|shadow|off sets it)'}; /config makes it permanent.` }
     }
     // First run on a machine: install the routed agents, then say what the pane's yellow lines mean and what comes next.
     if (verb === 'setup') {
@@ -1793,13 +1819,18 @@ export const register: Register = (on, options) => {
       const hint = name.endsWith('-move') ? `; /router ${verbWords} revert undoes it` : name.endsWith('-revert') ? '' : `; /router ${verbWords} move does it, /router ${verbWords} revert undoes it`
       return { text: started ? `${JOBS[name]!.title} started; the pane shows its output${hint}` : 'a job is still running; try again when it ends' }
     }
+    if (verb === 'replay') {
+      await showPane($, PANE, 'Model router')
+      const started = await runJob($, 'replay', tail ? [tail] : [])
+      return { text: started ? `replay started; the pane prices the last 30 days under ${tail || 'the current routing.json (/router replay <candidate.json> prices another)'}.` : 'Not started.' }
+    }
     const spec = JOBS[verb]
     if (spec) {
       await showPane($, PANE, 'Model router')
       const started = await runJob($, verb)
-      return { text: started ? `${spec.title} started; the pane shows its output.` : 'Not started.' }
+      return { text: started ? `${spec.title} started; the pane shows its output.${verb === 'update' ? ' (update is now recheck; both work, upgrade updates the install.)' : ''}` : 'Not started.' }
     }
-    return { text: 'Usage: /router [open | monitor [save [id]] | task start <name>|end | runs [import [--days N] | show <id>] | setup | doctor | check | fetch | update | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file] [--accept-flags]|list | pull | routing ask|auto|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>]' }
+    return { text: 'Usage: /router [open | monitor [save [id]] | task start <name>|end | runs [import [--days N] | show <id>] | setup | doctor | check | fetch | recheck | replay [candidate.json] | upgrade | ledger | apply | prune [move|revert] | agents pin <url>|check|update [file] [--accept-flags]|list | pull | routing ask|auto|shadow|off | effort advise|auto|off | mark <note> | prefer <class> <model> <effort> | dismiss <n|id>]' }
   })
 
   // A subagent starts: one row in the agents block, under its parent when it has one.
@@ -1947,6 +1978,35 @@ export const register: Register = (on, options) => {
     const s = await read($, status)
     const agent = e.subagent_type ?? 'general-purpose'
     const fam = matchFamily(agent, e.prompt)?.family ?? null
+    if (mode === 'shadow') {
+      // Shadow mode: what auto would have done, logged and shown, nothing moved: the routing's effect on this machine before it is applied.
+      const c = s?.json ? decideCall(s.json, agent, e.prompt, e.model, e.effort, await $.session.model().catch(() => '')) : null
+      if (c && !c.floor) {
+        const at0 = await $.clock.now(), run0 = currentRunId(await read($, live))
+        await update($, routed, r => [...r, { at: at0, agent, family: c.family, from: c.asked, to: `${c.model} ${c.effort}`, decision: 'shadow' as const, description: e.description, callId: e.tool_use_id, runId: run0 }].slice(-50))
+        await logRouted($, c.family, agent, c.asked, `${c.model} ${c.effort}`, 'shadow')
+      }
+      return next(e)
+    }
+    if (!fam && pressureHard > 0 && worstNow >= pressureHard && (!e.model || !(TIER[e.model] === 0))) {
+      // The hard line: a window nearly out, and a call no measured family covers would run on the session model. Ask (ask mode),
+      // or say so once (auto); nothing unmeasured is ever moved down, and a skipped call tells the main model to go on without it.
+      const at0 = await $.clock.now(), run0 = currentRunId(await read($, live))
+      const askedH = e.model ? `${e.model} ${e.effort ?? '(default effort)'}` : 'inherit'
+      let skip = false
+      if (routingMode === 'ask') {
+        const runIt = 'Run it as asked', skipIt = 'Skip it: answer with what you have'
+        try {
+          skip = (await $.ui.ask(`A rate-limit window is at ${Math.round(worstNow)}%. This Agent call (${e.description}) has no measured family and would run on the session model.`, { options: [runIt, skipIt], header: 'Window' })) === skipIt
+        } catch { skip = false }
+      } else if (!hardToasted) {
+        hardToasted = true
+        $.ui.toast(`router: a window is at ${Math.round(worstNow)}%: unmeasured Agent calls still run on the session model (/router routing ask asks before each)`)
+      }
+      await update($, routed, r => [...r, { at: at0, agent, family: 'unmeasured', from: askedH, to: skip ? 'skipped' : 'as asked', decision: (skip ? 'skipped' : 'kept') as Routed['decision'], description: e.description, callId: e.tool_use_id, runId: run0 }].slice(-50))
+      if (skip) return { deny: `the router skipped this Agent call: a rate-limit window is at ${Math.round(worstNow)}% and no measured family covers it. Answer with what you have, or say what you would have delegated.` } as unknown as Awaited<ReturnType<typeof next>>
+      return next(e)
+    }
     if (fam) {
       const lv = await read($, live)
       const now = await $.clock.now()
@@ -2336,7 +2396,7 @@ export const register: Register = (on, options) => {
         {sections}
         {jobFrame}
         <Box flexDirection="row" gap={1} flexWrap="wrap">
-          <Button key="update" hotkey="u" variant="primary" dimColor={busy} onPress={() => { void runJob($, 'update') }}>Re-check routing</Button>
+          <Button key="recheck" hotkey="u" variant="primary" dimColor={busy} onPress={() => { void runJob($, 'recheck') }}>Re-check routing</Button>
           <Button key="details" hotkey="d" onPress={() => { void update($, details, v => !v) }}>{full ? 'Less' : 'Details'}</Button>
           <Button key="monitor" hotkey="g" onPress={() => { void showPane($, MONITOR, 'Agent run') }}>Monitor</Button>
           <Button key="ledger" hotkey="l" dimColor={busy} onPress={() => { void runJob($, 'ledger') }}>Ledger now</Button>

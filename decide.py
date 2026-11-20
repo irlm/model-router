@@ -120,7 +120,9 @@ def decide_family(cands, margin, min_trials, rule='lower'):
     above = sorted((k for k, v in ok.items() if score(v, rule) >= bar),
                    key=lambda k: (ok[k]['cost_per_success'], ok[k]['wall_mean'] if ok[k]['wall_mean'] is not None else math.inf))   # no wall time is not the fastest
     best = above[0]
-    # step-up: the cheapest candidate above the bar that is more reliable than the default
+    # step-up: the cheapest candidate above the bar that is more reliable than the default. (The widget's escalation rung, where a
+    # struggling family goes before "as asked", is the cheapest other model above the bar, equal rate allowed: tools/status.py
+    # escalation_rung reads it from the evidence, so a decided family needs no second decision here.)
     better = [k for k in above[1:] if ok[k]['rate'] > ok[best]['rate']]
     return bar, best, (better[0] if better else None)
 

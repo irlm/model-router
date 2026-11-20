@@ -50,6 +50,11 @@ USAGE_DAYS = 30            # the consumption window the suggestions are computed
 # run on (a 5.2 row dropped out of the suggestions when the key was the 5.1 id); the stale-model advice says when that is a guess.
 EFFORT_RATIO = {'xhigh': {'opus': 1.30, 'fable': 1.52}, 'high': {'opus': 1.06, 'fable': 1.16}}
 TIER_COMPARE_MSGS = 50        # messages on the other tier in the window before the pane compares your own Opus and Fable rows
+PREFIX_TOKENS = 23000         # what every request carries on this machine after the pruning (results/prefix): the floor of a spawn's cost
+PREFIX_SHARE_HOT = 0.6        # a call whose cost was mostly its prefix bought little work for its spawn
+PREFIX_MIN_CALLS = 3          # such calls of one class before the line is worth drawing
+RUNG_MARGIN = 0.02            # a rung's rate may sit this far under the default's (the decision margin)
+RUNG_MIN_N = 20               # trials behind a rung before a struggling family is sent to it
 UNMEASURED_MODEL_FLOOR = 1.0  # dollars in the window on a model no family has receipts for before the advice names it
 # Opus 5.5 cost per success divided by Fable 5.1's on the families where both were run at the same effort:
 # repo_fix 0.178/0.481 = 0.37, web_research 0.12/0.30 = 0.40 (results/cell8), same results on both.
@@ -315,6 +320,50 @@ def unmeasured_models(usage, routing):
             if m not in known and m != '?' and not m.startswith('<') and not m.endswith('(no price)')]
 
 
+def prefix_cost_share(call):
+    """The share of a call's cost that was its fixed prefix: PREFIX_TOKENS re-read on each request from the cache the session
+    already wrote (a spawn shares it: nothing is written again), at the model's cache-read rate, and never more than the call's
+    own cache-read tokens; None when the call has no price or no requests. Cents on any model: a call whose whole cost is that
+    bought nothing but its arrival."""
+    msgs, cost, tok = call.get('msgs') or 0, call.get('cost'), call.get('tok') or {}
+    entry = price.model_entry(call.get('model')) if call.get('model') else None
+    r = price.rates(entry) if entry else None
+    if not msgs or not cost or r is None:
+        return None
+    read = min(PREFIX_TOKENS * msgs, tok.get('cache_read_input_tokens', PREFIX_TOKENS * msgs) or 0)
+    return min(1.0, read * r['cache_read'] / cost)
+
+
+def escalation_rung(rf):
+    """Where a family's escalation goes before "as asked": routing.json's step_up when it has one, else the cheapest other Claude
+    model whose evidence cell (same variant) clears the decided bar: a different model is the point of a rung, not a higher rate.
+    None when nothing else clears the bar."""
+    su = rf.get('step_up') or {}
+    if su.get('model') and su.get('effort'):
+        return {'model': su['model'], 'effort': su['effort'], 'rate': (rf.get('evidence') or {}).get(f"{su['model']} {su['effort']}"), 'cost_per_success': su.get('cost_per_success'), 'why': 'step_up in routing.json'}
+    d = rf.get('default') or {}
+    variant, dev = evidence_of(rf)
+    dn = dev.get('n', 0) - dev.get('not_model', 0) if dev else 0
+    if not d.get('model') or not dn:
+        return None
+    # The default's own rate, less the decision margin: a rung is for the task the default just failed, so a candidate at the same
+    # measured rate on another model is what is wanted; the Wilson bar would refuse a 26/26 cell against a 76/78 one for its n alone.
+    floor = dev.get('success', 0) / dn - RUNG_MARGIN
+    best = None
+    for key, ev in ((rf.get('decided') or {}).get('evidence') or {}).items():
+        mid, _, rest = key.partition(' ')
+        eff, _, var = rest.partition('+')
+        if not mid.startswith('claude-') or decide.ALIAS.get(mid, mid) == d['model'] or var != variant or ev.get('cost_per_success') is None:
+            continue
+        n = ev.get('n', 0) - ev.get('not_model', 0)
+        if n < RUNG_MIN_N or ev.get('success', 0) / n < floor:
+            continue
+        if best is None or ev['cost_per_success'] < best['cost_per_success']:
+            best = {'model': decide.ALIAS.get(mid, mid), 'effort': eff, 'rate': f"{ev.get('success', 0)}/{n}", 'cost_per_success': ev['cost_per_success'],
+                    'why': f"the cheapest other model at the default's rate ({floor + RUNG_MARGIN:.3f}) or above, {RUNG_MIN_N}+ trials"}
+    return best
+
+
 def binom_tail(n, s, p):
     """P(X <= s) for X ~ Binomial(n, p): the one-sided tail regress.py judges a sample by."""
     return sum(math.comb(n, k) * p ** k * (1 - p) ** (n - k) for k in range(0, s + 1))
@@ -436,7 +485,28 @@ def suggest(usage, agents, routing=None):
                     'here': here,
                     'action': 'try `claude --model opus` for routine sessions, `/router mark model opus` to start the before/after count, and compare the next ledger; '
                               'keep Fable where you see the difference'})
-    # 6. the largest subagent bucket is work no family covers: the router says nothing about it, and it should at least be named
+    # 6. spawns that paid mostly for their prefix: the smallest asks are cheaper inline (the delegation break-even)
+    byc = collections.defaultdict(list)
+    for c in usage['subagents'].get('calls', []):
+        if c.get('window') == 'cur':
+            sh = prefix_cost_share(c)
+            if sh is not None:
+                byc[c.get('class') or 'other'].append((c, sh))
+    for cls, items in sorted(byc.items(), key=lambda kv: -sum(c['cost'] for c, _ in kv[1])):
+        hot = [(c, sh) for c, sh in items if sh >= PREFIX_SHARE_HOT]
+        cost = sum(c['cost'] for c, _ in hot)
+        if len(hot) < PREFIX_MIN_CALLS or cost < SUGGESTION_FLOOR:
+            continue
+        mean_sh = sum(sh for _, sh in hot) / len(hot)
+        mean_msgs = sum(c.get('msgs') or 0 for c, _ in hot) / len(hot)
+        out.append({'id': f'prefix:{cls}', 'kind': 'learned', 'stake': round(cost, 2), 'saving': [0.0, round(cost * mean_sh, 2)],
+                    'title': f"{len(hot)} of {len(items)} {CLASS_LABEL.get(cls, cls)} paid {mean_sh:.0%} of their cost for the {PREFIX_TOKENS // 1000}k prefix (${cost:.2f})",
+                    'basis': f"a spawn re-reads the prefix from the session's cache on each of its requests ({mean_msgs:.1f} here) before it does anything: cents, "
+                             f"and a call whose whole cost is that did nothing but arrive. The prefix size is results/prefix; the shares are this machine's "
+                             f"transcripts; the saving is the prefix part, an upper bound (inline, the main session re-reads its own context instead)",
+                    'action': 'the smallest asks (one grep, one lookup, one file) are cheaper inline in the main session; keep the spawns for work that reads more than it carries, '
+                              'and batch the small asks of one kind into one spawn'})
+    # 7. the largest subagent bucket is work no family covers: the router says nothing about it, and it should at least be named
     oth = bc.get('other')
     if oth and oth['n'] and oth['cost'] >= SUGGESTION_FLOOR and oth['cost'] >= max((b['cost'] for k, b in bc.items() if k != 'other'), default=0.0):
         descs = collections.Counter(c['description'] for c in usage['subagents'].get('calls', [])
@@ -831,9 +901,7 @@ def collect(fetch=False):
         bench = (decide.FAMILIES.get(fam) or {}).get('benches', [fam])[0]
         ok, why = can_run(bench)
         variant, ev = evidence_of(rf)
-        su = rf.get('step_up') or {}
-        step_up = ({'model': su['model'], 'effort': su['effort'], 'rate': (rf.get('evidence') or {}).get(f"{su['model']} {su['effort']}"), 'cost_per_success': su.get('cost_per_success')}
-                   if su.get('model') and su.get('effort') else None)
+        step_up = escalation_rung(rf)
         families.append({'name': fam, 'bench': bench, 'status': rf.get('status'), 'model': d.get('model'), 'effort': d.get('effort'), 'step_up': step_up,
                          'requires': rf.get('requires') or [], 'variant': variant, 'rate': f"{ev['success']}/{ev['n'] - ev.get('not_model', 0)}" if ev else None,
                          'ci': ev.get('ci'), 'cost_per_success': ev.get('cost_per_success'), 'can_run': ok, 'why': why})
@@ -872,11 +940,11 @@ def collect(fetch=False):
 
     advice = []
     if version and reg and reg.get('claude') and reg['claude'] != version:
-        advice.append(f"Claude Code is {version}; the last regression check ran on {reg['claude']}: /router update")
+        advice.append(f"Claude Code is {version}; the last regression check ran on {reg['claude']}: /router recheck")
     if reg and days_since(reg.get('date'), today) is not None and days_since(reg['date'], today) > ADVICE_REGRESS_DAYS:
-        advice.append(f"last regression check was {days_since(reg['date'], today)} days ago: /router update")
+        advice.append(f"last regression check was {days_since(reg['date'], today)} days ago: /router recheck")
     if not reg:
-        advice.append('no regression check yet: /router update')
+        advice.append('no regression check yet: /router recheck')
     for f in families:
         lc = f.get('last_check')
         if lc and lc['verdict'] not in ('ok',) and not lc['verdict'].startswith('skipped'):
@@ -885,7 +953,7 @@ def collect(fetch=False):
         unchecked = [f['name'] for f in families if f.get('status') == 'decided' and f['can_run'] and not f.get('last_check')]
         if unchecked:
             advice.append(f"{len(unchecked)} decided famil{'y' if len(unchecked) == 1 else 'ies'} can run here and {'has' if len(unchecked) == 1 else 'have'} no regression check "
-                          f"on this Claude Code version ({', '.join(unchecked)}): /router update")
+                          f"on this Claude Code version ({', '.join(unchecked)}): /router recheck")
     stale = [m for m in unmeasured_models(usage, routing) if m['cost'] >= UNMEASURED_MODEL_FLOOR]
     if stale:
         plans = routing.get('plan_for_unmeasured_models') or []

@@ -3,6 +3,32 @@
 The widget's version is `mod/.claude-plugin/plugin.json`; the directory publishes a new version when it
 rises. Earlier versions are the `widget x.y.z:` commits in the git log.
 
+## 0.32.0 — 2026-11-20
+
+The five gaps the 2026-11-18 pass had left open, closed:
+
+- **The step up for every family that has one measured.** `tools/status.py escalation_rung` reads it from the evidence: the
+  cheapest other Claude model at the default's rate or above (less the decision margin) with twenty trials or more, on the same
+  variant; routing.json's `step_up` first when it has one. find_feature keeps sonnet low (144/144); web_research gets sonnet low
+  (26/26, $0.062), repo_fix sonnet low +vitest (24/24), fix_bug and write_tests sonnet +kunit (42/42, 20/20). browser_flow (sonnet
+  37/42, under the rate) and research_synthesis (opus 12/12, under twenty trials) have none and go to "as asked". The Wilson bar
+  was not the rule for a rung: it refused a 26/26 cell against a 76/78 one for its n alone, and a rung is for the task the
+  default just failed, so a candidate at the same measured rate on another model is what is wanted.
+- **The prefix share and the delegation break-even.** A spawn re-reads the 23k prefix from the session's cache on each request
+  before it does anything (cents; never more than its own cache-read tokens). The Routing frame says "prefix 88% of its cost" per
+  ended agent above 60% and counts them at the foot; the
+  suggestions carry the same per class from the transcripts (`prefix:<class>`, learned, the prefix part as the upper bound of
+  what inline would have saved), with the per-agent request count now kept by the consumption scan.
+- **Shadow mode and replay.** `/router routing shadow` logs what auto would have done (`shadow` in the log, "1 would have been
+  routed (shadow)" in the pane) and moves nothing. `tools/replay.py [candidate.json]` and `/router replay [candidate.json]` price
+  the last 30 days under the current routing or a candidate file: every call of a covered class at the rates of the model the
+  routing decides for its family, per class and in total, the same-work figure the realized savings use.
+- **The hard pressure line.** From `pressureHard` (95%, /config) an Agent call that no measured family covers is asked about
+  before it runs on the session model: run it, or skip it, in which case the main model is told the router skipped it and to go
+  on with what it has (`skipped` in the log); auto mode says so once per episode. Nothing unmeasured is moved down at any pressure.
+- **The command names.** The regression check is `/router recheck` (`update` still works and says so); `upgrade` updates the
+  install; `replay` is new. The advice lines and the pane's button name `recheck`.
+
 ## 0.31.0 — 2026-11-18
 
 The gaps the 2026-11-18 review pass left open, implemented where they pay: the router moves calls up as well as down,
